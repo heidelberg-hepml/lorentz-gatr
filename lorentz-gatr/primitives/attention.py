@@ -13,8 +13,6 @@ from xformers.ops import AttentionBias, memory_efficient_attention
 
 from gatr.primitives.invariants import inner_product
 
-
-
 # Masked out attention logits are set to this constant (a finite replacement for -inf):
 _MASKED_OUT = float("-inf")
 
