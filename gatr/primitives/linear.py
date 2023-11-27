@@ -6,6 +6,7 @@ import torch
 
 from gatr.utils.einsum import cached_einsum, custom_einsum
 
+_FILENAME = "linear_basis.pt"
 
 @lru_cache()
 def _compute_pin_equi_linear_basis(
@@ -30,38 +31,17 @@ def _compute_pin_equi_linear_basis(
         Basis elements for equivariant linear maps.
     """
 
-    # We constructed these manually in a notebook, here hardcoded for convenience
-    basis_elements = [
-        [0],
-        [1, 2, 3, 4],
-        [5, 6, 7, 8, 9, 10],
-        [11, 12, 13, 14],
-        [15],
-        [(1, 0)],
-        [(5, 2), (6, 3), (7, 4)],
-        [(11, 8), (12, 9), (13, 10)],
-        [(15, 14)],
-    ]
-    basis = []
+    # To avoid duplicate loading, base everything on float32 CPU version
+    if device not in [torch.device("cpu"), "cpu"] and dtype != torch.float32:
+        basis = _compute_pin_equi_linear_basis()
+    else:
+        filename = Path(__file__).parent.resolve() / "data" / _FILENAME
+        sparse_basis = torch.load(filename).to(torch.float32)
+        # Convert to dense tensor
+        # The reason we do that is that einsum is not defined for sparse tensors
+        basis = sparse_basis.to_dense()
 
-    for elements in basis_elements:
-        w = torch.zeros((16, 16))
-        for element in elements:
-            try:
-                i, j = element
-                w[i, j] = 1.0
-            except TypeError:
-                w[element, element] = 1.0
-
-        if normalize:
-            w /= torch.linalg.norm(w)
-
-        w = w.unsqueeze(0)
-        basis.append(w)
-
-    catted_basis = torch.cat(basis, dim=0)
-
-    return catted_basis.to(device=device, dtype=dtype)
+    return basis.to(device=device, dtype=dtype)
 
 
 @lru_cache()
