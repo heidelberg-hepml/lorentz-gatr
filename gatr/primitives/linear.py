@@ -9,8 +9,8 @@ from gatr.utils.einsum import cached_einsum, custom_einsum
 _FILENAME = "linear_basis.pt"
 
 @lru_cache()
-def _compute_pin_equi_linear_basis(
-    device=torch.device("cpu"), dtype=torch.float32, normalize=True
+def _load_pin_equi_linear_basis(
+    device=torch.device("cpu"), dtype=torch.float32
 ) -> torch.Tensor:
     """Constructs basis elements for Pin(3,0,1)-equivariant linear maps between multivectors.
 
@@ -22,8 +22,6 @@ def _compute_pin_equi_linear_basis(
         Device
     dtype : torch.dtype
         Dtype
-    normalize : bool
-        Whether to normalize the basis elements
 
     Returns
     -------
@@ -33,7 +31,7 @@ def _compute_pin_equi_linear_basis(
 
     # To avoid duplicate loading, base everything on float32 CPU version
     if device not in [torch.device("cpu"), "cpu"] and dtype != torch.float32:
-        basis = _compute_pin_equi_linear_basis()
+        basis = _load_pin_equi_linear_basis()
     else:
         filename = Path(__file__).parent.resolve() / "data" / _FILENAME
         sparse_basis = torch.load(filename).to(torch.float32)
@@ -87,7 +85,7 @@ def _compute_grade_involution(device=torch.device("cpu"), dtype=torch.float32) -
     return involution_flat
 
 
-NUM_PIN_LINEAR_BASIS_ELEMENTS = len(_compute_pin_equi_linear_basis())
+NUM_PIN_LINEAR_BASIS_ELEMENTS = len(_load_pin_equi_linear_basis())
 
 
 def equi_linear(x: torch.Tensor, coeffs: torch.Tensor) -> torch.Tensor:
@@ -108,7 +106,7 @@ def equi_linear(x: torch.Tensor, coeffs: torch.Tensor) -> torch.Tensor:
     outputs : torch.Tensor with shape (..., 16)
         Result. Batch dimensions are result of broadcasting between x and coeffs.
     """
-    basis = _compute_pin_equi_linear_basis(device=x.device, dtype=x.dtype)
+    basis = _load_pin_equi_linear_basis(device=x.device, dtype=x.dtype)
     return custom_einsum("y x a, a i j, ... x j -> ... y i", coeffs, basis, x, path=[0, 1, 0, 1])
 
 
@@ -131,7 +129,7 @@ def grade_project(x: torch.Tensor) -> torch.Tensor:
     """
 
     # Select kernel on correct device
-    basis = _compute_pin_equi_linear_basis(device=x.device, dtype=x.dtype, normalize=False)
+    basis = _load_pin_equi_linear_basis(device=x.device, dtype=x.dtype, normalize=False)
 
     # First five basis elements are grade projections
     basis = basis[:5]

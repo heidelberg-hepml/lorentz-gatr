@@ -17,10 +17,6 @@ def compute_inner_product_mask(device=torch.device("cpu")) -> torch.Tensor:
     The inner product of MVs is <~x y>_0, i.e. take the grade-0 component of the geometric
     product of the reverse of x with y.
     Both the scalar component of the GP, and the reversal matrix, are diagonal.
-    Their product is 0 for basis elements involving e0, and 1 elsewhere, i.e.
-    IP = [1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 0]
-    for dim order '', 'e0', 'e1', 'e2', 'e3', 'e01', 'e02', 'e03', 'e12', 'e13', 'e23',
-                  'e012', 'e013', 'e023', 'e123', 'e0123'
 
     Parameters
     ----------
@@ -32,7 +28,7 @@ def compute_inner_product_mask(device=torch.device("cpu")) -> torch.Tensor:
     ip_mask : torch.Tensor with shape (16,)
         Inner product mask
     """
-    gp = _load_bilinear_basis("gp", device=device, dtype=torch.float32)
+    gp = _load_bilinear_basis(device=device, dtype=torch.float32)
     inner_product_mask = torch.diag(gp[0]) * _compute_reversal(device=device, dtype=torch.float32)
     return inner_product_mask.bool()
 

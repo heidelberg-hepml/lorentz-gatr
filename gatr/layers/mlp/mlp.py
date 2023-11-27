@@ -93,9 +93,6 @@ class GeoMLP(nn.Module):
         mv, s = multivectors, scalars
 
         for i, layer in enumerate(self.layers):
-            if i == 0:
-                mv, s = layer(mv, scalars=s, reference_mv=reference_mv)
-            else:
-                mv, s = layer(mv, scalars=s)
+            mv, s = layer(mv, scalars=s)
 
         return mv, s

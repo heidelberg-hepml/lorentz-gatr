@@ -1,8 +1,6 @@
 """Functions that embed 4-vectors in the geometric algebra."""
 
-
 import torch
-
 
 def embed_vector(vector: torch.Tensor) -> torch.Tensor:
     """Embeds 4-vectors in multivectors.
@@ -42,6 +40,6 @@ def extract_point(multivector: torch.Tensor) -> torch.Tensor:
         4-vector corresponding to the vector components of the multivector.
     """
 
-    vector = torch.cat(multivector[..., 1:5], dim=-1)
+    vector = multivector[..., 1:5]
 
     return vector
