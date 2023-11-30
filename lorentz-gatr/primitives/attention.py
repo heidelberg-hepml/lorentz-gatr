@@ -11,23 +11,13 @@ from torch import Tensor
 from torch.nn.functional import scaled_dot_product_attention as torch_sdpa
 from xformers.ops import AttentionBias, memory_efficient_attention
 
-from gatr.primitives.invariants import inner_product
+from gatr.primitives.invariants import _load_inner_product_factors
 
 # Masked out attention logits are set to this constant (a finite replacement for -inf):
 _MASKED_OUT = float("-inf")
 
 # Force the use of xformers attention, even when no xformers attention mask is provided:
 FORCE_XFORMERS = False
-
-@lru_cache
-def _load_inner_product_factors(device=torch.device("cpu"), dtype=torch.float32) -> torch.Tensor:
-    if device not in [torch.device("cpu"), "cpu"] and dtype != torch.float32:
-        basis = _load_bilinear_basis(kind)
-    else:
-        _INNER_PRODUCT_FACTORS = [1, 1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, -1, -1]
-        factors = torch.tensor(_INNER_PRODUCT_FACTORS)
-        
-    return basis.to(device=device, dtype=dtype)
 
 def sdp_attention(
     q_mv: Tensor,

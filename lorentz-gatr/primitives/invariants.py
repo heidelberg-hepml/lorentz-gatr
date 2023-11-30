@@ -9,6 +9,15 @@ from gatr.primitives.bilinear import _load_bilinear_basis
 from gatr.primitives.linear import _compute_reversal, grade_project
 from gatr.utils.einsum import cached_einsum
 
+@lru_cache
+def _load_inner_product_factors(device=torch.device("cpu"), dtype=torch.float32) -> torch.Tensor:
+    if device not in [torch.device("cpu"), "cpu"] and dtype != torch.float32:
+        basis = _load_bilinear_basis(kind)
+    else:
+        _INNER_PRODUCT_FACTORS = [1, 1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, -1, -1]
+        factors = torch.tensor(_INNER_PRODUCT_FACTORS)
+        
+    return basis.to(device=device, dtype=dtype)
 
 @lru_cache()
 def compute_inner_product_mask(device=torch.device("cpu")) -> torch.Tensor:

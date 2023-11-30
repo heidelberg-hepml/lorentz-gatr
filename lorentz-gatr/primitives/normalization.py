@@ -1,20 +1,48 @@
 # Copyright (c) 2023 Qualcomm Technologies, Inc.
 # All rights reserved.
 import torch
+import math
 
-from gatr.primitives.invariants import inner_product
+from gatr.primitives.invariants import _load_inner_product_factors
 
+@lru_cache()
+def ga_metric_grades(device=torch.device("cpu"), dtype=torch.float32) -> torch.Tensor:
+    """Generate tensor of the diagonal of the GA metric, combined with a grade projection.
+
+    Parameters
+    ----------
+    device
+    dtype
+
+    Returns
+    -------
+    torch.Tensor of shape [5, 16]
+    """
+    m = _load_inner_product_factors(device, dtype)
+    m_grades = torch.zeros(5, 16, device=device, dtype=dtype)
+    offset = 0
+    for k in range(4 + 1):
+        d = math.comb(4, k)
+        m_grades[k, offset : offset + d] = m[offset : offset + d]
+        offset += d
+    return m_grades
+
+def abs_squared_norm(self, x: Tensor) -> Tensor:
+    m = ga_metric_grades(device=x.device, dtype=x.dtype)
+    squared_norms = cached_einsum("... c i, ... c i, g i -> ... c g", x, x, m).abs().sum(-1, keepdim=True)
+    return squared_norms
 
 def equi_layer_norm(
     x: torch.Tensor, channel_dim: int = -2, gain: float = 1.0, epsilon: float = 0.01
 ) -> torch.Tensor:
-    """Equivariant LayerNorm for multivectors.
+    """Modified version for the EquiLayerNorm for geometric algebras with negative-norm states,
+    following Appendix E in https://arxiv.org/pdf/2311.04744.pdf
 
-    Rescales input such that `mean_channels |inputs|^2 = 1`, where the norm is the GA norm and the
-    mean goes over the channel dimensions.
-
-    Using a factor `gain > 1` makes up for the fact that the GP norm overestimates the actual
-    standard deviation of the input data.
+    Two aspects are used to stabilize the normalization
+    1) Take the absolute value of the scalar products. This avoids negative values in the square root
+    2) Replace the absolute value of the scalar product with the sum over absolute values of scalar products
+        between graded vectors, with the sum running over all possible grades. This also avoids that the
+        contributions of two states to the norm can cancel.
 
     Parameters
     ----------
@@ -36,14 +64,14 @@ def equi_layer_norm(
     """
 
     # Compute mean_channels |inputs|^2
-    squared_norms = inner_product(x, x)
-    squared_norms = torch.mean(squared_norms, dim=channel_dim, keepdim=True)
+    abs_squared_norms = abs_squared_norm
+    abs_squared_norms = torch.mean(abs_squared_norms, dim=channel_dim, keepdim=True)
 
     # Insure against low-norm tensors (which can arise even when `x.var(dim=-1)` is high b/c some
     # entries don't contribute to the inner product / GP norm!)
-    squared_norms = torch.clamp(squared_norms, epsilon)
+    abs_squared_norms = torch.clamp(abs_squared_norms, epsilon)
 
     # Rescale inputs
-    outputs = gain * x / torch.sqrt(squared_norms)
+    outputs = gain * x / torch.sqrt(abs_squared_norms)
 
     return outputs
