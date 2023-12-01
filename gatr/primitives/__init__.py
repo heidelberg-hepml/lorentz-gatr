@@ -1,9 +1,9 @@
 # Copyright (c) 2023 Qualcomm Technologies, Inc.
 # All rights reserved.
-from .attention import geometric_attention, pga_attention, sdp_attention
-from .bilinear import geometric_product, outer_product
+from .attention import sdp_attention
+from .bilinear import geometric_product
 from .dropout import grade_dropout
-from .dual import dual, equivariant_join
+from .dual import dual
 from .invariants import inner_product, norm, pin_invariants
 from .linear import (
     NUM_PIN_LINEAR_BASIS_ELEMENTS,

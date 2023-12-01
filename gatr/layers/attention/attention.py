@@ -8,7 +8,7 @@ import torch
 from torch import nn
 
 from gatr.layers.attention.config import SelfAttentionConfig
-from gatr.primitives.attention import sdp_attention, lin_square_normalizer
+from gatr.primitives.attention import sdp_attention
 
 
 class GeometricAttention(nn.Module):

@@ -8,7 +8,7 @@ import torch
 from torch import nn
 
 from gatr.layers.linear import EquiLinear
-from gatr.primitives import equivariant_join, geometric_product
+from gatr.primitives import geometric_product
 
 
 class GeometricBilinear(nn.Module):
@@ -86,6 +86,8 @@ class GeometricBilinear(nn.Module):
         output_s : None or torch.Tensor with shape (..., out_s_channels)
             Output scalars.
         """
+
+        # BUGGED HERE
 
         # GP
         left, _ = self.linear_left(multivectors, scalars=scalars)

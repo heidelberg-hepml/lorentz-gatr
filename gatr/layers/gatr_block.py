@@ -114,7 +114,7 @@ class GATrBlock(nn.Module):
 
         # Attention block: layer norm
         h_mv, h_s = self.norm(multivectors, scalars=scalars)
-
+        
         # Attention block: self attention
         h_mv, h_s = self.attention(
             h_mv,

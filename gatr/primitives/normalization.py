@@ -1,9 +1,11 @@
 # Copyright (c) 2023 Qualcomm Technologies, Inc.
 # All rights reserved.
+from functools import lru_cache
 import torch
 import math
 
 from gatr.primitives.invariants import _load_inner_product_factors
+from gatr.utils.einsum import cached_einsum
 
 @lru_cache()
 def ga_metric_grades(device=torch.device("cpu"), dtype=torch.float32) -> torch.Tensor:
@@ -27,7 +29,7 @@ def ga_metric_grades(device=torch.device("cpu"), dtype=torch.float32) -> torch.T
         offset += d
     return m_grades
 
-def abs_squared_norm(self, x: Tensor) -> Tensor:
+def abs_squared_norm(x: torch.Tensor) -> torch.Tensor:
     m = ga_metric_grades(device=x.device, dtype=x.dtype)
     squared_norms = cached_einsum("... c i, ... c i, g i -> ... c g", x, x, m).abs().sum(-1, keepdim=True)
     return squared_norms
@@ -64,7 +66,7 @@ def equi_layer_norm(
     """
 
     # Compute mean_channels |inputs|^2
-    abs_squared_norms = abs_squared_norm
+    abs_squared_norms = abs_squared_norm(x)
     abs_squared_norms = torch.mean(abs_squared_norms, dim=channel_dim, keepdim=True)
 
     # Insure against low-norm tensors (which can arise even when `x.var(dim=-1)` is high b/c some

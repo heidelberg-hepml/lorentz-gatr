@@ -26,7 +26,7 @@ def embed_vector(vector: torch.Tensor) -> torch.Tensor:
     return multivector
 
 
-def extract_point(multivector: torch.Tensor) -> torch.Tensor:
+def extract_vector(multivector: torch.Tensor) -> torch.Tensor:
     """Given a multivector, extract a 4-vector from the vector components.
 
     Parameters
