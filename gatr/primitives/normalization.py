@@ -2,37 +2,9 @@
 # All rights reserved.
 from functools import lru_cache
 import torch
-import math
 
-from gatr.primitives.invariants import _load_inner_product_factors
+from gatr.primitives.invariants import abs_squared_norm
 from gatr.utils.einsum import cached_einsum
-
-@lru_cache()
-def ga_metric_grades(device=torch.device("cpu"), dtype=torch.float32) -> torch.Tensor:
-    """Generate tensor of the diagonal of the GA metric, combined with a grade projection.
-
-    Parameters
-    ----------
-    device
-    dtype
-
-    Returns
-    -------
-    torch.Tensor of shape [5, 16]
-    """
-    m = _load_inner_product_factors(device, dtype)
-    m_grades = torch.zeros(5, 16, device=device, dtype=dtype)
-    offset = 0
-    for k in range(4 + 1):
-        d = math.comb(4, k)
-        m_grades[k, offset : offset + d] = m[offset : offset + d]
-        offset += d
-    return m_grades
-
-def abs_squared_norm(x: torch.Tensor) -> torch.Tensor:
-    m = ga_metric_grades(device=x.device, dtype=x.dtype)
-    squared_norms = cached_einsum("... c i, ... c i, g i -> ... c g", x, x, m).abs().sum(-1, keepdim=True)
-    return squared_norms
 
 def equi_layer_norm(
     x: torch.Tensor, channel_dim: int = -2, gain: float = 1.0, epsilon: float = 0.01

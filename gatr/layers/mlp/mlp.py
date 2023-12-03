@@ -34,8 +34,7 @@ class GeoMLP(nn.Module):
         self,
         config: MLPConfig,
     ) -> None:
-        super().__init__()
-        print(config)
+        super().__init__()        
 
         # Store settings
         self.config = config
@@ -47,7 +46,6 @@ class GeoMLP(nn.Module):
 
         layers: List[nn.Module] = []
 
-        # THIS IS WHERE THINGS FAIL
         if len(config.mv_channels) >= 2:
             layers.append(
                 GeometricBilinear(

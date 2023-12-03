@@ -7,12 +7,12 @@ from typing import Optional
 import clifford
 import numpy as np
 import torch
-from clifford import pga as PGA
+import clifford
 
 
 def np_to_mv(array):
     """Shorthand to transform a numpy array to a PGA multivector."""
-    return clifford.MultiVector(PGA.layout, value=array)
+    return clifford.MultiVector(cilfford.Cl(1,3)[0], value=array)
 
 
 def tensor_to_mv(tensor):
@@ -40,7 +40,7 @@ def mv_list_to_tensor(multivectors, batch_shape=None):
 
 
 def sample_pin_multivector(spin: bool = False, rng: Optional[np.random.Generator] = None):
-    """Samples from the Pin(3,0,1) group as a product of reflections."""
+    """Samples from the Pin(1,3) group as a product of reflections."""
 
     if rng is None:
         rng = np.random.default_rng()
@@ -53,7 +53,7 @@ def sample_pin_multivector(spin: bool = False, rng: Optional[np.random.Generator
 
     # If no reflections, just return unit scalar
     if i == 0:
-        return PGA.blades[""]
+        return clifford.Cl(1,3)[1][""]
 
     multivector = 1.0
     for _ in range(i):

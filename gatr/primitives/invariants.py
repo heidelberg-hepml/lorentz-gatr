@@ -4,6 +4,7 @@ from functools import lru_cache
 
 import torch
 import torch.linalg
+import math
 
 from gatr.primitives.bilinear import _load_bilinear_basis
 from gatr.primitives.linear import _compute_reversal, grade_project
@@ -16,31 +17,7 @@ def _load_inner_product_factors(device=torch.device("cpu"), dtype=torch.float32)
     else:
         _INNER_PRODUCT_FACTORS = [1, 1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, -1, -1]
         factors = torch.tensor(_INNER_PRODUCT_FACTORS)
-        
     return factors.to(device=device, dtype=dtype)
-
-@lru_cache()
-def compute_inner_product_mask(device=torch.device("cpu")) -> torch.Tensor:
-    """Constructs a bool array for the inner product calculation.
-
-    The inner product of MVs is <~x y>_0, i.e. take the grade-0 component of the geometric
-    product of the reverse of x with y.
-    Both the scalar component of the GP, and the reversal matrix, are diagonal.
-
-    Parameters
-    ----------
-    device : torch.device
-        Device
-
-    Returns
-    -------
-    ip_mask : torch.Tensor with shape (16,)
-        Inner product mask
-    """
-    gp = _load_bilinear_basis(device=device, dtype=torch.float32)
-    inner_product_mask = torch.diag(gp[0]) * _compute_reversal(device=device, dtype=torch.float32)
-    return inner_product_mask.bool()
-
 
 def inner_product(x: torch.Tensor, y: torch.Tensor, channel_sum: bool = False) -> torch.Tensor:
     """Computes the inner product of multivectors f(x,y) = <x, y> = <~x y>_0.
@@ -65,8 +42,7 @@ def inner_product(x: torch.Tensor, y: torch.Tensor, channel_sum: bool = False) -
         Result. Batch dimensions are result of broadcasting between x and y.
     """
 
-    x = x[..., compute_inner_product_mask(device=x.device)]
-    y = y[..., compute_inner_product_mask(device=x.device)]
+    x = x * _load_inner_product_factors()
 
     if channel_sum:
         outputs = cached_einsum("... c i, ... c i -> ...", x, y)
@@ -125,3 +101,30 @@ def pin_invariants(x: torch.Tensor) -> torch.Tensor:
 
     # Outputs: scalar component of input and norms of four other grades
     return torch.cat((x[..., [0]], norms[..., 1:]), dim=-1)  # (..., 5)
+
+@lru_cache()
+def ga_metric_grades(device=torch.device("cpu"), dtype=torch.float32) -> torch.Tensor:
+    """Generate tensor of the diagonal of the GA metric, combined with a grade projection.
+
+    Parameters
+    ----------
+    device
+    dtype
+
+    Returns
+    -------
+    torch.Tensor of shape [5, 16]
+    """
+    m = _load_inner_product_factors(device, dtype)
+    m_grades = torch.zeros(5, 16, device=device, dtype=dtype)
+    offset = 0
+    for k in range(4 + 1):
+        d = math.comb(4, k)
+        m_grades[k, offset : offset + d] = m[offset : offset + d]
+        offset += d
+    return m_grades
+
+def abs_squared_norm(x: torch.Tensor) -> torch.Tensor:
+    m = ga_metric_grades(device=x.device, dtype=x.dtype)
+    squared_norms = cached_einsum("... c i, ... c i, g i -> ... c g", x, x, m).abs().sum(-1, keepdim=True)
+    return squared_norms

@@ -87,8 +87,6 @@ class GeometricBilinear(nn.Module):
             Output scalars.
         """
 
-        # BUGGED HERE
-
         # GP
         left, _ = self.linear_left(multivectors, scalars=scalars)
         right, _ = self.linear_right(multivectors, scalars=scalars)
@@ -97,4 +95,4 @@ class GeometricBilinear(nn.Module):
         # Output linear
         outputs_mv, outputs_s = self.linear_out(gp_outputs, scalars=scalars)
         
-        return gp_outputs, scalars
+        return gp_outputs, outputs_s
