@@ -5,30 +5,21 @@ import os
 import warnings
 warnings.filterwarnings("ignore")
 
-from gatr.utils.misc import load_config
-from experiments.mass_regression.mass_regression import MassRegressionExperiment
+from experiments.misc import load_config
+from experiments.amplitudes.experiment import AmplitudeExperiment
 
 def define_flags():
     flags.DEFINE_string('warm_start_path', None, "Path to the pre-trained model folder")
     flags.DEFINE_string('overwrite_config_path', None, "Path to another config file to overwrite some config")
     
     flags.DEFINE_boolean('train', None, "Overwrite train parameter in config")
-    flags.DEFINE_boolean('compute_logL', None, "Overwrite compute_logL parameter in config")
-    flags.DEFINE_boolean('sample', None, "Overwrite sample parameter in config")
-    flags.DEFINE_boolean("reweight", None, "Overwrite reweight in config")
-    flags.DEFINE_boolean('load_samples', None, "Overwrite load_samples parameter in config")
     flags.DEFINE_boolean('plot', None, "Overwrite plot parameter in config")
     
-    flags.DEFINE_integer('n_samples', None, "Overwrite n_samples in config")
     flags.DEFINE_integer('n_epochs', None, "Overwrite n_epochs in config")
-    flags.DEFINE_integer('iterations', None, "Overwrite iterations in config")
     
-    flags.DEFINE_boolean('save_samples', None, "Overwrite save_samples parameter in config")
+    flags.DEFINE_boolean('save_predictions', None, "Overwrite save_predictions parameter in config")
     flags.DEFINE_boolean("redirect_console", None, "Overwrite redirect_console in config")
     
-    flags.DEFINE_list("channels", None, "Overwrite channels in config")
-    flags.DEFINE_boolean("use_df", None, "Overwrite use_df in config")
-
 def main(argv):
     if FLAGS.warm_start_path is None:
         config = load_config(sys.argv[1])
@@ -47,38 +38,21 @@ def main(argv):
 
     if FLAGS.train is not None:
         config["train"] = FLAGS.train
-    if FLAGS.compute_logL is not None:
-        config["compute_logL"] = FLAGS.compute_logL
-    if FLAGS.sample is not None:
-        config["sample"] = FLAGS.sample
-    if FLAGS.reweight is not None:
-        config["reweight"] = FLAGS.reweight
-    if FLAGS.load_samples is not None:
-        config["load_samples"] = FLAGS.load_samples
     if FLAGS.plot is not None:
         config["plot"] = FLAGS.plot
         
-    if FLAGS.n_samples is not None:
-        config["n_samples"] = FLAGS.n_samples
     if FLAGS.n_epochs is not None:
         config["n_epochs"] = FLAGS.n_epochs
-    if FLAGS.iterations is not None:
-        config["iterations"] = FLAGS.iterations
 
     if FLAGS.redirect_console is not None:
         config["redirect_console"] = FLAGS.redirect_console
-    if FLAGS.save_samples is not None:
-        config['save_samples'] = FLAGS.save_samples
-
-    if FLAGS.channels is not None:
-        config["channels"] = [int(i) for i in FLAGS.channels]
-    if FLAGS.use_df is not None:
-        config["use_df"] = FLAGS.use_df
+    if FLAGS.save_predictions is not None:
+        config['save_predictions'] = FLAGS.save_predictions
 
     # Instantiate the experiment class
     experiment_type = config.get("experiment_type", None)
-    if experiment_type == "massregression":
-        experiment = MassRegressionExperiment(config)
+    if experiment_type == "amplitudes":
+        experiment = AmplitudeExperiment(config)
     else:
         raise ValueError(f"main: experiment_type {experiment_type} not implemented.")
 
