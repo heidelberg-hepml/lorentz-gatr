@@ -5,7 +5,6 @@ from functools import lru_cache
 import torch
 import torch.linalg
 
-from gatr.primitives.bilinear import _load_bilinear_basis
 from gatr.primitives.linear import _compute_reversal, grade_project
 from gatr.utils.einsum import cached_einsum
 

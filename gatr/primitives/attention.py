@@ -11,7 +11,6 @@ from torch import Tensor
 from torch.nn.functional import scaled_dot_product_attention as torch_sdpa
 from xformers.ops import AttentionBias, memory_efficient_attention
 
-from gatr.primitives.dual import join_norm
 from gatr.primitives.invariants import inner_product
 from gatr.utils.einsum import cached_einsum
 from gatr.utils.tensors import expand_pairwise, to_nd

@@ -8,7 +8,7 @@ import torch
 from torch import nn
 
 from gatr.layers.linear import EquiLinear
-from gatr.primitives import equivariant_join, geometric_product
+from gatr.primitives import geometric_product
 
 
 class GeometricBilinear(nn.Module):
