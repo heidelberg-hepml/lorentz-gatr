@@ -5,7 +5,7 @@
 import pytest
 import torch
 
-from gatr.primitives import inner_product, squared_norm, pin_invariants
+from gatr.primitives import inner_product, squared_norm, abs_squared_norm, pin_invariants
 from tests.helpers import BATCH_DIMS, TOLERANCES, check_pin_invariance
 
 
@@ -58,8 +58,13 @@ def test_inner_product_invariance(batch_dims):
 
 @pytest.mark.parametrize("batch_dims", BATCH_DIMS)
 def test_squared_norm_invariance(batch_dims):
-    """Tests the norm() primitive for equivariance."""
+    """Tests the squared_norm() primitive for equivariance."""
     check_pin_invariance(squared_norm, 1, batch_dims=batch_dims, **TOLERANCES)
+
+@pytest.mark.parametrize("batch_dims", BATCH_DIMS)
+def test_abs_squared_norm_invariance(batch_dims):
+    """Tests the abs_squared_norm() primitive for equivariance."""
+    check_pin_invariance(abs_squared_norm, 1, batch_dims=batch_dims, **TOLERANCES)
 
 
 @pytest.mark.parametrize("batch_dims", BATCH_DIMS)

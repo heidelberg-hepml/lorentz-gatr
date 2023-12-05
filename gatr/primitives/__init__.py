@@ -3,7 +3,12 @@
 from .attention import geometric_attention, pga_attention, sdp_attention
 from .bilinear import geometric_product
 from .dropout import grade_dropout
-from .invariants import inner_product, squared_norm, pin_invariants
+from .invariants import (
+    inner_product,
+    squared_norm,
+    abs_squared_norm,
+    pin_invariants,
+)
 from .linear import (
     NUM_PIN_LINEAR_BASIS_ELEMENTS,
     equi_linear,

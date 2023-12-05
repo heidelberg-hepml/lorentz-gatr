@@ -2,7 +2,7 @@
 # All rights reserved.
 import torch
 
-from gatr.primitives.invariants import inner_product
+from gatr.primitives.invariants import abs_squared_norm
 
 
 def equi_layer_norm(
@@ -36,14 +36,14 @@ def equi_layer_norm(
     """
 
     # Compute mean_channels |inputs|^2
-    squared_norms = inner_product(x, x)
-    squared_norms = torch.mean(squared_norms, dim=channel_dim, keepdim=True)
+    abs_squared_norms = abs_squared_norm(x)
+    abs_squared_norms = torch.mean(abs_squared_norms, dim=channel_dim, keepdim=True)
 
     # Insure against low-norm tensors (which can arise even when `x.var(dim=-1)` is high b/c some
     # entries don't contribute to the inner product / GP norm!)
-    squared_norms = torch.clamp(squared_norms, epsilon)
+    abs_squared_norms = torch.clamp(abs_squared_norms, epsilon)
 
     # Rescale inputs
-    outputs = gain * x / torch.sqrt(squared_norms)
+    outputs = gain * x / torch.sqrt(abs_squared_norms)
 
     return outputs
