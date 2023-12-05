@@ -137,9 +137,6 @@ class AxialGATr(nn.Module):  # pylint: disable=duplicate-code
             Output scalars, if scalars are provided. Otherwise None.
         """
 
-        # Reference multivector
-        reference_mv = self._construct_dual_reference(multivectors)
-
         # Pass through the blocks
         h_mv, h_s = self.linear_in(multivectors, scalars=scalars)
 
@@ -163,14 +160,12 @@ class AxialGATr(nn.Module):  # pylint: disable=duplicate-code
                     h_mv,
                     use_reentrant=False,
                     scalars=h_s,
-                    reference_mv=reference_mv,
                     attention_mask=this_attention_mask,
                 )
             else:
                 h_mv, h_s = block(
                     h_mv,
                     scalars=h_s,
-                    reference_mv=reference_mv,
                     attention_mask=this_attention_mask,
                 )
 
@@ -181,16 +176,6 @@ class AxialGATr(nn.Module):  # pylint: disable=duplicate-code
         outputs_mv, outputs_s = self.linear_out(h_mv, scalars=h_s)
 
         return outputs_mv, outputs_s
-
-    @staticmethod
-    def _construct_dual_reference(inputs: torch.Tensor):
-        """Constructs a reference vector for dualization from the inputs."""
-
-        # When using torch-geometric-style batching, this code should be adapted to perform the
-        # mean over the items in each batch, but not over the batch dimension.
-        # We leave this as an exercise for the practitioner :)
-        mean_dim = tuple(range(1, len(inputs.shape) - 1))
-        return torch.mean(inputs, dim=mean_dim, keepdim=True)  # (batch, 1, ..., 1, 16)
 
     def _reshape_data_before_odd_blocks(self, multivector, scalar):
         # Prepare reshuffling between axial layers

@@ -132,8 +132,7 @@ class GATr(nn.Module):
             Output scalars, if scalars are provided. Otherwise None.
         """
 
-        # Reference multivector and channels that will be re-inserted in any query / key computation
-        reference_mv = self._construct_dual_reference(multivectors)
+        # Channels that will be re-inserted in any query / key computation
         additional_qk_features_mv, additional_qk_features_s = self._construct_reinserted_channels(
             multivectors, scalars
         )
@@ -147,7 +146,6 @@ class GATr(nn.Module):
                     h_mv,
                     use_reentrant=False,
                     scalars=h_s,
-                    reference_mv=reference_mv,
                     additional_qk_features_mv=additional_qk_features_mv,
                     additional_qk_features_s=additional_qk_features_s,
                     attention_mask=attention_mask,
@@ -156,7 +154,6 @@ class GATr(nn.Module):
                 h_mv, h_s = block(
                     h_mv,
                     scalars=h_s,
-                    reference_mv=reference_mv,
                     additional_qk_features_mv=additional_qk_features_mv,
                     additional_qk_features_s=additional_qk_features_s,
                     attention_mask=attention_mask,
@@ -181,13 +178,3 @@ class GATr(nn.Module):
             additional_qk_features_s = scalars[..., self._reinsert_s_channels]
 
         return additional_qk_features_mv, additional_qk_features_s
-
-    @staticmethod
-    def _construct_dual_reference(inputs: torch.Tensor) -> torch.Tensor:
-        """Constructs a reference vector for the equivariant join from the inputs."""
-
-        # When using torch-geometric-style batching, this code should be adapted to perform the
-        # mean over the items in each batch, but not over the batch dimension.
-        # We leave this as an exercise for the practitioner :)
-        mean_dim = tuple(range(1, len(inputs.shape) - 1))
-        return torch.mean(inputs, dim=mean_dim, keepdim=True)  # (batch, 1, ..., 1, 16)

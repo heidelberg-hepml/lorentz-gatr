@@ -75,7 +75,6 @@ class GATrBlock(nn.Module):
         self,
         multivectors: torch.Tensor,
         scalars: torch.Tensor,
-        reference_mv=None,
         additional_qk_features_mv=None,
         additional_qk_features_s=None,
         attention_mask=None,
@@ -93,8 +92,6 @@ class GATrBlock(nn.Module):
             Input multivectors.
         scalars : torch.Tensor with shape (..., s_channels)
             Input scalars.
-        reference_mv : torch.Tensor with shape (..., 16) or None
-            Reference multivector for the equivariant join operation in the MLP.
         additional_qk_features_mv : None or torch.Tensor with shape
             (..., num_items, add_qk_mv_channels, 16)
             Additional Q/K features, multivector part.
@@ -132,7 +129,7 @@ class GATrBlock(nn.Module):
         h_mv, h_s = self.norm(outputs_mv, scalars=outputs_s)
 
         # MLP block: MLP
-        h_mv, h_s = self.mlp(h_mv, scalars=h_s, reference_mv=reference_mv)
+        h_mv, h_s = self.mlp(h_mv, scalars=h_s)
 
         # MLP block: skip connection
         outputs_mv = outputs_mv + h_mv
