@@ -8,5 +8,5 @@ model : mlp
 dataset : "zjj"
 data_path : /media/jspinner/shared/Studium/project3/data/
 
-n_epochs : 50
+n_epochs : 5
 data_split : .5

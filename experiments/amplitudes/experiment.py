@@ -168,16 +168,16 @@ class AmplitudeExperiment:
     def build_dataloaders(self):
         n_data = len(self.particles)
         data_split = self.params.get("data_split", 0.5)
-        cut = int(n_data * data_split)
+        self.cut = int(n_data * data_split)
 
         # BNN: add #trainingdata here
             
         self.train_loader = \
-            DataLoader(dataset=AmplitudeDataset(self.particles[:cut], self.amplitudes_prepd[:cut]),
+            DataLoader(dataset=AmplitudeDataset(self.particles[:self.cut], self.amplitudes_prepd[:self.cut]),
                            batch_size=self.batch_size,
                            shuffle=True)
         self.test_loader = \
-            DataLoader(dataset=AmplitudeDataset(self.particles[cut:], self.amplitudes_prepd[cut:]),
+            DataLoader(dataset=AmplitudeDataset(self.particles[self.cut:], self.amplitudes_prepd[self.cut:]),
                            batch_size=self.batch_size,
                            shuffle=False)
         print(f"build_dataloaders: Built dataloaders with data_split {data_split} and batch_size {self.batch_size}")
@@ -314,20 +314,20 @@ class AmplitudeExperiment:
         if params_plot.get("plot_histograms", True):
             out = f"{path}/histograms.pdf"
             with PdfPages(out) as file:
-                labels = ["Test", "Prediction"]
+                labels = ["Test", "Train", "Prediction"]
 
                 func = lambda x: np.log(x)
-                data = [func(self.amplitudes_truth), func(self.amplitudes_prediction)]
+                data = [func(self.amplitudes_truth), func(self.amplitudes[:self.cut]), func(self.amplitudes_prediction)]
                 plot_histograms(file, data, labels, title=self.dataset_title,
                            xlabel=r"$\log A$", logx=False)
 
         if params_plot.get("plot_delta", True):
             out = f"{path}/delta.pdf"
             with PdfPages(out) as file:
-                data = (np.log(self.amplitudes_truth) - np.log(self.amplitudes_prediction)) / np.log(self.amplitudes_truth)
+                data = (self.amplitudes_truth - self.amplitudes_prediction) / self.amplitudes_truth
                 plot_single_histogram(file, data, title=self.dataset_title,
                            xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$",
-                           logx=False, xrange=(-.5, .5))
+                           logx=False, xrange=(-.3, .3), bins=50)
             
 
     def finish_up(self):

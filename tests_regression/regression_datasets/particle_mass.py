@@ -2,7 +2,7 @@
 # All rights reserved.
 import torch
 
-from gatr.base_wrapper import BaseWrapper
+from experiments.base_wrapper import BaseWrapper
 from gatr.interface import embed_vector, extract_scalar
 from tests_regression.regression_datasets.constants import DATASET_SIZE, DEVICE
 

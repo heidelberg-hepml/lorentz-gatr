@@ -1,6 +1,6 @@
 # Copyright (c) 2023 Qualcomm Technologies, Inc.
 # All rights reserved.
-from gatr.utils.misc import get_device
+from experiments.misc import get_device
 
 BATCHSIZE = 64
 NUM_STEPS = 200 #2000

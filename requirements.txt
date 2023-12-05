@@ -20,9 +20,7 @@ rope
 h5py
 matplotlib
 numpy==1.23
-pandas<2.0.0
 scipy
-seaborn
 
 ## Standard utils
 celluloid

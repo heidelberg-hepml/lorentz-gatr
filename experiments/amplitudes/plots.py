@@ -10,7 +10,7 @@ FONTSIZE=14
 FONTSIZE_LEGEND=13
 FONTSIZE_TICK=12
 
-colors = ["black","#A52A2A","#0343DE", "darkorange"]
+colors = ["black","#0343DE","#A52A2A", "darkorange"]
 
 def plot_histograms(file, data, labels, bins=60, xlabel=None,
                    title=None, logx=False, logy=False, xrange=None,
@@ -64,11 +64,12 @@ def plot_histograms(file, data, labels, bins=60, xlabel=None,
 def plot_single_histogram(file, data, bins=60, xlabel=None,
                    title=None, logx=False, logy=False, xrange=None):
     hist, bins = np.histogram(data, bins=bins, range=xrange)
+    scale = 1/np.sum((bins[1:] - bins[:-1]) * hist)
     dup_last = lambda a: np.append(a, a[-1])
 
     fig, axs = plt.subplots(figsize=(6,4))
-    axs.step(bins, dup_last(hist), colors[0], where="post")
-    axs.fill_between(bins, dup_last(hist), 0.*dup_last(hist), facecolor=colors[0],
+    axs.step(bins, dup_last(hist)*scale, colors[0], where="post")
+    axs.fill_between(bins, dup_last(hist)*scale, 0.*dup_last(hist)*scale, facecolor=colors[0],
                                 alpha=.1, step="post")
 
     if logx:
@@ -78,6 +79,7 @@ def plot_single_histogram(file, data, bins=60, xlabel=None,
 
     _, ymax=axs.get_ylim()
     axs.set_ylim(0., ymax)
+    axs.set_xlim(xrange)
     axs.tick_params(axis="both", labelsize=FONTSIZE_TICK)
     axs.text(.02, .95, s=title, horizontalalignment="left", verticalalignment="top",
                 transform=axs.transAxes, fontsize=FONTSIZE)
