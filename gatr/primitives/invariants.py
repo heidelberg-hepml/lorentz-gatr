@@ -3,23 +3,15 @@
 from functools import lru_cache
 
 import torch
-import torch.linalg
 
-from gatr.primitives.linear import _compute_reversal, grade_project
+from gatr.primitives.linear import grade_project
 from gatr.utils.einsum import cached_einsum
 
 
 @lru_cache()
-def compute_inner_product_mask(device=torch.device("cpu")) -> torch.Tensor:
-    """Constructs a bool array for the inner product calculation.
-
-    The inner product of MVs is <~x y>_0, i.e. take the grade-0 component of the geometric
-    product of the reverse of x with y.
-    Both the scalar component of the GP, and the reversal matrix, are diagonal.
-    Their product is 0 for basis elements involving e0, and 1 elsewhere, i.e.
-    IP = [1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 0]
-    for dim order '', 'e0', 'e1', 'e2', 'e3', 'e01', 'e02', 'e03', 'e12', 'e13', 'e23',
-                  'e012', 'e013', 'e023', 'e123', 'e0123'
+def _load_inner_product_factors(device=torch.device("cpu")) -> torch.Tensor:
+    """Constructs an array of 1's and -1's for the metric of the space,
+    used to compute the inner product.
 
     Parameters
     ----------
@@ -28,12 +20,13 @@ def compute_inner_product_mask(device=torch.device("cpu")) -> torch.Tensor:
 
     Returns
     -------
-    ip_mask : torch.Tensor with shape (16,)
-        Inner product mask
+    ip_factors : torch.Tensor with shape (16,)
+        Inner product factors
     """
-    gp = _load_bilinear_basis("gp", device=device, dtype=torch.float32)
-    inner_product_mask = torch.diag(gp[0]) * _compute_reversal(device=device, dtype=torch.float32)
-    return inner_product_mask.bool()
+    
+    _INNER_PRODUCT_FACTORS = [1, 1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, -1, -1]
+    factors = torch.tensor(_INNER_PRODUCT_FACTORS, dtype=torch.float32, device=torch.device("cpu")).to_dense()
+    return factors
 
 
 def inner_product(x: torch.Tensor, y: torch.Tensor, channel_sum: bool = False) -> torch.Tensor:
@@ -59,8 +52,7 @@ def inner_product(x: torch.Tensor, y: torch.Tensor, channel_sum: bool = False) -
         Result. Batch dimensions are result of broadcasting between x and y.
     """
 
-    x = x[..., compute_inner_product_mask(device=x.device)]
-    y = y[..., compute_inner_product_mask(device=x.device)]
+    x = x * _load_inner_product_factors()
 
     if channel_sum:
         outputs = cached_einsum("... c i, ... c i -> ...", x, y)
@@ -73,10 +65,10 @@ def inner_product(x: torch.Tensor, y: torch.Tensor, channel_sum: bool = False) -
     return outputs
 
 
-def norm(x: torch.Tensor) -> torch.Tensor:
-    """Computes the GA norm of an input multivector.
+def squared_norm(x: torch.Tensor) -> torch.Tensor:
+    """Computes the squared GA norm of an input multivector.
 
-    Equal to sqrt(inner_product(x, x)).
+    Equal to inner_product(x, x).
 
     NOTE: this primitive is not used widely in our architectures.
 
@@ -91,7 +83,7 @@ def norm(x: torch.Tensor) -> torch.Tensor:
         Geometric algebra norm of x.
     """
 
-    return torch.sqrt(torch.clamp(inner_product(x, x), 0.0))
+    return inner_product(x, x)
 
 
 def pin_invariants(x: torch.Tensor) -> torch.Tensor:
