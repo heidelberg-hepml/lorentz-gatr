@@ -1,6 +1,6 @@
 # Copyright (c) 2023 Qualcomm Technologies, Inc.
 # All rights reserved.
-from .attention import geometric_attention, pga_attention, sdp_attention
+from .attention import sdp_attention
 from .bilinear import geometric_product
 from .dropout import grade_dropout
 from .invariants import (

@@ -3,21 +3,6 @@
 import torch
 
 
-def expand_pairwise(*tensors, exclude_dims=()):
-    """Expand tensors to largest, optionally excluding some axes."""
-    max_dim = max(t.dim() for t in tensors)
-    shapes = [(1,) * (max_dim - t.dim()) + t.shape for t in tensors]
-    max_shape = [max(s[d] for s in shapes) for d in range(max_dim)]
-    for d in exclude_dims:
-        max_shape[d] = -1
-    return tuple(t.expand(tuple(max_shape)) for t in tensors)
-
-
-def to_nd(tensor, d):
-    """Make tensor n-dimensional, group extra dimensions in first."""
-    return tensor.view(-1, *(1,) * (max(0, d - 1 - tensor.dim())), *tensor.shape[-(d - 1) :])
-
-
 def assert_equal(vals):
     """Assert all values in sequence are equal."""
     for v in vals:
