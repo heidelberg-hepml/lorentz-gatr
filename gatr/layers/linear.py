@@ -173,7 +173,7 @@ class EquiLinear(nn.Module):
         initialization: str,
         gain: float = 1.0,
         additional_factor=1.0 / np.sqrt(3.0),
-        use_mv_heuristics=True,
+        use_mv_heuristics=False,
     ) -> None:
         """Initializes the weights of the layer.
 
