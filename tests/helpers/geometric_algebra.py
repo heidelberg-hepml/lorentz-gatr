@@ -5,7 +5,6 @@
 import clifford
 import numpy as np
 import torch
-from clifford import pga as PGA
 
 from gatr.utils.clifford import mv_list_to_tensor
 
@@ -13,7 +12,7 @@ from gatr.utils.clifford import mv_list_to_tensor
 def _sample_list_of_mv(batch_dims, rng):
     """Utility function that samples a list of multivectors."""
     total_batchsize = 1 if not batch_dims else np.product(batch_dims)
-    xs = clifford.randomMV(layout=PGA.layout, n=total_batchsize, rng=rng)
+    xs = clifford.randomMV(layout=clifford.Cl(1,3)[0], n=total_batchsize, rng=rng)
     if total_batchsize == 1:  # Dealing with inconsistency of clifford.randomMV
         xs = [xs]
     return xs
