@@ -34,14 +34,11 @@ def test_geo_mlp_equivariance(batch_dims, mv_channels, s_channels, activation):
     net = GeoMLP(MLPConfig(mv_channels=mv_channels, s_channels=s_channels, activation=activation))
     data_dims = tuple(list(batch_dims) + [mv_channels[0]])
     scalars = torch.randn(*batch_dims, s_channels[0])
-    reference_mv = torch.randn(16)
 
-    # Because of the fixed reference MV, we only test Spin equivariance
     check_pin_equivariance(
         net,
         1,
         batch_dims=data_dims,
-        fn_kwargs=dict(scalars=scalars, reference_mv=reference_mv),
-        spin=True,
+        fn_kwargs=dict(scalars=scalars),
         **TOLERANCES,
     )

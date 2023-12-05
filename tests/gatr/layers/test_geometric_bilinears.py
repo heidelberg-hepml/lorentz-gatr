@@ -25,14 +25,11 @@ def test_geometric_bilinears_equivariance(
     )
     data_dims = tuple(list(batch_dims) + [in_mv_channels])
     scalars = torch.randn(*batch_dims, in_s_channels)
-    reference_mv = torch.randn(16)
 
-    # Because of the fixed reference MV, we only test Spin equivariance
     check_pin_equivariance(
         layer,
         1,
-        fn_kwargs=dict(scalars=scalars, reference_mv=reference_mv),
+        fn_kwargs=dict(scalars=scalars),
         batch_dims=data_dims,
-        spin=True,
         **TOLERANCES,
     )
