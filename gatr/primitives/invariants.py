@@ -6,7 +6,6 @@ import torch
 import torch.linalg
 import math
 
-from gatr.primitives.bilinear import _load_bilinear_basis
 from gatr.primitives.linear import _compute_reversal, grade_project
 from gatr.utils.einsum import cached_einsum
 
@@ -16,7 +15,7 @@ def _load_inner_product_factors(device=torch.device("cpu"), dtype=torch.float32)
         factors = _load_inner_product_factors(kind)
     else:
         _INNER_PRODUCT_FACTORS = [1, 1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, -1, -1]
-        factors = torch.tensor(_INNER_PRODUCT_FACTORS)
+        factors = torch.tensor(_INNER_PRODUCT_FACTORS).to_dense()
     return factors.to(device=device, dtype=dtype)
 
 def inner_product(x: torch.Tensor, y: torch.Tensor, channel_sum: bool = False) -> torch.Tensor:
@@ -55,7 +54,7 @@ def inner_product(x: torch.Tensor, y: torch.Tensor, channel_sum: bool = False) -
     return outputs
 
 
-def norm(x: torch.Tensor) -> torch.Tensor:
+def squared_norm(x: torch.Tensor) -> torch.Tensor:
     """Computes the GA norm of an input multivector.
 
     Equal to sqrt(inner_product(x, x)).
@@ -73,7 +72,7 @@ def norm(x: torch.Tensor) -> torch.Tensor:
         Geometric algebra norm of x.
     """
 
-    return torch.sqrt(torch.clamp(inner_product(x, x), 0.0))
+    return inner_product(x, x)
 
 
 def pin_invariants(x: torch.Tensor) -> torch.Tensor:

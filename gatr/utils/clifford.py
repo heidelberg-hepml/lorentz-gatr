@@ -11,8 +11,8 @@ import clifford
 
 
 def np_to_mv(array):
-    """Shorthand to transform a numpy array to a PGA multivector."""
-    return clifford.MultiVector(cilfford.Cl(1,3)[0], value=array)
+    """Shorthand to transform a numpy array to a Pin(1,3) multivector."""
+    return clifford.MultiVector(clifford.Cl(1,3)[0], value=array)
 
 
 def tensor_to_mv(tensor):
@@ -61,7 +61,7 @@ def sample_pin_multivector(spin: bool = False, rng: Optional[np.random.Generator
         vector = np.zeros(16)
         vector[1:5] = rng.normal(size=4)
         vector_mv = np_to_mv(vector)
-        vector_mv = vector_mv / vector_mv.mag2() ** 0.5
+        vector_mv = vector_mv / abs(vector_mv.mag2()) ** 0.5
 
         # Multiply together (geometric product)
         multivector = multivector * vector_mv
@@ -110,7 +110,6 @@ class SlowRandomPinTransform:
     def __init__(self, spin=False, rng=None):
         super().__init__()
         self._u = sample_pin_multivector(spin, rng)
-        self._u_inverse = self._u.shirokov_inverse()
 
     def __call__(self, inputs: torch.Tensor) -> torch.Tensor:
         """Apply Pin transformation to multivector inputs."""

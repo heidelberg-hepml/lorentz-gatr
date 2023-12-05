@@ -117,7 +117,7 @@ class EquiLinear(nn.Module):
             self.s2s = None
 
         # Initialization
-        self.reset_parameters(initialization)
+        self.reset_parameters(initialization, use_mv_heuristics=False)
 
     def forward(
         self, multivectors: torch.Tensor, scalars: Optional[torch.Tensor] = None

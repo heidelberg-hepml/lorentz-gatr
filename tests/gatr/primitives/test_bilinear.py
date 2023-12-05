@@ -9,7 +9,6 @@ from tests.helpers import (
     BATCH_DIMS,
     TOLERANCES,
     check_consistence_with_geometric_product,
-    check_consistence_with_outer_product,
     check_pin_equivariance,
 )
 

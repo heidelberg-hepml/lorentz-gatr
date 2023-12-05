@@ -4,16 +4,16 @@ from functools import lru_cache
 from pathlib import Path
 
 import torch
+import clifford
+import numpy as np
 
 from gatr.utils.einsum import cached_einsum, custom_einsum
 
-_FILENAME = "linear_basis.pt"
-
 @lru_cache()
 def _load_pin_equi_linear_basis(
-    device=torch.device("cpu"), dtype=torch.float32
+    device=torch.device("cpu"), dtype=torch.float32, normalize=True
 ) -> torch.Tensor:
-    """Constructs basis elements for Pin(3,0,1)-equivariant linear maps between multivectors.
+    """Constructs basis elements for Pin(1,3)-equivariant linear maps between multivectors.
 
     This function is cached.
 
@@ -23,26 +23,34 @@ def _load_pin_equi_linear_basis(
         Device
     dtype : torch.dtype
         Dtype
+    normalize : bool
+        Whether to normalize the basis elements
 
     Returns
     -------
-    basis : torch.Tensor with shape (7, 16, 16)
+    basis : torch.Tensor with shape (10, 16, 16)
         Basis elements for equivariant linear maps.
     """
-
-    # To avoid duplicate loading, base everything on float32 CPU version
+    
     if device not in [torch.device("cpu"), "cpu"] and dtype != torch.float32:
-        basis = _load_pin_equi_linear_basis()
+        basis = _load_pin_equi_linear_basis(normalize=normalize)
     else:
-        filename = Path(__file__).parent.resolve() / "data" / _FILENAME
-        sparse_basis = torch.load(filename).to(torch.float32)
-        # Convert to dense tensor
-        # The reason we do that is that einsum is not defined for sparse tensors
-        basis = sparse_basis.to_dense()
+        layout, blades = clifford.Cl(1, 3)
+        linear_basis = []
+        for mult in [1, layout.pseudoScalar]:
+            for grade in range(5):
+                w = np.stack([(x(grade)*mult).value for x in blades.values()], 1)
+                w = w.astype(np.float32)
+                if normalize:
+                    #w /= np.linalg.norm(w)
+                    w /= np.linalg.svd(w)[1].max()
+                linear_basis.append(w)
+        linear_basis = np.stack(linear_basis)
 
+        basis = torch.tensor(linear_basis, dtype=torch.float32).to_dense()
     return basis.to(device=device, dtype=dtype)
-
-
+    
+    
 @lru_cache()
 def _compute_reversal(device=torch.device("cpu"), dtype=torch.float32) -> torch.Tensor:
     """Constructs a matrix that computes multivector reversal.
