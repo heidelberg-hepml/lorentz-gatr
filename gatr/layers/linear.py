@@ -117,7 +117,7 @@ class EquiLinear(nn.Module):
             self.s2s = None
 
         # Initialization
-        self.reset_parameters(initialization, use_mv_heuristics=False)
+        self.reset_parameters(initialization)
 
     def forward(
         self, multivectors: torch.Tensor, scalars: Optional[torch.Tensor] = None
@@ -149,6 +149,7 @@ class EquiLinear(nn.Module):
         outputs_s : None or torch.Tensor with shape (..., out_s_channels)
             Output scalars, if scalars are provided. Otherwise None.
         """
+
         outputs_mv = equi_linear(multivectors, self.weight)  # (..., out_channels, 16)
 
         if self.bias is not None:
@@ -172,7 +173,7 @@ class EquiLinear(nn.Module):
         initialization: str,
         gain: float = 1.0,
         additional_factor=1.0 / np.sqrt(3.0),
-        use_mv_heuristics=True,
+        use_mv_heuristics=False,
     ) -> None:
         """Initializes the weights of the layer.
 

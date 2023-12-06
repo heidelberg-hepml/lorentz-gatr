@@ -20,7 +20,9 @@ rope
 h5py
 matplotlib
 numpy==1.23
+pandas<2.0.0
 scipy
+seaborn
 
 ## Standard utils
 celluloid
@@ -40,6 +42,9 @@ torchvision
 ## Project-specific: general
 clifford==1.4.0
 xformers==0.0.20
+
+## Project-specific: baselines
+git+https://github.com/microsoft/cliffordlayers.git@74799cf4588a065916305bfcf2f030d84918f0ad  # The current version on pip (0.1.1) doesn't have GCAN yet
 
 # Coronary Mesh Convolution
 openmesh>=1.2.1

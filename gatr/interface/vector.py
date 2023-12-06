@@ -1,14 +1,18 @@
-"""Functions that embed 4-vectors in the geometric algebra."""
+# Copyright (c) 2023 Qualcomm Technologies, Inc.
+# All rights reserved.
+"""Functions that embed Lorentz vector in the geometric algebra."""
+
 
 import torch
 
+
 def embed_vector(vector: torch.Tensor) -> torch.Tensor:
-    """Embeds 4-vectors in multivectors.
+    """Embeds Lorentz vector in multivectors.
 
     Parameters
     ----------
-    coordinates : torch.Tensor with shape (..., 4)
-        4-vector coordinates
+    vector : torch.Tensor with shape (..., 4)
+        Lorentz vector
 
     Returns
     -------
@@ -20,14 +24,14 @@ def embed_vector(vector: torch.Tensor) -> torch.Tensor:
     batch_shape = vector.shape[:-1]
     multivector = torch.zeros(*batch_shape, 16, dtype=vector.dtype, device=vector.device)
 
-    # Embedding into 4-vectors
-    multivector[..., 1:5] = vector
+    # Embedding into Lorentz vectors
+    multivector[...,1:5] = vector
 
     return multivector
 
 
 def extract_vector(multivector: torch.Tensor) -> torch.Tensor:
-    """Given a multivector, extract a 4-vector from the vector components.
+    """Given a multivector, extract a Lorentz vector.
 
     Parameters
     ----------
@@ -37,9 +41,9 @@ def extract_vector(multivector: torch.Tensor) -> torch.Tensor:
     Returns
     -------
     vector : torch.Tensor with shape (..., 4)
-        4-vector corresponding to the vector components of the multivector.
+        Lorentz vector
     """
 
-    vector = multivector[..., 1:5]
+    vector = multivector[...,1:5]
 
     return vector

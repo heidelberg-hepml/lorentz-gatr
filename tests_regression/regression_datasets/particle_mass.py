@@ -8,7 +8,7 @@ from tests_regression.regression_datasets.constants import DATASET_SIZE, DEVICE
 
 
 class ParticleMassDataset(torch.utils.data.Dataset):
-    """Toy dataset that maps a particle (E, px, py, pz) to its mass m**2 = sqrt(E**2-px**2-py**2-pz**2)."""
+    """Toy dataset that maps a particle (E, px, py, pz) to its mass m = sqrt(E**2-px**2-py**2-pz**2)."""
 
     def __init__(self, mass_min=0.01, mass_max=1., p_mu=0., p_std=1.):
         super().__init__()

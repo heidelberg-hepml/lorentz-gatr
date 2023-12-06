@@ -5,32 +5,32 @@
 import pytest
 import torch
 
-from gatr.primitives import inner_product, squared_norm, pin_invariants
+from gatr.primitives import inner_product, squared_norm, abs_squared_norm, pin_invariants
 from tests.helpers import BATCH_DIMS, TOLERANCES, check_pin_invariance
 
 
 @pytest.mark.parametrize("batch_dims", BATCH_DIMS)
-def test_norm_correctness(batch_dims):
-    """Checks that norm() is consistent with inner_product()."""
+def test_squared_norm_correctness(batch_dims):
+    """Checks that squared_norm() is consistent with inner_product()."""
     inputs = torch.randn(*batch_dims, 16)
-    norms = squared_norm(inputs)
-    true_norms = inner_product(inputs, inputs)
-    torch.testing.assert_close(norms, true_norms)
+    squared_norms = squared_norm(inputs)
+    true_squared_norms = inner_product(inputs, inputs)
+    torch.testing.assert_close(squared_norms, true_squared_norms)
 
 
 @pytest.mark.parametrize(
     "vector,true_squared_norm",
     [
-        ((0.0, 0.0, 0.0, 0.), 0.0),
-        ((1.0, 0.0, 0.0, 0.), 1.0),
-        ((0.0, -2.0, 0.0, 0.), -4.0),
-        ((0.0, 0.0, 3.1, 0.), -9.61),
-        ((0.0, 0.0, 0.0, 42.), -1764.),
+        ((0.0, 0.0, 0.0, 0.0), 0.0),
+        ((1.0, 0.0, 0.0, 0.0), 1.0),
+        ((0.0, -2.0, 0.0, 0.0), -4.0),
+        ((0.0, 0.0, 3.1, 0.0), -9.61),
+        ((0.0, 0.0, 0.0, -1.2), -1.44),
         (None, None),
     ],
 )
-def test_norm_of_vector(vector, true_squared_norm):
-    """Computes the norm of a pure vector and compares against a known result."""
+def test_squared_norm_of_vector(vector, true_squared_norm):
+    """Computes the squared norm of a pure vector and compares against a known result."""
 
     # If vector is None, randomly sample it
     if vector is None:
@@ -57,9 +57,14 @@ def test_inner_product_invariance(batch_dims):
 
 
 @pytest.mark.parametrize("batch_dims", BATCH_DIMS)
-def test_norm_invariance(batch_dims):
-    """Tests the norm() primitive for equivariance."""
+def test_squared_norm_invariance(batch_dims):
+    """Tests the squared_norm() primitive for equivariance."""
     check_pin_invariance(squared_norm, 1, batch_dims=batch_dims, **TOLERANCES)
+
+@pytest.mark.parametrize("batch_dims", BATCH_DIMS)
+def test_abs_squared_norm_invariance(batch_dims):
+    """Tests the abs_squared_norm() primitive for equivariance."""
+    check_pin_invariance(abs_squared_norm, 1, batch_dims=batch_dims, **TOLERANCES)
 
 
 @pytest.mark.parametrize("batch_dims", BATCH_DIMS)

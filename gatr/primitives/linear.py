@@ -1,7 +1,6 @@
 # Copyright (c) 2023 Qualcomm Technologies, Inc.
 # All rights reserved.
 from functools import lru_cache
-from pathlib import Path
 
 import torch
 import clifford
@@ -9,8 +8,9 @@ import numpy as np
 
 from gatr.utils.einsum import cached_einsum, custom_einsum
 
+
 @lru_cache()
-def _load_pin_equi_linear_basis(
+def _compute_pin_equi_linear_basis(
     device=torch.device("cpu"), dtype=torch.float32, normalize=True
 ) -> torch.Tensor:
     """Constructs basis elements for Pin(1,3)-equivariant linear maps between multivectors.
@@ -31,10 +31,11 @@ def _load_pin_equi_linear_basis(
     basis : torch.Tensor with shape (10, 16, 16)
         Basis elements for equivariant linear maps.
     """
-    
+
     if device not in [torch.device("cpu"), "cpu"] and dtype != torch.float32:
-        basis = _load_pin_equi_linear_basis(normalize=normalize)
+        basis = _compute_pin_equi_linear_basis(normalize=normalize)
     else:
+        # explicit construction of a pin-equilinear basis for the Lorentz group
         layout, blades = clifford.Cl(1, 3)
         linear_basis = []
         for mult in [1, layout.pseudoScalar]:
@@ -42,15 +43,15 @@ def _load_pin_equi_linear_basis(
                 w = np.stack([(x(grade)*mult).value for x in blades.values()], 1)
                 w = w.astype(np.float32)
                 if normalize:
-                    #w /= np.linalg.norm(w)
-                    w /= np.linalg.svd(w)[1].max()
+                    #w /= np.linalg.norm(w) # straight-forward normalization
+                    w /= np.linalg.svd(w)[1].max() # alternative normalization
                 linear_basis.append(w)
         linear_basis = np.stack(linear_basis)
 
         basis = torch.tensor(linear_basis, dtype=torch.float32).to_dense()
     return basis.to(device=device, dtype=dtype)
-    
-    
+
+
 @lru_cache()
 def _compute_reversal(device=torch.device("cpu"), dtype=torch.float32) -> torch.Tensor:
     """Constructs a matrix that computes multivector reversal.
@@ -94,7 +95,7 @@ def _compute_grade_involution(device=torch.device("cpu"), dtype=torch.float32) -
     return involution_flat
 
 
-NUM_PIN_LINEAR_BASIS_ELEMENTS = len(_load_pin_equi_linear_basis())
+NUM_PIN_LINEAR_BASIS_ELEMENTS = len(_compute_pin_equi_linear_basis())
 
 
 def equi_linear(x: torch.Tensor, coeffs: torch.Tensor) -> torch.Tensor:
@@ -115,7 +116,7 @@ def equi_linear(x: torch.Tensor, coeffs: torch.Tensor) -> torch.Tensor:
     outputs : torch.Tensor with shape (..., 16)
         Result. Batch dimensions are result of broadcasting between x and coeffs.
     """
-    basis = _load_pin_equi_linear_basis(device=x.device, dtype=x.dtype)
+    basis = _compute_pin_equi_linear_basis(device=x.device, dtype=x.dtype)
     return custom_einsum("y x a, a i j, ... x j -> ... y i", coeffs, basis, x, path=[0, 1, 0, 1])
 
 
@@ -138,7 +139,7 @@ def grade_project(x: torch.Tensor) -> torch.Tensor:
     """
 
     # Select kernel on correct device
-    basis = _load_pin_equi_linear_basis(device=x.device, dtype=x.dtype, normalize=False)
+    basis = _compute_pin_equi_linear_basis(device=x.device, dtype=x.dtype, normalize=False)
 
     # First five basis elements are grade projections
     basis = basis[:5]

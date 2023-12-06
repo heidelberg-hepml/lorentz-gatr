@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from gatr.layers.layer_norm import EquiLayerNorm
-from gatr.primitives import squared_norm
+from gatr.primitives import abs_squared_norm
 from tests.helpers import TOLERANCES, check_pin_equivariance
 
 
@@ -17,7 +17,7 @@ def test_equi_layer_norm_layer_correctness(batch_dims, num_scalars):
     layer = EquiLayerNorm(epsilon=1e-9)
     normalized_inputs, _ = layer(inputs, scalars=scalars)
     dims = tuple(range(1, len(batch_dims) + 1))
-    variance = torch.mean(squared_norm(normalized_inputs), dim=dims)
+    variance = torch.mean(abs_squared_norm(normalized_inputs), dim=dims)
     torch.testing.assert_close(variance, torch.ones_like(variance), **TOLERANCES)
 
 

@@ -10,8 +10,8 @@ from tests.helpers import BATCH_DIMS, TOLERANCES
 
 @pytest.mark.parametrize("batch_dims", BATCH_DIMS)
 def test_vector_embedding_consistency(batch_dims):
-    """Tests whether vector embeddings into multivectors are cycle consistent."""
-    vector = torch.randn(*batch_dims, 4)
-    multivectors = embed_vector(vector)
-    vector_reencoded = extract_vector(multivectors)
-    torch.testing.assert_close(vector, vector_reencoded, **TOLERANCES)
+    """Tests whether Lorentz vector embeddings into multivectors are cycle consistent."""
+    vectors = torch.randn(*batch_dims, 4)
+    multivectors = embed_vector(vectors)
+    vectors_reencoded = extract_vector(multivectors)
+    torch.testing.assert_close(vectors, vectors_reencoded, **TOLERANCES)

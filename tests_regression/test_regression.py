@@ -40,7 +40,8 @@ def gatr_factory(wrapper_class):
 
 @pytest.mark.parametrize("model_factory", [gatr_factory], ids=["GATr"])
 @pytest.mark.parametrize(
-    "data,wrapper_class", [(ParticleMassDataset(), ParticleMassWrapper)])
+    "data,wrapper_class", [(ParticleMassDataset(), ParticleMassWrapper)], ids=["distance"]
+)
 def test_regression(model_factory, data, wrapper_class, lr=3e-4, target_loss=0.1):
     """Test whether model can successfully regress on a dataset data to almost zero train error."""
 

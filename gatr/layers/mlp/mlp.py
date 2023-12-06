@@ -34,7 +34,7 @@ class GeoMLP(nn.Module):
         self,
         config: MLPConfig,
     ) -> None:
-        super().__init__()        
+        super().__init__()
 
         # Store settings
         self.config = config
@@ -69,7 +69,7 @@ class GeoMLP(nn.Module):
         self.layers = nn.ModuleList(layers)
 
     def forward(
-        self, multivectors: torch.Tensor, scalars: torch.Tensor, reference_mv: torch.Tensor
+        self, multivectors: torch.Tensor, scalars: torch.Tensor
     ) -> Tuple[torch.Tensor, Union[torch.Tensor, None]]:
         """Forward pass.
 
@@ -79,8 +79,6 @@ class GeoMLP(nn.Module):
             Input multivectors.
         scalars : None or torch.Tensor with shape (..., in_s_channels)
             Optional input scalars.
-        reference_mv : torch.Tensor with shape (..., 16)
-            Reference multivector for equivariant join.
 
         Returns
         -------

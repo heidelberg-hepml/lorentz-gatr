@@ -405,3 +405,94 @@ class BaselineTransformer(nn.Module):
                 h = block(h, attention_mask=attention_mask)
         outputs = self.linear_out(h)
         return outputs
+
+
+class BaselineAxialTransformer(nn.Module):
+    """Baseline axial transformer for data with two token dimensions.
+
+    Combines num_blocks transformer blocks, each consisting of multi-head self-attention layers, an
+    MLP, residual connections, and normalization layers.
+
+    Assumes input data with shape `(..., num_items_1, num_items_2, num_channels, [16])`.
+
+    The first, third, fifth, ... block computes attention over the `items_2` axis. The other blocks
+    compute attention over the `items_1` axis. Positional encoding can be specified separately for
+    both axes.
+
+    Parameters
+    ----------
+    in_channels : int
+        Number of input channels.
+    out_channels : int
+        Number of output channels.
+    hidden_channels : int
+        Number of hidden channels.
+    num_blocks : int
+        Number of transformer blocks.
+    num_heads : int
+        Number of attention heads.
+    pos_encodings : tuple of bool
+        Whether to apply rotary positional embeddings along the item dimensions to the scalar keys
+        and queries.
+    pos_encoding_base : int
+        Maximum frequency used in positional encodings. (The minimum frequency is always 1.)
+    """
+
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        hidden_channels: int,
+        num_blocks: int = 20,
+        num_heads: int = 8,
+        pos_encodings: Tuple[bool, bool] = (False, False),
+        pos_encoding_base: int = 4096,
+    ) -> None:
+        super().__init__()
+        self.linear_in = nn.Linear(in_channels, hidden_channels)
+        self.blocks = nn.ModuleList(
+            [
+                BaselineTransformerBlock(
+                    hidden_channels,
+                    num_heads=num_heads,
+                    pos_encoding=pos_encodings[(block + 1) % 2],
+                    pos_encoding_base=pos_encoding_base,
+                )
+                for block in range(num_blocks)
+            ]
+        )
+        self.linear_out = nn.Linear(hidden_channels, out_channels)
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        """Forward pass.
+
+        Parameters
+        ----------
+        inputs : Tensor with shape (..., num_items1, num_items2, num_channels)
+            Input data
+
+        Returns
+        -------
+        outputs : Tensor with shape (..., num_items1, num_items2, num_channels)
+            Outputs
+        """
+
+        rearrange_pattern = "... i j c -> ... j i c"
+
+        h = self.linear_in(inputs)
+
+        for i, block in enumerate(self.blocks):
+            # For first, third, ... block, we want to perform attention over the first token
+            # dimension. We implement this by transposing the two item dimensions.
+            if i % 2 == 1:
+                h = rearrange(h, rearrange_pattern)
+
+            h = block(h)
+
+            # Transposing back to standard axis order
+            if i % 2 == 1:
+                h = rearrange(h, rearrange_pattern)
+
+        outputs = self.linear_out(h)
+
+        return outputs

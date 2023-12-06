@@ -1,8 +1,6 @@
 # Copyright (c) 2023 Qualcomm Technologies, Inc.
 # All rights reserved.
-import math
-from functools import lru_cache
-from typing import Callable, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -19,6 +17,7 @@ _MASKED_OUT = float("-inf")
 # Force the use of xformers attention, even when no xformers attention mask is provided:
 FORCE_XFORMERS = False
 
+
 def sdp_attention(
     q_mv: Tensor,
     k_mv: Tensor,
@@ -26,7 +25,7 @@ def sdp_attention(
     q_s: Tensor,
     k_s: Tensor,
     v_s: Tensor,
-    attn_mask: Optional[Tensor] = None,
+    attn_mask : Optional[Tensor] = None,
 ) -> Tuple[Tensor, Tensor]:
     """Equivariant geometric attention based on scaled dot products.
 
@@ -56,6 +55,8 @@ def sdp_attention(
         Keys, scalar part.
     v_s : Tensor with shape (..., num_items_in, num_s_channels_out)
         Values, scalar part.
+    attn_mask : None or Tensor with shape (..., num_items, num_items)
+        Optional attention mask
 
     Returns
     -------
@@ -66,18 +67,20 @@ def sdp_attention(
     """
 
     # Construct queries and keys by concatenating relevant MV components and aux scalars
-    q = torch.cat([rearrange(q_mv * _load_inner_product_factors(), "... c x -> ... (c x)"), q_s], -1)
+    q = torch.cat([rearrange(q_mv * _load_inner_product_factors(device=q_mv.device, dtype=q_mv.dtype),
+                             "... c x -> ... (c x)"), q_s], -1)
     k = torch.cat([rearrange(k_mv, "... c x -> ... (c x)"), k_s], -1)
 
     num_channels_out = v_mv.shape[-2]
     v = torch.cat([rearrange(v_mv, "... c x -> ... (c x)"), v_s], -1)
 
-    v_out = scaled_dot_product_attention(q, k, v, attn_mask=attn_mask)
+    v_out = scaled_dot_product_attention(q, k, v)
 
     v_out_mv = rearrange(v_out[..., : num_channels_out * 16], "... (c x) -> ...  c x", x=16)
     v_out_s = v_out[..., num_channels_out * 16 :]
 
     return v_out_mv, v_out_s
+
 
 def scaled_dot_product_attention(
     query: Tensor,
