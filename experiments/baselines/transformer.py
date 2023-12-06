@@ -12,7 +12,7 @@ from torch.utils.checkpoint import checkpoint
 
 from gatr.layers import ApplyRotaryPositionalEncoding
 from gatr.primitives.attention import scaled_dot_product_attention
-from gatr.utils.tensors import to_nd
+from experiments.misc import to_nd
 
 
 class BaselineLayerNorm(nn.Module):

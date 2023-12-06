@@ -1,12 +1,12 @@
 ### General ###
 runs_dir : /media/jspinner/shared/Studium/project3/lorentz-gatr/runs
-run_name : amplitudes_mlp_
+run_name : amplitudes_transformer_
 redirect_console : False
 experiment_type : "amplitudes"
-model : mlp
+model : transformer
 
 dataset : "zjj"
 data_path : /media/jspinner/shared/Studium/project3/data/
 
-n_epochs : 50
+n_epochs : 20
 data_split : .5

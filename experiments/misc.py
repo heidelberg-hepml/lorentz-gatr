@@ -14,22 +14,26 @@ def get_device() -> torch.device:
     return torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 
-def load_params(path):
+def load_config(path):
     """
     Method to load a parameter dict from a yaml file
     :param path: path to a *.yaml parameter file
     :return: the parameters as a dict
     """
     with open(path) as f:
-        param = yaml.load(f, Loader=yaml.FullLoader)
-        return param
+        config = yaml.load(f, Loader=yaml.FullLoader)
+        return config
 
 
-def save_params(params, name="paramfile.yaml"):
+def save_config(config, name="config.yaml"):
     """
     Method to save a parameter dict to a yaml file
     :param params: the parameter dict
     :param name: the name of the yaml file
     """
     with open(name, 'w') as f:
-        yaml.dump(params, f)
+        yaml.dump(config, f)
+
+def to_nd(tensor, d):
+    """Make tensor n-dimensional, group extra dimensions in first."""
+    return tensor.view(-1, *(1,) * (max(0, d - 1 - tensor.dim())), *tensor.shape[-(d - 1) :])

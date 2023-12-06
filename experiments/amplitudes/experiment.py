@@ -9,12 +9,13 @@ from torch.utils.data import DataLoader
 from matplotlib.backends.backend_pdf import PdfPages
 
 from experiments.misc import get_device, save_config
-from experiments.amplitudes.wrappers import AmplitudeGATrWrapper, AmplitudeBaselineWrapper
+from experiments.amplitudes.wrappers import AmplitudeMLPWrapper, AmplitudeTransformerWrapper, AmplitudeGATrWrapper
 from experiments.baselines import MLP, BaselineTransformer
 from experiments.amplitudes.dataset import AmplitudeDataset
 from experiments.amplitudes.preprocessing import preprocess_particles, preprocess_amplitude, undo_preprocess_amplitude
 from experiments.amplitudes.plots import plot_histograms, plot_loss, plot_single_histogram
 from gatr.nets import GATr
+from gatr.layers import MLPConfig, SelfAttentionConfig
 
 import matplotlib.pyplot as plt # debugging
 
@@ -95,6 +96,10 @@ class AmplitudeExperiment:
         self.dataset = self.params["dataset"]
         assert self.dataset in ["aag", "aagg", "zjj", "zjjj", "zjjjj"]
 
+        self.type_token_dict = {"aag": [0,1,2,2,3], "aagg": [0,1,2,2,3,3],
+                           "zjj": [0,1,2,3,3], "zjjj": [0,1,2,3,3,3],
+                           "zjjjj": [0,1,2,3,3,3,3]}
+
         data_path = self.params["data_path"]
         dataset_path = os.path.join(data_path, f"{self.dataset}.npy")
         assert os.path.exists(dataset_path), f"path {dataset_path} does not exist"
@@ -113,20 +118,58 @@ class AmplitudeExperiment:
             raise ValueError("build_model: model not specified")
         
         if model_type == "mlp":
+            self.type_token = None
+            
             in_shape = self.particles.shape[1]
             out_shape = (1,)
             hidden_channels = self.params.get("hidden_channels", 32)
             hidden_layers = self.params.get("hidden_layers", 4)
             net = MLP(in_shape=in_shape, out_shape=out_shape, hidden_channels=hidden_channels, hidden_layers=hidden_layers)
-            self.model = AmplitudeBaselineWrapper(net, self.particles_mean, self.particles_std)
+            self.model = AmplitudeMLPWrapper(net, self.particles_mean, self.particles_std)
+            
         elif model_type == "transformer":
-            # TBD
-            net = BaselineTransformer(self.params)
-            self.model = AmplitudeBaselineWrapper(net, self.particles_mean, self.particles_std)
-        elif model_type == "GATr":
-            # TBD
-            net = GATr(self.params)
-            self.model = AmplitudeGatrWrapper(net)
+            self.type_token = self.type_token_dict[self.dataset]
+            
+            in_channels = 4 + (max(self.type_token) + 1)
+            out_channels = 1
+            hidden_channels = self.params.get("hidden_channels", 16)
+            num_blocks = self.params.get("num_blocks", 1)
+            num_heads = self.params.get("num_heads", 2)
+            increase_hidden_channels = self.params.get("increase_hidden_channels", 4)
+            multi_query = self.params.get("multi_query", False)
+            net = BaselineTransformer(in_channels=in_channels, out_channels=out_channels, hidden_channels=hidden_channels,
+                                      num_blocks=num_blocks, num_heads=num_heads, pos_encoding=False,
+                                      increase_hidden_channels=increase_hidden_channels, multi_query=multi_query)
+            self.model = AmplitudeTransformerWrapper(net, self.particles_mean, self.particles_std)
+        elif model_type == "gatr":
+            self.type_token = self.type_token_dict[self.dataset]
+            
+            in_mv_channels = 1
+            out_mv_channels = 1
+            hidden_mv_channels = self.params.get("hidden_mv_channels", 1)
+            in_s_channels = max(self.type_token) + 1
+            out_s_channels = 1
+            hidden_s_channels = self.params.get("hidden_s_channels", 8)
+            num_blocks = self.params.get("num_blocks", 1)
+            dropout_prob = self.params.get("dropout_prob", 0.0)
+
+            multi_query = self.params.get("multi_query", True)
+            num_heads = self.params.get("num_heads", 2)
+            increase_hidden_channels = self.params.get("increase_hidden_channels", 2)
+            attention = SelfAttentionConfig(multi_query=multi_query,
+                                            in_mv_channels=hidden_mv_channels, out_mv_channels=hidden_mv_channels,
+                                            in_s_channels=hidden_s_channels, out_s_channels=hidden_s_channels,
+                                            num_heads=num_heads, increase_hidden_channels=increase_hidden_channels)
+            
+            mlp = MLPConfig(mv_channels=[hidden_mv_channels, 2*hidden_mv_channels, hidden_mv_channels],
+                            s_channels=[hidden_s_channels, 2*hidden_s_channels, hidden_s_channels],
+                            activation=self.params.get("activation", "gelu"))
+            
+            net = GATr(in_mv_channels=in_mv_channels, out_mv_channels=out_mv_channels, hidden_mv_channels=hidden_mv_channels,
+                       in_s_channels=in_s_channels, out_s_channels=out_s_channels, hidden_s_channels=hidden_s_channels,
+                       num_blocks=num_blocks, dropout_prob=dropout_prob, mlp=mlp, attention=attention)
+            self.model = AmplitudeGATrWrapper(net)
+            
         else:
             raise ValueError(f"build_model: model class {model_type} not recognised. Use INN, CFM, DDPM or DAT")
         model_parameters = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
@@ -251,7 +294,7 @@ class AmplitudeExperiment:
         self.optimizer.zero_grad()
         for batch_id, (x, y) in enumerate(self.train_loader):
             x, y = x.to(self.device), y.to(self.device)
-            y_pred = self.model(x).flatten()
+            y_pred = self.model(x, type_token=self.type_token).flatten()
             loss = self.loss_fn(y, y_pred)
             #if self.epoch == 4:
             #    print( torch.mean((y - y_pred)**2).item(), loss.item())
@@ -276,7 +319,7 @@ class AmplitudeExperiment:
         self.amplitudes_truth_prepd = self.test_loader.dataset.amplitudes.numpy()
         self.amplitudes_prediction_prepd = np.zeros(0)
         for x, y in self.test_loader:
-            y_pred = self.model(x).flatten().detach().cpu().numpy()
+            y_pred = self.model(x, type_token=self.type_token).flatten().detach().cpu().numpy()
             self.amplitudes_prediction_prepd = np.concatenate((self.amplitudes_prediction_prepd, y_pred), axis=0)
         assert self.amplitudes_truth_prepd.shape == self.amplitudes_prediction_prepd.shape, \
                f"{self.amplitudes_truth_prepd.shape} != {self.amplitudes_prediction_prepd.shape}"
