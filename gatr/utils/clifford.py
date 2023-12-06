@@ -8,10 +8,11 @@ import clifford
 import numpy as np
 import torch
 
+LAYOUT, BLADES = clifford.Cl(1,3)
 
 def np_to_mv(array):
     """Shorthand to transform a numpy array to a Pin(1,3) multivector."""
-    return clifford.MultiVector(clifford.Cl(1,3)[0], value=array)
+    return clifford.MultiVector(LAYOUT, value=array)
 
 
 def tensor_to_mv(tensor):
@@ -52,7 +53,7 @@ def sample_pin_multivector(spin: bool = False, rng: Optional[np.random.Generator
 
     # If no reflections, just return unit scalar
     if i == 0:
-        return clifford.Cl(1,3)[1][""]
+        return BLADES[""]
 
     multivector = 1.0
     for _ in range(i):

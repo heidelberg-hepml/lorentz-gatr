@@ -67,7 +67,8 @@ def sdp_attention(
     """
 
     # Construct queries and keys by concatenating relevant MV components and aux scalars
-    q = torch.cat([rearrange(q_mv * _load_inner_product_factors(), "... c x -> ... (c x)"), q_s], -1)
+    q = torch.cat([rearrange(q_mv * _load_inner_product_factors(device=q_mv.device, dtype=q_mv.dtype),
+                             "... c x -> ... (c x)"), q_s], -1)
     k = torch.cat([rearrange(k_mv, "... c x -> ... (c x)"), k_s], -1)
 
     num_channels_out = v_mv.shape[-2]
