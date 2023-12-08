@@ -9,4 +9,3 @@ from .linear import EquiLinear
 from .mlp.geometric_bilinears import GeometricBilinear
 from .mlp.mlp import GeoMLP
 from .mlp.nonlinearities import ScalarGatedNonlinearity
-from .mlp.config import MLPConfig

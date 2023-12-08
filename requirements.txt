@@ -1,54 +1,25 @@
 ## Code quality
 black~=22.8.0
-mypy==1.1.1
-pydocstyle
-pylint~=2.15.0
-pytest-cov==3.0.0
 pytest==7.0.1
-xenon==0.9.0
-
-## Types
-types-tqdm
-
-## CLI
-click==8.0.4
-
-## Package mgmt
-rope
 
 ## Standard science stack
 h5py
 matplotlib
 numpy==1.23
-pandas<2.0.0
 scipy
-seaborn
 
 ## Standard utils
-celluloid
-jupyter>=1.0.0
-jupyterlab
-jupytext
 rich
 tqdm
 
 ## Deep learning
 einops
 git+https://github.com/dgasmith/opt_einsum.git@1a984b7b75f3e532e7129f6aa13f7ddc3da66e10 # Un-released latest master (pinned for repro); the latest released version 3.3.0 has bugs in shape-based contraction path computations (used for einsum)
-torch-ema
 torch==2.0.1
-torchvision
+
+## Experiment management
+hydra-core
 
 ## Project-specific: general
 clifford==1.4.0
 xformers==0.0.20
-
-## Project-specific: baselines
-git+https://github.com/microsoft/cliffordlayers.git@74799cf4588a065916305bfcf2f030d84918f0ad  # The current version on pip (0.1.1) doesn't have GCAN yet
-
-# Coronary Mesh Convolution
-openmesh>=1.2.1
-potpourri3d>=0.0.8
-prettytable
-trimesh>=3.15.3
-vtk>=9.2.2

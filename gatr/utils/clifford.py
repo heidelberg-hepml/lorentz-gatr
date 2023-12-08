@@ -44,7 +44,7 @@ def sample_pin_multivector(spin: bool = False, rng: Optional[np.random.Generator
 
     if rng is None:
         rng = np.random.default_rng()
-    
+
     # Sample number of reflections we want to multiply
     if spin:
         i = np.random.randint(3) * 2
