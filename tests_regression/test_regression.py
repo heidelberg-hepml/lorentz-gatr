@@ -14,6 +14,10 @@ from tests_regression.regression_datasets.particle_mass import (
     ParticleMassDataset,
     ParticleMassWrapper,
 )
+from tests_regression.regression_datasets.top_reconstruction import (
+    TopReconstructionDataset,
+    TopReconstructionWrapper,
+)
 
 
 def gatr_factory(wrapper_class):
@@ -37,10 +41,41 @@ def gatr_factory(wrapper_class):
     wrapped_model = wrapper_class(model)
     return wrapped_model
 
+'''
+@pytest.mark.parametrize("model_factory", [gatr_factory], ids=["GATr"])
+@pytest.mark.parametrize(
+    "data,wrapper_class", [(ParticleMassDataset(), ParticleMassWrapper)], ids=["mass"]
+)
+def test_regression(model_factory, data, wrapper_class, lr=3e-4, target_loss=0.1):
+    """Test whether model can successfully regress on a dataset data to almost zero train error."""
+
+    model = model_factory(wrapper_class)
+    dataloader = torch.utils.data.DataLoader(data, batch_size=BATCHSIZE, shuffle=True)
+    optim = torch.optim.Adam(model.parameters(), lr=lr)
+    criterion = torch.nn.MSELoss()
+    model = model.to(DEVICE)
+
+    print("Starting training")
+    for _ in (pbar := trange(NUM_EPOCHS)):
+        epoch_loss = 0.0
+        for x, y in dataloader:
+            x, y = x.to(DEVICE), y.to(DEVICE)
+            y_pred = model(x)
+            loss = criterion(y_pred, y)
+            optim.zero_grad()
+            loss.backward()
+            optim.step()
+            epoch_loss += loss.item() / len(dataloader)
+            pbar.set_description(desc=f"Loss = {loss.item():.3f}", refresh=True)
+
+    print(f"Training loss in last epoch: {epoch_loss}")
+    assert epoch_loss < target_loss
+'''
 
 @pytest.mark.parametrize("model_factory", [gatr_factory], ids=["GATr"])
 @pytest.mark.parametrize(
-    "data,wrapper_class", [(ParticleMassDataset(), ParticleMassWrapper)], ids=["distance"]
+    "data,wrapper_class", [(ParticleMassDataset(), ParticleMassWrapper),
+                           (TopReconstructionDataset(), TopReconstructionWrapper)]#, ids=["reconstruction"]
 )
 def test_regression(model_factory, data, wrapper_class, lr=3e-4, target_loss=0.1):
     """Test whether model can successfully regress on a dataset data to almost zero train error."""
