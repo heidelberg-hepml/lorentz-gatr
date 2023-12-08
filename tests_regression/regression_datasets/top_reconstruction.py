@@ -16,8 +16,8 @@ class TopReconstructionDataset(torch.utils.data.Dataset):
     def __init__(self, mW_mean=80.4, mW_std=5., mt_mean=173., mt_std=20.,
                  mq_std=10., p_std=10., safety_factor=10):
         '''
-        Possible improvements for sampling the event
-        - Sample iflat and iflat2 event-wise instead of globally
+        This is ugly...
+        Very happy about suggestions for how to do it nicer.
         '''
         super().__init__()
         DATASET_SIZE_TEST = DATASET_SIZE * safety_factor
@@ -32,26 +32,27 @@ class TopReconstructionDataset(torch.utils.data.Dataset):
 
             # sample top 4-momentum
             pt = torch.randn(DATASET_SIZE_TEST, 4) * p_std
-            iflat = torch.randint(low=1,high=4,size=(1,))
-            inotflat = [i for i in range(1,4) if i!=iflat]
-            pt[:,iflat] = 0.
+            iflat = torch.randint(low=1,high=4,size=(DATASET_SIZE_TEST,))
+            inotflat = torch.stack(( 1+(iflat)%3, 1+(iflat+1)%3 ), dim=-1)
+            ihelper = torch.arange(DATASET_SIZE_TEST)
+            pt[ihelper, iflat] = 0.
             pt[:,0] = torch.sqrt(mt**2 + torch.sum(pt[:,1:]**2, dim=-1))
 
             # sample W and b with the constraint pW+pb=pt
             pW = torch.randn(DATASET_SIZE_TEST, 4) * p_std
-            iflat2 = (iflat+1)%3 +1
-            inotflat2 = [i for i in range(1,4) if i!=iflat2]
-            pW[:,iflat2] = 0.
+            iflat2 = 1+ (iflat+1)%3
+            inotflat2 = torch.stack(( 1+(iflat2)%3, 1+(iflat2+1)%3 ), dim=-1)
+            pW[ihelper,iflat2] = 0.
             pW[:,0] = 1/(2 * pt[:,0]) * (mW**2 - mb**2 + pt[:,0]**2 \
-                       + torch.sum(pW[:,inotflat]**2 - (pt[:,inotflat]-pW[:,inotflat])**2, dim=-1))
-            pW[:,iflat] = torch.sqrt(pW[:,0]**2 - mW**2 - torch.sum(pW[:,inotflat]**2,dim=-1)).unsqueeze(-1)
+                       + torch.sum(pW[ihelper[:,None],inotflat]**2 - (pt[ihelper[:,None],inotflat]-pW[ihelper[:,None],inotflat])**2, dim=-1))
+            pW[ihelper,iflat] = torch.sqrt(pW[:,0]**2 - mW**2 - torch.sum(pW[ihelper[:,None],inotflat]**2,dim=-1))
             pb = pt - pW
-        
+
             # sample q1 and q2 with the constraint pq1+pq2=pW
             pq1 = torch.randn(DATASET_SIZE_TEST, 4) * p_std
             pq1[:,0] = 1/(2 * pW[:,0]) * (mq1**2 - mq2**2 + pW[:,0]**2 \
-                        + torch.sum(pq1[:,inotflat2]**2 - (pW[:,inotflat2] - pq1[:,inotflat2])**2, dim=-1))
-            pq1[:,iflat2] = torch.sqrt(pq1[:,0]**2 - mq1**2 - torch.sum(pq1[:,inotflat2]**2, dim=-1)).unsqueeze(-1)
+                        + torch.sum(pq1[ihelper[:,None],inotflat2]**2 - (pW[ihelper[:,None],inotflat2] - pq1[ihelper[:,None],inotflat2])**2, dim=-1))
+            pq1[ihelper,iflat2] = torch.sqrt(pq1[:,0]**2 - mq1**2 - torch.sum(pq1[ihelper[:,None],inotflat2]**2, dim=-1))
             pq2 = pW - pq1
 
             # collect valid events
@@ -66,7 +67,7 @@ class TopReconstructionDataset(torch.utils.data.Dataset):
         # consistency checks
         def check_momentum_conservation(p1, p2, p3):
             diff = p1 - (p2 + p3)
-            mask = (diff > 10.).any(dim=-1)
+            mask = (diff > .1).any(dim=-1)
             assert (torch.abs(diff) < .1).all()
         check_momentum_conservation(pt, pW, pb)
         check_momentum_conservation(pW, pq1, pq2)
@@ -180,5 +181,5 @@ class TopReconstructionWrapper(BaseWrapper):
         pW = extract_vector(multivector[:, :, 1, :])  # (batchsize, 3, 4)
         reco = torch.stack((pt, pW), dim=1)
         reco = reco[:,:,0,:] # pick first output channel
-        #reco = reco.mean(dim=2) # average over output channels (works badly)
+        #reco = reco.mean(dim=2) # average over output channels (much worse, probably because mean breaks symmetry)
         return reco, None
