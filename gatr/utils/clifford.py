@@ -44,7 +44,7 @@ def sample_pin_multivector(spin: bool = False, rng: Optional[np.random.Generator
 
     if rng is None:
         rng = np.random.default_rng()
-
+    
     # Sample number of reflections we want to multiply
     if spin:
         i = np.random.randint(3) * 2
@@ -59,13 +59,23 @@ def sample_pin_multivector(spin: bool = False, rng: Optional[np.random.Generator
     for _ in range(i):
         # Sample reflection vector
         vector = np.zeros(16)
-        vector[1:5] = rng.normal(size=4)
+        #vector[1:5] = rng.normal(size=4)
+        vector[2:5] = rng.normal(size=3) * 2
+        norm = np.linalg.norm(vector[2:5])
+        vector[1] = ( rng.uniform(size=1) - .5 ) * norm
+        
         vector_mv = np_to_mv(vector)
         vector_mv = vector_mv / abs(vector_mv.mag2()) ** 0.5
 
         # Multiply together (geometric product)
         multivector = multivector * vector_mv
-
+    '''
+    mv_generator_vec = np.zeros(16)
+    mv_generator_vec[5:11] = rng.normal(size=6)
+    multivector = LAYOUT.MultiVector(mv_generator_vec).exp()
+    print("SAMPLED: ", multivector.mag2(), multivector)
+    '''
+    
     return multivector
 
 
