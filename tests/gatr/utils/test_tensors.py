@@ -2,31 +2,7 @@
 # All rights reserved.
 import torch
 
-from gatr.utils.tensors import block_stack, expand_pairwise, to_nd
-
-
-def test_to_nd():
-    """Test to_nd."""
-    assert to_nd(torch.randn(3), 3).shape == (1, 1, 3)
-    assert to_nd(torch.randn(2, 3), 3).shape == (1, 2, 3)
-    assert to_nd(torch.randn(2, 3, 4), 3).shape == (2, 3, 4)
-    assert to_nd(torch.randn(5, 2, 3, 4), 3).shape == (10, 3, 4)
-    assert to_nd(torch.randn(3), 4).shape == (1, 1, 1, 3)
-    assert to_nd(torch.randn(2, 3), 4).shape == (1, 1, 2, 3)
-    assert to_nd(torch.randn(2, 3, 4), 4).shape == (1, 2, 3, 4)
-    assert to_nd(torch.randn(5, 2, 3, 4), 4).shape == (5, 2, 3, 4)
-    assert to_nd(torch.randn(3, 5, 2, 3, 4), 4).shape == (15, 2, 3, 4)
-
-
-def test_expand_pairwise():
-    """Test expand pairwise."""
-    x = torch.randn(2, 5)
-    y = torch.randn(3, 2, 1)
-    z = torch.randn(4, 1, 2, 1)
-    x2, y2, z2 = expand_pairwise(x, y, z)
-    assert x2.shape == (4, 3, 2, 5)
-    assert y2.shape == (4, 3, 2, 5)
-    assert z2.shape == (4, 3, 2, 5)
+from gatr.utils.tensors import block_stack
 
 
 def test_block_stack():

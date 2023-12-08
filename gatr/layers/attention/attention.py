@@ -2,13 +2,11 @@
 # All rights reserved.
 """Self-attention layers."""
 
-from functools import partial
-
 import torch
 from torch import nn
 
 from gatr.layers.attention.config import SelfAttentionConfig
-from gatr.primitives.attention import geometric_attention, lin_square_normalizer
+from gatr.primitives.attention import sdp_attention
 
 
 class GeometricAttention(nn.Module):
@@ -37,11 +35,6 @@ class GeometricAttention(nn.Module):
 
     def __init__(self, config: SelfAttentionConfig) -> None:
         super().__init__()
-
-        self.normalizer = partial(lin_square_normalizer, epsilon=config.normalizer_eps)
-        self.log_weights = nn.Parameter(
-            torch.zeros((config.num_heads, 1, config.hidden_mv_channels))
-        )
 
     def forward(self, q_mv, k_mv, v_mv, q_s, k_s, v_s, attention_mask=None):
         """Forward pass through geometric attention.
@@ -76,16 +69,13 @@ class GeometricAttention(nn.Module):
             Optional attention mask.
         """
 
-        weights = self.log_weights.exp()
-        h_mv, h_s = geometric_attention(
+        h_mv, h_s = sdp_attention(
             q_mv,
             k_mv,
             v_mv,
             q_s,
             k_s,
             v_s,
-            normalizer=self.normalizer,
-            weights=weights,
             attn_mask=attention_mask,
         )
 

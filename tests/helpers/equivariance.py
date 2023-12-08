@@ -1,6 +1,6 @@
 # Copyright (c) 2023 Qualcomm Technologies, Inc.
 # All rights reserved.
-"""Utility functions to test callables for equivariance with respect to Pin(3,0,1)."""
+"""Utility functions to test callables for equivariance with respect to Pin(1,3)."""
 
 import torch
 
@@ -27,12 +27,12 @@ def check_pin_equivariance(
     num_multivector_args=1,
     fn_kwargs=None,
     batch_dims=(1,),
-    spin=False,
+    spin=True,
     rng=None,
     num_checks=3,
     **kwargs,
 ):
-    """Checks whether a callable is equivariant with respect to the Pin(3,0,1) or Spin(3,0,1) group.
+    """Checks whether a callable is equivariant with respect to the Pin(1,3) or Spin(1,3) group.
 
     The callable can have an arbitray number of multivector inputs.
 
@@ -91,12 +91,12 @@ def check_pin_invariance(
     num_multivector_args=1,
     fn_kwargs=None,
     batch_dims=(1,),
-    spin=False,
+    spin=True,
     rng=None,
     num_checks=3,
     **kwargs,
 ):
-    """Checks whether a callable is invariant with respect to the Pin(3,0,1) or Spin(3,0,1) group.
+    """Checks whether a callable is invariant with respect to the Pin(1,3) or Spin(1,3) group.
 
     Parameters
     ----------
@@ -136,7 +136,7 @@ def check_pin_invariance(
         # Generate function inputs
         inputs = torch.randn(num_multivector_args, *batch_dims, 16)
 
-        # Transform inputs with Pin(3,0,1)
+        # Transform inputs with Pin(1,3)
         transform = SlowRandomPinTransform(rng=rng, spin=spin)
         transformed_inputs = transform(inputs)
 

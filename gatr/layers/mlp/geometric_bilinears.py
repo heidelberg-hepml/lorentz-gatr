@@ -8,7 +8,7 @@ import torch
 from torch import nn
 
 from gatr.layers.linear import EquiLinear
-from gatr.primitives import equivariant_join, geometric_product
+from gatr.primitives import geometric_product
 
 
 class GeometricBilinear(nn.Module):
@@ -45,32 +45,19 @@ class GeometricBilinear(nn.Module):
         if hidden_mv_channels is None:
             hidden_mv_channels = out_mv_channels
 
-        out_mv_channels_each = hidden_mv_channels // 2
-        assert (
-            out_mv_channels_each * 2 == hidden_mv_channels
-        ), "GeometricBilinear needs even channel number"
-
         # Linear projections for GP
         self.linear_left = EquiLinear(
             in_mv_channels,
-            out_mv_channels_each,
+            hidden_mv_channels,
             in_s_channels=in_s_channels,
             out_s_channels=None,
         )
         self.linear_right = EquiLinear(
             in_mv_channels,
-            out_mv_channels_each,
+            hidden_mv_channels,
             in_s_channels=in_s_channels,
             out_s_channels=None,
             initialization="almost_unit_scalar",
-        )
-
-        # Linear projections for join
-        self.linear_join_left = EquiLinear(
-            in_mv_channels, out_mv_channels_each, in_s_channels=in_s_channels, out_s_channels=None
-        )
-        self.linear_join_right = EquiLinear(
-            in_mv_channels, out_mv_channels_each, in_s_channels=in_s_channels, out_s_channels=None
         )
 
         # Output linear projection
@@ -81,7 +68,6 @@ class GeometricBilinear(nn.Module):
     def forward(
         self,
         multivectors: torch.Tensor,
-        reference_mv: torch.Tensor,
         scalars: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Forward pass.
@@ -92,8 +78,6 @@ class GeometricBilinear(nn.Module):
             Input multivectors
         scalars : torch.Tensor with shape (..., in_s_channels)
             Input scalars
-        reference_mv : torch.Tensor with shape (..., 16)
-            Reference multivector for equivariant join.
 
         Returns
         -------
@@ -108,13 +92,8 @@ class GeometricBilinear(nn.Module):
         right, _ = self.linear_right(multivectors, scalars=scalars)
         gp_outputs = geometric_product(left, right)
 
-        # Equivariant join
-        left, _ = self.linear_join_left(multivectors, scalars=scalars)
-        right, _ = self.linear_join_right(multivectors, scalars=scalars)
-        join_outputs = equivariant_join(left, right, reference_mv)
 
         # Output linear
-        outputs_mv = torch.cat((gp_outputs, join_outputs), dim=-2)
-        outputs_mv, outputs_s = self.linear_out(outputs_mv, scalars=scalars)
+        outputs_mv, outputs_s = self.linear_out(gp_outputs, scalars=scalars)
 
         return outputs_mv, outputs_s

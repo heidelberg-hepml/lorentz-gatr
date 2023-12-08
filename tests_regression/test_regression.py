@@ -10,9 +10,9 @@ from gatr.layers.attention.config import SelfAttentionConfig
 from gatr.layers.mlp.config import MLPConfig
 from gatr.nets import GATr
 from tests_regression.regression_datasets.constants import BATCHSIZE, DEVICE, NUM_EPOCHS
-from tests_regression.regression_datasets.points_distance import (
-    PointsDistanceDataset,
-    PointsDistanceWrapper,
+from tests_regression.regression_datasets.particle_mass import (
+    ParticleMassDataset,
+    ParticleMassWrapper,
 )
 
 
@@ -40,7 +40,7 @@ def gatr_factory(wrapper_class):
 
 @pytest.mark.parametrize("model_factory", [gatr_factory], ids=["GATr"])
 @pytest.mark.parametrize(
-    "data,wrapper_class", [(PointsDistanceDataset(), PointsDistanceWrapper)], ids=["distance"]
+    "data,wrapper_class", [(ParticleMassDataset(), ParticleMassWrapper)], ids=["distance"]
 )
 def test_regression(model_factory, data, wrapper_class, lr=3e-4, target_loss=0.1):
     """Test whether model can successfully regress on a dataset data to almost zero train error."""
