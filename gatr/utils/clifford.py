@@ -59,12 +59,19 @@ def sample_pin_multivector(spin: bool = False, rng: Optional[np.random.Generator
     for _ in range(i):
         # Sample reflection vector
         vector = np.zeros(16)
+        
         #vector[1:5] = rng.normal(size=4)
+        
         vector[2:5] = rng.normal(size=3) * 2
         norm = np.linalg.norm(vector[2:5])
         vector[1] = ( rng.uniform(size=1) - .5 ) * norm
         
+        #norm = rng.normal(size=1) + 5.
+        #vector[2:5] = rng.normal(size=3) * 2
+        #vector[1] = (norm**2 + np.sum(vector[2:5]**2))**.5
+        
         vector_mv = np_to_mv(vector)
+        
         vector_mv = vector_mv / abs(vector_mv.mag2()) ** 0.5
 
         # Multiply together (geometric product)
