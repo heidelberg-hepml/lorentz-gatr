@@ -33,9 +33,7 @@ def plot_histograms(file, data, labels, bins=60, xlabel=None,
                                 alpha=.1, step="post")
             continue
 
-        ratio = (hist * scale) / (hists[0] * scales[0])
-        ratio[np.isnan(ratio)] = 0.
-
+        ratio = np.divide(hist * scale, hists[0] * scales[0], where=hists[0] * scales[0]!=0) # sets denominator=0 terms to 0
         axs[1].step(bins, dup_last(ratio), linewidth=1.0, where="post", color=color)
 
     if logx:
@@ -49,7 +47,7 @@ def plot_histograms(file, data, labels, bins=60, xlabel=None,
     axs[0].set_ylim(0., ymax)
     axs[0].tick_params(axis="both", labelsize=FONTSIZE_TICK)
     axs[1].tick_params(axis="both", labelsize=FONTSIZE_TICK)
-    axs[0].text(.02, .95, s=title, horizontalalignment="left", verticalalignment="top",
+    axs[0].text(.04, .95, s=title, horizontalalignment="left", verticalalignment="top",
                 transform=axs[0].transAxes, fontsize=FONTSIZE)
 
     axs[1].set_yticks(ratio_ticks)
@@ -68,8 +66,8 @@ def plot_single_histogram(file, data, bins=60, xlabel=None,
     dup_last = lambda a: np.append(a, a[-1])
 
     fig, axs = plt.subplots(figsize=(6,4))
-    axs.step(bins, dup_last(hist)*scale, colors[0], where="post")
-    axs.fill_between(bins, dup_last(hist)*scale, 0.*dup_last(hist)*scale, facecolor=colors[0],
+    axs.step(bins, dup_last(hist)*scale, colors[2], where="post")
+    axs.fill_between(bins, dup_last(hist)*scale, 0.*dup_last(hist)*scale, facecolor=colors[2],
                                 alpha=.1, step="post")
 
     if logx:
@@ -81,7 +79,7 @@ def plot_single_histogram(file, data, bins=60, xlabel=None,
     axs.set_ylim(0., ymax)
     axs.set_xlim(xrange)
     axs.tick_params(axis="both", labelsize=FONTSIZE_TICK)
-    axs.text(.02, .95, s=title, horizontalalignment="left", verticalalignment="top",
+    axs.text(.04, .95, s=title, horizontalalignment="left", verticalalignment="top",
                 transform=axs.transAxes, fontsize=FONTSIZE)
 
     fig.savefig(file, format="pdf", bbox_inches="tight")

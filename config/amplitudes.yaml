@@ -1,0 +1,19 @@
+exp_name: amplitudes
+base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
+warm_start_path : null
+
+data:
+ dataset : zjj
+ data_path : /media/jspinner/shared/Studium/project3/data/
+ subsample : 10000
+
+train: true
+training:
+ nepochs : 1
+ split : .5
+
+defaults:
+ - model: gatr_amplitudes
+ - default
+ - hydra
+ - _self_

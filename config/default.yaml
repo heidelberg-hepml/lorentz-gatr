@@ -1,0 +1,33 @@
+seed: null
+debug: false
+
+warm_start_path: null
+warm_start_idx: 0
+
+train: true
+training:
+ n_epochs : 100
+ split : .5
+
+ optimizer : Adam
+ lr: 3.e-4
+ batchsize: 1024
+ betas: [.9, .999]
+ eps: 1.e-8
+ scheduler: null
+
+ float16: false
+ enable_flash_sdp: false
+ enable_math_sdp: true
+ enable_mem_efficient_sdp: false
+ force_xformers: false
+
+evaluate: true
+evaluation:
+ batchsize: 1024
+
+plot: true
+plotting:
+ loss: true
+ histograms: true
+ delta: true

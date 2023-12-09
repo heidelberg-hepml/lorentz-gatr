@@ -8,4 +8,5 @@ from .layer_norm import EquiLayerNorm
 from .linear import EquiLinear
 from .mlp.geometric_bilinears import GeometricBilinear
 from .mlp.mlp import GeoMLP
+from .mlp.config import MLPConfig
 from .mlp.nonlinearities import ScalarGatedNonlinearity

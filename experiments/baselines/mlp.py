@@ -33,8 +33,4 @@ class MLP(nn.Module):
 
     def forward(self, inputs: torch.Tensor):
         """Forward pass of baseline MLP."""
-        batchsize = inputs.shape[0]
-        inputs = inputs.reshape(batchsize, -1)
-        outputs = self.mlp(inputs)
-        outputs = outputs.reshape(batchsize, *self.out_shape)
-        return outputs
+        return self.mlp(inputs)
