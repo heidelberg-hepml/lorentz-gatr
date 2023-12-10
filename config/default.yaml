@@ -8,6 +8,7 @@ train: true
 training:
  n_epochs : 100
  split : .5
+ subsample: null
 
  optimizer : Adam
  lr: 3.e-4

@@ -1,7 +1,7 @@
 _target_: experiments.amplitudes.wrappers.AmplitudeTransformerWrapper
 
 net:
-  _target_: experiments.baselines.BaselineTransformer
+  _target_: experiments.baselines.Transformer
 
   in_channels: 8
   out_channels: 1

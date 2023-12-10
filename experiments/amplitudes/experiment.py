@@ -11,7 +11,6 @@ from hydra.utils import instantiate
 from matplotlib.backends.backend_pdf import PdfPages
 
 from experiments.amplitudes.wrappers import AmplitudeMLPWrapper, AmplitudeTransformerWrapper, AmplitudeGATrWrapper
-from experiments.baselines import MLP, BaselineTransformer
 from experiments.amplitudes.dataset import AmplitudeDataset
 from experiments.amplitudes.preprocessing import preprocess_particles, preprocess_amplitude, undo_preprocess_amplitude
 from experiments.amplitudes.plots import plot_histograms, plot_loss, plot_single_histogram
@@ -19,16 +18,35 @@ from experiments.misc import get_device
 import experiments.logger
 from experiments.logger import LOGGER, MEMORY_HANDLER
 
-from experiments.baselines import MLP, BaselineTransformer
 from gatr.layers import MLPConfig, SelfAttentionConfig
 cs = ConfigStore.instance()
 cs.store(name="base_attention", node=SelfAttentionConfig)
 cs.store(name="base_mlp", node=MLPConfig)
 
+
+TYPE_TOKEN_DICT = {"aag": [0,1,2,2,3], "aagg": [0,1,2,2,3,3],
+                    "zjj": [0,1,2,3,3], "zjjj": [0,1,2,3,3,3],
+                    "zjjjj": [0,1,2,3,3,3,3]}
+
 class AmplitudeExperiment:
 
     def __init__(self, cfg):
         self.cfg = cfg
+
+        # experiment-specific adaptations in cfg
+        self.type_token = TYPE_TOKEN_DICT[self.cfg.data.dataset]
+        n_tokens = np.unique(self.type_token).shape[0]
+        OmegaConf.set_struct(self.cfg, True)
+        modelname = self.cfg.model.net._target_.rsplit(".", 1)[-1]
+        with open_dict(self.cfg):
+            # append modelname to exp_name
+            self.cfg.exp_name = f"{self.cfg.exp_name}_{modelname}"
+            
+            # specify shape of type_token (for permutation-equivariant architectures)
+            if modelname == "GATr":
+                self.cfg.model.net.in_s_channels = n_tokens
+            if modelname == "Transformer":
+                self.cfg.model.net.in_channels = 4 + n_tokens
 
     def __call__(self):
         # pass all exceptions to the logger
@@ -93,10 +111,6 @@ class AmplitudeExperiment:
         self.model.to(self.device)
 
     def init_data(self):
-        type_token_dict = {"aag": [0,1,2,2,3], "aagg": [0,1,2,2,3,3],
-                           "zjj": [0,1,2,3,3], "zjjj": [0,1,2,3,3,3],
-                           "zjjjj": [0,1,2,3,3,3,3]}
-        self.type_token = type_token_dict[self.cfg.data.dataset]
         LOGGER.info(f"Working with dataset {self.cfg.data.dataset} "\
                     f"and type_token={self.type_token}")
 
@@ -113,7 +127,7 @@ class AmplitudeExperiment:
 
         # preprocess data
         self.amplitudes_prepd, self.amplitudes_mean, self.amplitudes_std = preprocess_amplitude(self.amplitudes)
-        if type(self.model.net) in [MLP, BaselineTransformer]:
+        if type(self.model.net).__name__ in ["MLP", "Transformer"]:
             self.particles_prepd, self.particles_mean, self.particles_std = preprocess_particles(self.particles)
         else:
             self.particles_prepd = self.particles / self.particles.std()
@@ -131,8 +145,8 @@ class AmplitudeExperiment:
         self.amplitudes_pred_prepd = np.zeros((0, 1))
         LOGGER.info(f"Starting to evaluate model on test dataset with {self.amplitudes_truth_prepd.shape[0]} elements")
         with torch.no_grad():
-            for x, y in self.test_loader:
-                y_pred = self.model(x, type_token=self.type_token)
+            for x, _ in self.test_loader:
+                y_pred = self.model(x.to(self.device), type_token=self.type_token)
                 self.amplitudes_pred_prepd = np.concatenate((self.amplitudes_pred_prepd,
                                                              y_pred.cpu().numpy()), axis=0)
         assert self.amplitudes_truth_prepd.shape == self.amplitudes_pred_prepd.shape
@@ -156,9 +170,10 @@ class AmplitudeExperiment:
     def plot(self):
         plot_path = os.path.join(self.exp_dir, f"plots_{self.cfg.exp_idx}")
         os.makedirs(plot_path)
-        dataset_title = {"aag": r"$\gamma\gamma g$", "aagg": r"$\gamma\gamma gg$",
-                              "zjj": "$Zjj$", "zjjj": "$Zjjj$", "zjjjj": "$Zjjjj$"}[self.cfg.data.dataset]
-        model_title = {"GATr": "GATr", "BaselineTransformer": "Tr", "MLP": "MLP"}[type(self.model.net).__name__]
+        dataset_title = {"aag": r"$gg\to\gamma\gamma g$", "aagg": r"$gg\to\gamma\gamma gg$",
+                              "zjj": r"$q\bar q'\to Zjj$", "zjjj": r"$q\bar q'\to Zjjj$",
+                         "zjjjj": r"$q\bar q'\to Zjjjj$"}[self.cfg.data.dataset]
+        model_title = {"GATr": "GATr", "Transformer": "Tr", "MLP": "MLP"}[type(self.model.net).__name__]
         title = f"{model_title}: {dataset_title}"
         
         if self.cfg.plotting.loss:
@@ -204,7 +219,6 @@ class AmplitudeExperiment:
             self.exp_idx = self.cfg.exp_idx + 1
             LOGGER.info(f"Warm-starting from existing experiment {self.cfg.exp_dir} for {self.exp_idx}th time")
 
-        OmegaConf.set_struct(self.cfg, True)
         with open_dict(self.cfg):
             self.cfg.exp_idx = self.exp_idx
             self.cfg.warm_start = self.warm_start
