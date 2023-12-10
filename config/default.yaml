@@ -10,6 +10,8 @@ training:
  split : .5
  subsample: null
 
+ loss_prepd: false
+
  optimizer : Adam
  lr: 3.e-4
  batchsize: 1024

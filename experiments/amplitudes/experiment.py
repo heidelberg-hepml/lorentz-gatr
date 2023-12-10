@@ -34,7 +34,10 @@ class AmplitudeExperiment:
         self.cfg = cfg
 
         # experiment-specific adaptations in cfg
-        self.type_token = TYPE_TOKEN_DICT[self.cfg.data.dataset]
+        if self.cfg.data.include_permsym:
+            self.type_token = TYPE_TOKEN_DICT[self.cfg.data.dataset]
+        else:
+            self.type_token = list(range(len(TYPE_TOKEN_DICT[self.cfg.data.dataset])))
         n_tokens = np.unique(self.type_token).shape[0]
         OmegaConf.set_struct(self.cfg, True)
         modelname = self.cfg.model.net._target_.rsplit(".", 1)[-1]
@@ -194,6 +197,9 @@ class AmplitudeExperiment:
             out = f"{plot_path}/delta.pdf"
             with PdfPages(out) as file:
                 data = (self.amplitudes_truth - self.amplitudes_pred) / self.amplitudes_truth
+                plot_single_histogram(file, data, title=title,
+                           xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$",
+                           logx=False, xrange=(-.1, .1), bins=200)
                 plot_single_histogram(file, data, title=title,
                            xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$",
                            logx=False, xrange=(-.3, .3), bins=50)
@@ -371,6 +377,9 @@ class AmplitudeExperiment:
         x, y = x.to(self.device), y.to(self.device)
 
         y_pred = self.model(x, type_token=self.type_token)
+        if not self.cfg.training.loss_prepd:
+            y = (y * torch.tensor(self.amplitudes_std) + torch.tensor(self.amplitudes_mean)).exp()
+            y_pred = (y_pred * torch.tensor(self.amplitudes_std) + torch.tensor(self.amplitudes_mean)).exp()
         loss = self.loss(y, y_pred)
         assert torch.isfinite(loss).all()
 

@@ -85,13 +85,15 @@ def plot_single_histogram(file, data, bins=60, xlabel=None,
     fig.savefig(file, format="pdf", bbox_inches="tight")
     plt.close()
 
-def plot_loss(file, losses, lr, labels=None):
+def plot_loss(file, losses, lr, labels=None, logy=True):
     labels = [None for _ in range(len(losses))] if labels is None else labels
     iterations = range(1, len(losses[0])+1)
     fig, ax = plt.subplots()
     for loss, label in zip(losses, labels):
         ax.plot(iterations, loss, label=label)
 
+    if logy:
+        ax.set_yscale("log")
     axright=ax.twinx()
     axright.plot(iterations, lr, label="learning rate", color="crimson")
     ax.set_xlabel("Number of iterations", fontsize=FONTSIZE)
