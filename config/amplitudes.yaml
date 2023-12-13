@@ -13,6 +13,8 @@ training:
  nepochs : 1
  split : .5
 
+ loss_delta : true
+
 defaults:
  - model: gatr_amplitudes
  - default

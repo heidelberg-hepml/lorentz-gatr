@@ -28,28 +28,14 @@ TYPE_TOKEN_DICT = {"aag": [0,1,2,2,3], "aagg": [0,1,2,2,3,3],
                     "zjj": [0,1,2,3,3], "zjjj": [0,1,2,3,3,3],
                     "zjjjj": [0,1,2,3,3,3,3]}
 
+DATASET_TITLE_DICT = {"aag": r"$gg\to\gamma\gamma g$", "aagg": r"$gg\to\gamma\gamma gg$",
+                      "zjj": r"$q\bar q\to Zjj$", "zjjj": r"$q\bar q\to Zjjj$",
+                      "zjjjj": r"$q\bar q\to Zjjjj$"}
+
 class AmplitudeExperiment:
 
     def __init__(self, cfg):
         self.cfg = cfg
-
-        # experiment-specific adaptations in cfg
-        if self.cfg.data.include_permsym:
-            self.type_token = TYPE_TOKEN_DICT[self.cfg.data.dataset]
-        else:
-            self.type_token = list(range(len(TYPE_TOKEN_DICT[self.cfg.data.dataset])))
-        n_tokens = np.unique(self.type_token).shape[0]
-        OmegaConf.set_struct(self.cfg, True)
-        modelname = self.cfg.model.net._target_.rsplit(".", 1)[-1]
-        with open_dict(self.cfg):
-            # append modelname to exp_name
-            self.cfg.exp_name = f"{self.cfg.exp_name}_{modelname}"
-            
-            # specify shape of type_token (for permutation-equivariant architectures)
-            if modelname == "GATr":
-                self.cfg.model.net.in_s_channels = n_tokens
-            if modelname == "Transformer":
-                self.cfg.model.net.in_channels = 4 + n_tokens
 
     def __call__(self):
         # pass all exceptions to the logger
@@ -70,6 +56,7 @@ class AmplitudeExperiment:
             # this only prints stdout, not the stack trace :(
                 
     def full_run(self):
+        # implement all ml boilerplate as private methods (_name)
         t0 = time.time()
         
         # initialize environment
@@ -78,12 +65,16 @@ class AmplitudeExperiment:
         self._init_logger()
         self._init_backend()
 
+        self.init_physics()
         self.init_model()
         self.init_data()
         self._init_dataloader()
 
-        if self.cfg.train:  
+        if self.cfg.train:
+            self._init_optimizer()
+            self._init_scheduler()
             self.train()
+            self._save_model()
 
         if self.cfg.evaluate:
             self.evaluate()
@@ -93,6 +84,24 @@ class AmplitudeExperiment:
 
         dt = time.time() - t0
         LOGGER.info(f"Finished experiment after {dt/60:.2f}min = {dt/60**2:.2f}h")
+
+    def init_physics(self):
+        # experiment-specific adaptations in cfg
+        if self.cfg.data.include_permsym:
+            self.type_token = TYPE_TOKEN_DICT[self.cfg.data.dataset]
+        else:
+            self.type_token = list(range(len(TYPE_TOKEN_DICT[self.cfg.data.dataset])))
+        n_tokens = np.unique(self.type_token).shape[0]
+        OmegaConf.set_struct(self.cfg, True)
+        modelname = self.cfg.model.net._target_.rsplit(".", 1)[-1]
+        with open_dict(self.cfg):
+            # specify shape of type_token
+            if modelname == "GATr":
+                self.cfg.model.net.in_s_channels = n_tokens
+            elif modelname == "Transformer":
+                self.cfg.model.net.in_channels = 4 + n_tokens
+            elif modelname == "MLP":
+                self.cfg.model.net.in_shape = 4 * len(TYPE_TOKEN_DICT[self.cfg.data.dataset])
 
     def init_model(self):
         # initialize model
@@ -135,77 +144,102 @@ class AmplitudeExperiment:
         else:
             self.particles_prepd = self.particles / self.particles.std()
 
-    def train(self):
-        self._init_optimizer()
-        self._init_scheduler()
-
-        self._train()
-        self._save_model()
-
     def evaluate(self):
+        self.amplitudes_pred_train, self.amplitudes_truth_train = self._evaluate_single(self.train_loader, "train")
+        self.amplitudes_pred_test, self.amplitudes_truth_test = self._evaluate_single(self.test_loader, "test")
+
+    def _evaluate_single(self, loader, title):
         # compute predictions
-        self.amplitudes_truth_prepd = self.test_loader.dataset.amplitudes.numpy()
-        self.amplitudes_pred_prepd = np.zeros((0, 1))
-        LOGGER.info(f"Starting to evaluate model on test dataset with {self.amplitudes_truth_prepd.shape[0]} elements")
+        # note: shuffle=True or False does not matter, because we take the predictions directly from the dataloader and not from the dataset
+        amplitudes_truth_prepd, amplitudes_pred_prepd = np.zeros((0, 1)), np.zeros((0, 1))
+        LOGGER.info(f"Starting to evaluate model on {title} dataset with {amplitudes_truth_prepd.shape[0]} elements")
         with torch.no_grad():
-            for x, _ in self.test_loader:
+            for x, y in loader:
                 y_pred = self.model(x.to(self.device), type_token=self.type_token)
-                self.amplitudes_pred_prepd = np.concatenate((self.amplitudes_pred_prepd,
-                                                             y_pred.cpu().numpy()), axis=0)
-        assert self.amplitudes_truth_prepd.shape == self.amplitudes_pred_prepd.shape
+                amplitudes_pred_prepd = np.concatenate((amplitudes_pred_prepd,
+                                                        y_pred.cpu().numpy()), axis=0)
+                amplitudes_truth_prepd = np.concatenate((amplitudes_truth_prepd,
+                                                         y.cpu().numpy()), axis=0)
+        assert amplitudes_truth_prepd.shape == amplitudes_pred_prepd.shape \
+               and amplitudes_truth_prepd.shape == loader.dataset.amplitudes.shape
 
         # compute metrics over preprocessed amplitudes 
-        self.mse_prepd = np.mean( (self.amplitudes_truth_prepd - self.amplitudes_pred_prepd) **2)
-        self.mae_prepd = np.linalg.norm(self.amplitudes_truth_prepd - self.amplitudes_pred_prepd, axis=1).mean()
-        LOGGER.info(f"Metrics on test dataset (preprocessed): \tMSE={self.mse_prepd:.4e}, MAE={self.mae_prepd:.4e}")
+        mse_prepd = np.mean( (amplitudes_truth_prepd - amplitudes_pred_prepd) **2)
+        mae_prepd = np.linalg.norm(amplitudes_truth_prepd - amplitudes_pred_prepd, axis=1).mean()
+        LOGGER.info(f"logA_pred - logA_truth on {title} dataset:\t\tMSE={mse_prepd:.4e}, MAE={mae_prepd:.4e}")
 
         # undo preprocessing
-        self.amplitudes_truth = undo_preprocess_amplitude(self.amplitudes_truth_prepd,
-                                                          self.amplitudes_mean, self.amplitudes_std)
-        self.amplitudes_pred = undo_preprocess_amplitude(self.amplitudes_pred_prepd,
-                                                          self.amplitudes_mean, self.amplitudes_std)
+        amplitudes_truth = undo_preprocess_amplitude(amplitudes_truth_prepd,
+                                                     self.amplitudes_mean, self.amplitudes_std)
+        amplitudes_pred = undo_preprocess_amplitude(amplitudes_pred_prepd,
+                                                  self.amplitudes_mean, self.amplitudes_std)
 
         # compute metrics
-        self.mse = np.mean( (self.amplitudes_truth - self.amplitudes_pred) **2)
-        self.mae = np.linalg.norm(self.amplitudes_truth - self.amplitudes_pred, axis=1).mean()
-        LOGGER.info(f"Metrics on test dataset: \t\t\tMSE={self.mse:.4e}, MAE={self.mae:.4e}")
+        delta = (amplitudes_truth - amplitudes_pred) / amplitudes_truth
+        LOGGER.info(f"delta_mean = {np.mean(delta):.4f}, delta_std = {np.std(delta):.4f}")
+        mse = np.mean( delta**2)
+        mae = np.linalg.norm(delta, axis=1).mean()
+        LOGGER.info(f"delta=(A_pred-A_truth)/A_truth on {title} dataset:\tMSE={mse:.4e}, MAE={mae:.4e}")
+
+        delta_maxs = [.001, .01, .1]
+        delta_rates = []
+        for delta_max in delta_maxs:
+            rate = np.mean( (delta > -delta_max) * (delta < delta_max)) # rate of events with -delta_max < delta < delta_max
+            delta_rates.append(rate)
+        LOGGER.info(f"rate of events in delta interval on {title} dataset:\t"\
+                    f"{[f'{delta_rates[i]:.4f} ({delta_maxs[i]})' for i in range(len(delta_maxs))]}")
+
+        return amplitudes_pred, amplitudes_truth
 
     def plot(self):
-        plot_path = os.path.join(self.exp_dir, f"plots_{self.cfg.exp_idx}")
+        plot_path = os.path.join(self.cfg.exp_dir, f"plots_{self.cfg.exp_idx}")
         os.makedirs(plot_path)
-        dataset_title = {"aag": r"$gg\to\gamma\gamma g$", "aagg": r"$gg\to\gamma\gamma gg$",
-                              "zjj": r"$q\bar q'\to Zjj$", "zjjj": r"$q\bar q'\to Zjjj$",
-                         "zjjjj": r"$q\bar q'\to Zjjjj$"}[self.cfg.data.dataset]
+        dataset_title = DATASET_TITLE_DICT[self.cfg.data.dataset]
         model_title = {"GATr": "GATr", "Transformer": "Tr", "MLP": "MLP"}[type(self.model.net).__name__]
         title = f"{model_title}: {dataset_title}"
         
-        if self.cfg.plotting.loss:
+        if self.cfg.plotting.loss and self.cfg.train:
             file = f"{plot_path}/loss.pdf"
             plot_loss(file, [self.metrics["loss"]], self.metrics["lr"], labels=["loss"])
 
-        if self.cfg.plotting.histograms:
+        if self.cfg.plotting.histograms and self.cfg.evaluate:
             out = f"{plot_path}/histograms.pdf"
             with PdfPages(out) as file:
                 labels = ["Test", "Train", "Prediction"]
 
-                data = [np.log(self.amplitudes_truth), np.log(self.amplitudes[:self.split]),
-                        np.log(self.amplitudes_pred)]
+                data = [np.log(self.amplitudes_truth_test), np.log(self.amplitudes_truth_train),
+                        np.log(self.amplitudes_pred_test)]
                 plot_histograms(file, data, labels, title=title,
                            xlabel=r"$\log A$", logx=False)
 
-        if self.cfg.plotting.delta:
+        if self.cfg.plotting.delta and self.cfg.evaluate:
             out = f"{plot_path}/delta.pdf"
             with PdfPages(out) as file:
-                data = (self.amplitudes_truth - self.amplitudes_pred) / self.amplitudes_truth
+                data = (self.amplitudes_truth_test - self.amplitudes_pred_test) / self.amplitudes_truth_test * 100
+                plot_single_histogram(file, data, title=title,
+                           xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$ [\%]",
+                           logx=False, xrange=(-10, 10), bins=200)
+                data /= 100
                 plot_single_histogram(file, data, title=title,
                            xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$",
-                           logx=False, xrange=(-.1, .1), bins=200)
+                           logx=False, xrange=(-.3, .3), bins=50)
+                
+                data = (self.amplitudes_truth_train - self.amplitudes_pred_train) / self.amplitudes_truth_train * 100
                 plot_single_histogram(file, data, title=title,
-                           xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$",
+                           xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$ [\%] (train)",
+                           logx=False, xrange=(-10, 10), bins=200)
+                data /= 100
+                plot_single_histogram(file, data, title=title,
+                           xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$ (train)",
                            logx=False, xrange=(-.3, .3), bins=50)
 
     def _init_experiment(self):
         self.warm_start = False if self.cfg.warm_start_path is None else True
+
+        modelname = self.cfg.model.net._target_.rsplit(".", 1)[-1]
+        with open_dict(self.cfg):
+            # append modelname to exp_name
+            self.cfg.exp_name = f"{self.cfg.exp_name}_{modelname}"
 
         if not self.warm_start:
             rnd_number = np.random.randint(low=0, high=9999)
@@ -231,6 +265,8 @@ class AmplitudeExperiment:
             if not self.warm_start:
                 self.cfg.exp_dir = self.exp_dir
 
+        LOGGER.debug(OmegaConf.to_yaml(self.cfg))
+
         # set seed
         if self.cfg.seed is not None:
             LOGGER.info(f"Using seed {self.cfg.seed}")
@@ -243,7 +279,7 @@ class AmplitudeExperiment:
         if exp_dir.exists() and not self.warm_start:
             LOGGER.error(f"Experiment in directory {self.cfg.exp_dir} alredy exists. Aborting.")
             exit()
-        os.makedirs(exp_dir)
+        os.makedirs(exp_dir, exist_ok=True)
         os.makedirs(os.path.join(exp_dir, "models"), exist_ok=True)
             
         self._save_config("config.yaml")
@@ -347,7 +383,7 @@ class AmplitudeExperiment:
 
         LOGGER.info(f"Using learning rate scheduler {self.cfg.training.scheduler}")
 
-    def _train(self):
+    def train(self):
         # performance metrics
         self.metrics = {"loss": [], "lr": []}
         self.loss = torch.nn.MSELoss()
@@ -377,10 +413,14 @@ class AmplitudeExperiment:
         x, y = x.to(self.device), y.to(self.device)
 
         y_pred = self.model(x, type_token=self.type_token)
-        if not self.cfg.training.loss_prepd:
-            y = (y * torch.tensor(self.amplitudes_std) + torch.tensor(self.amplitudes_mean)).exp()
-            y_pred = (y_pred * torch.tensor(self.amplitudes_std) + torch.tensor(self.amplitudes_mean)).exp()
-        loss = self.loss(y, y_pred)
+        if self.cfg.training.loss_delta: # probably dont want to use this
+            y = (y * torch.tensor(self.amplitudes_std, device=self.device) \
+                 + torch.tensor(self.amplitudes_mean, device=self.device)).exp()
+            y_pred = (y_pred * torch.tensor(self.amplitudes_std, device=self.device) \
+                      + torch.tensor(self.amplitudes_mean, device=self.device)).exp()
+            y_pred = y_pred / y
+            y = torch.ones_like(y)
+        loss = self.loss(y_pred, y)
         assert torch.isfinite(loss).all()
 
         self.optimizer.zero_grad()

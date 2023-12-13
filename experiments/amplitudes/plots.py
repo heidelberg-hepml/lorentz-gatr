@@ -61,7 +61,9 @@ def plot_histograms(file, data, labels, bins=60, xlabel=None,
     
 def plot_single_histogram(file, data, bins=60, xlabel=None,
                    title=None, logx=False, logy=False, xrange=None):
-    hist, bins = np.histogram(data, bins=bins, range=xrange)
+    assert xrange is not None
+    data = np.clip(data, xrange[0], xrange[1])
+    hist, bins = np.histogram(data, bins=bins-1, range=xrange)
     scale = 1/np.sum((bins[1:] - bins[:-1]) * hist)
     dup_last = lambda a: np.append(a, a[-1])
 
@@ -76,6 +78,7 @@ def plot_single_histogram(file, data, bins=60, xlabel=None,
     axs.set_xlabel(xlabel, fontsize = FONTSIZE)
 
     _, ymax=axs.get_ylim()
+    axs.vlines(0., 0., ymax, color="k", linestyle="--", lw=.5)
     axs.set_ylim(0., ymax)
     axs.set_xlim(xrange)
     axs.tick_params(axis="both", labelsize=FONTSIZE_TICK)

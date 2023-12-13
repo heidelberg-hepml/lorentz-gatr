@@ -10,9 +10,18 @@ from experiments.amplitudes.preprocessing import preprocess_particles
 
 class AmplitudeGATrWrapper(nn.Module):
 
-    def __init__(self, net):
+    def __init__(self, net,
+                 mlp_blocks, mlp_channels, average):
         super().__init__()
         self.net = net
+        self.average = average
+
+        layers = [nn.GELU()] # start with activation, because the transformer finished with a linear layer
+        for _ in range(mlp_blocks):
+            layers.append(nn.Linear(mlp_channels, mlp_channels))
+            layers.append(nn.GELU())
+        layers.append(nn.Linear(mlp_channels, 1))
+        self.mlp = nn.Sequential(*layers)
 
     def forward(self, inputs: torch.Tensor, type_token):
         batchsize, num_features = inputs.shape
@@ -21,7 +30,15 @@ class AmplitudeGATrWrapper(nn.Module):
         multivector, scalars = self.embed_into_ga(inputs, type_token)
 
         multivector_outputs, scalar_outputs = self.net(multivector, scalars=scalars)
-        amplitude = self.extract_from_ga(multivector_outputs, scalar_outputs)
+        mv_outputs = self.extract_from_ga(multivector_outputs, scalar_outputs)
+
+        outputs = mv_outputs
+        #outputs = scalar_outputs
+        if self.average:
+            outputs = outputs.mean(dim=1)
+        else:
+            outputs = outputs[:,0,:]
+        amplitude = self.mlp(outputs)
 
         return amplitude
 
@@ -40,14 +57,10 @@ class AmplitudeGATrWrapper(nn.Module):
         return multivector, scalars
 
     def extract_from_ga(self, multivector, scalars):
-        # Check channels of inputs. Batchsize and object numbers are free.
-        assert multivector.shape[2:] == (1, 16)
-        assert scalars.shape[2:] == (1,)
+        # Extract scalars from GA representation
+        outputs = extract_scalar(multivector)[...,0]
 
-        # Extract amplitude from one (arbitrary but fixed) object
-        amplitude = extract_scalar(multivector[:, 0, 0, :])
-
-        return amplitude
+        return outputs
 
 
 class AmplitudeMLPWrapper(nn.Module):
@@ -63,9 +76,18 @@ class AmplitudeMLPWrapper(nn.Module):
 
 class AmplitudeTransformerWrapper(nn.Module):
 
-    def __init__(self, net):
+    def __init__(self, net,
+                 mlp_blocks, mlp_channels, average):
         super().__init__()
         self.net = net
+        self.average = average
+
+        layers = [nn.GELU()] # start with activation, because the transformer finished with a linear layer
+        for _ in range(mlp_blocks):
+            layers.append(nn.Linear(mlp_channels, mlp_channels))
+            layers.append(nn.GELU())
+        layers.append(nn.Linear(mlp_channels, 1))
+        self.mlp = nn.Sequential(*layers)
 
     def forward(self, inputs, type_token):
         batchsize, num_inputs = inputs.shape
@@ -77,6 +99,10 @@ class AmplitudeTransformerWrapper(nn.Module):
         inputs = torch.cat((inputs, type_token), dim=-1)
         
         outputs = self.net(inputs)
-        amplitudes = outputs.mean(dim=1)
+        if self.average:
+            outputs = outputs.mean(dim=1) # average over transformer set elements
+        else:
+            outputs = outputs[:,0,:] # pick first transformer set element
+        amplitudes = self.mlp(outputs)
         
         return amplitudes

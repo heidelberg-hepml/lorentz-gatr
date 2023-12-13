@@ -4,13 +4,16 @@ debug: false
 warm_start_path: null
 warm_start_idx: 0
 
+data:
+ include_permsym: false
+
 train: true
 training:
  n_epochs : 100
  split : .5
  subsample: null
 
- loss_prepd: false
+ loss_delta: false
 
  optimizer : Adam
  lr: 3.e-4
