@@ -12,7 +12,7 @@ from gatr.layers.linear import EquiLinear
 from gatr.layers.mlp.config import MLPConfig
 from gatr.layers.mlp.geometric_bilinears import GeometricBilinear
 from gatr.layers.mlp.nonlinearities import ScalarGatedNonlinearity
-
+from gatr.layers.layer_norm import EquiLayerNorm
 
 class GeoMLP(nn.Module):
     """Geometric MLP.
@@ -55,6 +55,8 @@ class GeoMLP(nn.Module):
                     out_s_channels=s_channels[1],
                 )
             )
+            layers.append(EquiLayerNorm())
+                
             if config.dropout_prob is not None:
                 layers.append(GradeDropout(config.dropout_prob))
 

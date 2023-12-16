@@ -10,7 +10,8 @@ from hydra.core.config_store import ConfigStore
 from hydra.utils import instantiate
 from matplotlib.backends.backend_pdf import PdfPages
 
-from experiments.amplitudes.wrappers import AmplitudeMLPWrapper, AmplitudeTransformerWrapper, AmplitudeGATrWrapper
+from experiments.amplitudes.wrappers import AmplitudeMLPWrapper, AmplitudeTransformerWrapper, \
+     AmplitudeGATrWrapper, AmplitudeGAMLPWrapper
 from experiments.amplitudes.dataset import AmplitudeDataset
 from experiments.amplitudes.preprocessing import preprocess_particles, preprocess_amplitude, undo_preprocess_amplitude
 from experiments.amplitudes.plots import plot_histograms, plot_loss, plot_single_histogram
@@ -31,6 +32,8 @@ TYPE_TOKEN_DICT = {"aag": [0,1,2,2,3], "aagg": [0,1,2,2,3,3],
 DATASET_TITLE_DICT = {"aag": r"$gg\to\gamma\gamma g$", "aagg": r"$gg\to\gamma\gamma gg$",
                       "zjj": r"$q\bar q\to Zjj$", "zjjj": r"$q\bar q\to Zjjj$",
                       "zjjjj": r"$q\bar q\to Zjjjj$"}
+
+MODEL_TITLE_DICT = {"GATr": "GATr", "Transformer": "Tr", "MLP": "MLP", "GAMLP": "GAMLP"}
 
 class AmplitudeExperiment:
 
@@ -100,6 +103,8 @@ class AmplitudeExperiment:
                 self.cfg.model.net.in_s_channels = n_tokens
             elif modelname == "Transformer":
                 self.cfg.model.net.in_channels = 4 + n_tokens
+            elif modelname == "GAMLP":
+                self.cfg.model.net.in_mv_channels = len(TYPE_TOKEN_DICT[self.cfg.data.dataset])
             elif modelname == "MLP":
                 self.cfg.model.net.in_shape = 4 * len(TYPE_TOKEN_DICT[self.cfg.data.dataset])
 
@@ -195,7 +200,7 @@ class AmplitudeExperiment:
         plot_path = os.path.join(self.cfg.exp_dir, f"plots_{self.cfg.exp_idx}")
         os.makedirs(plot_path)
         dataset_title = DATASET_TITLE_DICT[self.cfg.data.dataset]
-        model_title = {"GATr": "GATr", "Transformer": "Tr", "MLP": "MLP"}[type(self.model.net).__name__]
+        model_title = MODEL_TITLE_DICT[type(self.model.net).__name__]
         title = f"{model_title}: {dataset_title}"
         
         if self.cfg.plotting.loss and self.cfg.train:
@@ -413,13 +418,6 @@ class AmplitudeExperiment:
         x, y = x.to(self.device), y.to(self.device)
 
         y_pred = self.model(x, type_token=self.type_token)
-        if self.cfg.training.loss_delta: # probably dont want to use this
-            y = (y * torch.tensor(self.amplitudes_std, device=self.device) \
-                 + torch.tensor(self.amplitudes_mean, device=self.device)).exp()
-            y_pred = (y_pred * torch.tensor(self.amplitudes_std, device=self.device) \
-                      + torch.tensor(self.amplitudes_mean, device=self.device)).exp()
-            y_pred = y_pred / y
-            y = torch.ones_like(y)
         loss = self.loss(y_pred, y)
         assert torch.isfinite(loss).all()
 

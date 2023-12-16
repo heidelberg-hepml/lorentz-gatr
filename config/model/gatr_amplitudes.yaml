@@ -1,6 +1,7 @@
 _target_: experiments.amplitudes.wrappers.AmplitudeGATrWrapper
 mlp_blocks: 1
-mlp_channels: ${model.net.out_mv_channels}
+mlp_channels_mv: ${model.net.out_mv_channels}
+mlp_channels_s: ${model.net.out_s_channels}
 average: false
 
 net:

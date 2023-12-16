@@ -6,62 +6,8 @@ import torch
 from torch import nn
 
 from gatr.interface import embed_vector, extract_scalar
+from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity
 from experiments.amplitudes.preprocessing import preprocess_particles
-
-class AmplitudeGATrWrapper(nn.Module):
-
-    def __init__(self, net,
-                 mlp_blocks, mlp_channels, average):
-        super().__init__()
-        self.net = net
-        self.average = average
-
-        layers = [nn.GELU()] # start with activation, because the transformer finished with a linear layer
-        for _ in range(mlp_blocks):
-            layers.append(nn.Linear(mlp_channels, mlp_channels))
-            layers.append(nn.GELU())
-        layers.append(nn.Linear(mlp_channels, 1))
-        self.mlp = nn.Sequential(*layers)
-
-    def forward(self, inputs: torch.Tensor, type_token):
-        batchsize, num_features = inputs.shape
-        inputs = inputs.reshape(batchsize, num_features // 4, 4)
-
-        multivector, scalars = self.embed_into_ga(inputs, type_token)
-
-        multivector_outputs, scalar_outputs = self.net(multivector, scalars=scalars)
-        mv_outputs = self.extract_from_ga(multivector_outputs, scalar_outputs)
-
-        outputs = mv_outputs
-        #outputs = scalar_outputs
-        if self.average:
-            outputs = outputs.mean(dim=1)
-        else:
-            outputs = outputs[:,0,:]
-        amplitude = self.mlp(outputs)
-
-        return amplitude
-
-    def embed_into_ga(self, inputs, type_token):
-        batchsize, num_objects, _ = inputs.shape
-
-        # encode momenta in multivectors
-        multivector = embed_vector(inputs)
-        multivector = multivector.unsqueeze(2)
-
-        # encode type_token in scalars
-        type_token = torch.tensor(type_token, device=inputs.device)
-        scalars = nn.functional.one_hot(type_token, num_classes=type_token.max()+1)
-        scalars = scalars.unsqueeze(0).expand(batchsize, *scalars.shape).to(inputs.dtype)
-
-        return multivector, scalars
-
-    def extract_from_ga(self, multivector, scalars):
-        # Extract scalars from GA representation
-        outputs = extract_scalar(multivector)[...,0]
-
-        return outputs
-
 
 class AmplitudeMLPWrapper(nn.Module):
 
@@ -106,3 +52,104 @@ class AmplitudeTransformerWrapper(nn.Module):
         amplitudes = self.mlp(outputs)
         
         return amplitudes
+
+class AmplitudeGAMLPWrapper(nn.Module):
+
+    def __init__(self, net):
+        super().__init__()
+        self.net = net
+
+    def forward(self, inputs: torch.Tensor, type_token):
+        # ignore type token
+        batchsize, num_features = inputs.shape
+        inputs = inputs.reshape(batchsize, num_features // 4, 4)
+
+        multivector, scalars = self.embed_into_ga(inputs)
+
+        multivector_outputs, scalar_outputs = self.net(multivector, scalars=scalars)
+
+        amplitude = self.extract_from_ga(multivector_outputs, scalar_outputs)
+
+        return amplitude
+
+    def embed_into_ga(self, inputs):
+        batchsize, num_channels, _ = inputs.shape
+
+        # encode momenta in multivectors
+        multivector = embed_vector(inputs)
+        scalars = torch.zeros((batchsize, 1), device=inputs.device)
+
+        return multivector, scalars
+
+    def extract_from_ga(self, multivector, scalars):
+        # Extract scalars from GA representation
+        outputs = extract_scalar(multivector)[...,0]
+
+        return outputs
+
+
+class AmplitudeGATrWrapper(nn.Module):
+
+    def __init__(self, net,
+                 mlp_blocks, mlp_channels_mv, mlp_channels_s, average, mlp_activation="gelu"):
+        super().__init__()
+        self.net = net
+        self.average = average
+
+        #layers = [nn.GELU()] # start with activation, because the transformer finished with a linear layer
+        #for _ in range(mlp_blocks):
+        #    layers.append(nn.Linear(mlp_channels, mlp_channels))
+        #    layers.append(nn.GELU())
+        #layers.append(nn.Linear(mlp_channels, 1))
+
+        layers = [ScalarGatedNonlinearity(mlp_activation)]
+        for _ in range(mlp_blocks):
+            layers.append(EquiLinear(mlp_channels_mv, mlp_channels_mv,
+                                     in_s_channels=mlp_channels_s, out_s_channels=mlp_channels_s))
+            layers.append(ScalarGatedNonlinearity(mlp_activation))
+        layers.append(EquiLinear(mlp_channels_mv, 1, in_s_channels=mlp_channels_s, out_s_channels=1))
+
+        self.mlp = nn.ModuleList(layers)
+
+    def forward(self, inputs: torch.Tensor, type_token):
+        batchsize, num_features = inputs.shape
+        inputs = inputs.reshape(batchsize, num_features // 4, 4)
+
+        multivector, scalars = self.embed_into_ga(inputs, type_token)
+
+        multivector_outputs, scalar_outputs = self.net(multivector, scalars=scalars)
+        #mv_outputs = self.extract_from_ga(multivector_outputs, scalar_outputs)
+
+        #outputs = mv_outputs
+        #if self.average:
+        #    outputs = outputs.mean(dim=1)
+        #else:
+        #    outputs = outputs[:,0,:]
+        #amplitude = self.mlp(outputs)
+        
+        mlp_mv, mlp_scalar = multivector_outputs[:,0,...], scalar_outputs[:,0,...]
+        for layer in self.mlp:
+            mlp_mv, mlp_scalar = layer(mlp_mv, scalars=mlp_scalar)
+        amplitude = extract_scalar(mlp_mv)[...,0]
+
+        return amplitude
+
+    def embed_into_ga(self, inputs, type_token):
+        batchsize, num_objects, _ = inputs.shape
+
+        # encode momenta in multivectors
+        multivector = embed_vector(inputs)
+        multivector = multivector.unsqueeze(2)
+
+        # encode type_token in scalars
+        type_token = torch.tensor(type_token, device=inputs.device)
+        scalars = nn.functional.one_hot(type_token, num_classes=type_token.max()+1)
+        scalars = scalars.unsqueeze(0).expand(batchsize, *scalars.shape).to(inputs.dtype)
+
+        return multivector, scalars
+
+    def extract_from_ga(self, multivector, scalars):
+        # Extract scalars from GA representation
+        outputs = extract_scalar(multivector)[...,0]
+
+        return outputs
