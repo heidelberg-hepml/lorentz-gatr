@@ -11,13 +11,13 @@ from hydra.utils import instantiate
 from matplotlib.backends.backend_pdf import PdfPages
 
 from experiments.amplitudes.wrappers import AmplitudeMLPWrapper, AmplitudeTransformerWrapper, \
-     AmplitudeGATrWrapper, AmplitudeGAMLPWrapper
+     AmplitudeCLSTrWrapper, AmplitudeGATrWrapper, AmplitudeGAMLPWrapper
 from experiments.amplitudes.dataset import AmplitudeDataset
 from experiments.amplitudes.preprocessing import preprocess_particles, preprocess_amplitude, undo_preprocess_amplitude
 from experiments.amplitudes.plots import plot_histograms, plot_loss, plot_single_histogram
 from experiments.misc import get_device
 import experiments.logger
-from experiments.logger import LOGGER, MEMORY_HANDLER
+from experiments.logger import LOGGER, MEMORY_HANDLER, FORMATTER
 
 from gatr.layers import MLPConfig, SelfAttentionConfig
 cs = ConfigStore.instance()
@@ -28,12 +28,11 @@ cs.store(name="base_mlp", node=MLPConfig)
 TYPE_TOKEN_DICT = {"aag": [0,1,2,2,3], "aagg": [0,1,2,2,3,3],
                     "zjj": [0,1,2,3,3], "zjjj": [0,1,2,3,3,3],
                     "zjjjj": [0,1,2,3,3,3,3]}
-
 DATASET_TITLE_DICT = {"aag": r"$gg\to\gamma\gamma g$", "aagg": r"$gg\to\gamma\gamma gg$",
                       "zjj": r"$q\bar q\to Zjj$", "zjjj": r"$q\bar q\to Zjjj$",
                       "zjjjj": r"$q\bar q\to Zjjjj$"}
-
-MODEL_TITLE_DICT = {"GATr": "GATr", "Transformer": "Tr", "MLP": "MLP", "GAMLP": "GAMLP"}
+MODEL_TITLE_DICT = {"GATr": "GATr", "Transformer": "Tr", "MLP": "MLP", "CLSTr": "CLSTr", "GAMLP": "GAMLP"}
+BASELINE_MODELS = ["MLP", "Transformer", "CLSTr"]
 
 class AmplitudeExperiment:
 
@@ -99,14 +98,16 @@ class AmplitudeExperiment:
         modelname = self.cfg.model.net._target_.rsplit(".", 1)[-1]
         with open_dict(self.cfg):
             # specify shape of type_token
-            if modelname == "GATr":
+            if modelname == "GATr" or modelname == "CLSGATr":
                 self.cfg.model.net.in_s_channels = n_tokens
-            elif modelname == "Transformer":
+            elif modelname == "Transformer" or modelname == "CLSTr":
                 self.cfg.model.net.in_channels = 4 + n_tokens
             elif modelname == "GAMLP":
                 self.cfg.model.net.in_mv_channels = len(TYPE_TOKEN_DICT[self.cfg.data.dataset])
             elif modelname == "MLP":
                 self.cfg.model.net.in_shape = 4 * len(TYPE_TOKEN_DICT[self.cfg.data.dataset])
+            else:
+                raise ValueError(f"model {modelname} not implemented")
 
     def init_model(self):
         # initialize model
@@ -116,13 +117,12 @@ class AmplitudeExperiment:
 
         # load existing model if specified
         if self.warm_start:
-            warm_start_idx = 0 if self.cfg.warm_start_idx is None else self.cfg.warm_start_idx
-            model_path = os.path.join(self.cfg.warm_start_path, "models", f"model_{warm_start_idx}.pt")
+            model_path = os.path.join(self.cfg.exp_dir, "models", f"model_{self.cfg.warm_start_idx}.pt")
             try:
                 state_dict = torch.load(model_path, map_location="cpu")
             except FileNotFoundError:
                 raise ValueError(f"Cannot load model from {model_path}")
-            LOGGER.info(f"Loaded model from {model_path}")
+            LOGGER.info(f"Loading model from {model_path}")
             self.model.load_state_dict(state_dict)
 
         self.model.to(self.device)
@@ -144,20 +144,22 @@ class AmplitudeExperiment:
 
         # preprocess data
         self.amplitudes_prepd, self.amplitudes_mean, self.amplitudes_std = preprocess_amplitude(self.amplitudes)
-        if type(self.model.net).__name__ in ["MLP", "Transformer"]:
+        if type(self.model.net).__name__ in BASELINE_MODELS:
             self.particles_prepd, self.particles_mean, self.particles_std = preprocess_particles(self.particles)
         else:
             self.particles_prepd = self.particles / self.particles.std()
 
     def evaluate(self):
-        self.amplitudes_pred_train, self.amplitudes_truth_train = self._evaluate_single(self.train_loader, "train")
-        self.amplitudes_pred_test, self.amplitudes_truth_test = self._evaluate_single(self.test_loader, "test")
+        self.amplitudes_pred_train, self.amplitudes_truth_train, self.amplitudes_pred_train_prepd, self.amplitudes_truth_train_prepd \
+                                    = self._evaluate_single(self.train_loader, "train")
+        self.amplitudes_pred_test, self.amplitudes_truth_test, self.amplitudes_pred_test_prepd, self.amplitudes_truth_test_prepd \
+                                   = self._evaluate_single(self.test_loader, "test")
 
     def _evaluate_single(self, loader, title):
         # compute predictions
         # note: shuffle=True or False does not matter, because we take the predictions directly from the dataloader and not from the dataset
         amplitudes_truth_prepd, amplitudes_pred_prepd = np.zeros((0, 1)), np.zeros((0, 1))
-        LOGGER.info(f"Starting to evaluate model on {title} dataset with {amplitudes_truth_prepd.shape[0]} elements")
+        LOGGER.info(f"Starting to evaluate model on {title} dataset with {loader.dataset.amplitudes.shape[0]} elements")
         with torch.no_grad():
             for x, y in loader:
                 y_pred = self.model(x.to(self.device), type_token=self.type_token)
@@ -194,7 +196,7 @@ class AmplitudeExperiment:
         LOGGER.info(f"rate of events in delta interval on {title} dataset:\t"\
                     f"{[f'{delta_rates[i]:.4f} ({delta_maxs[i]})' for i in range(len(delta_maxs))]}")
 
-        return amplitudes_pred, amplitudes_truth
+        return amplitudes_pred, amplitudes_truth, amplitudes_truth_prepd, amplitudes_pred_prepd
 
     def plot(self):
         plot_path = os.path.join(self.cfg.exp_dir, f"plots_{self.cfg.exp_idx}")
@@ -220,26 +222,72 @@ class AmplitudeExperiment:
         if self.cfg.plotting.delta and self.cfg.evaluate:
             out = f"{plot_path}/delta.pdf"
             with PdfPages(out) as file:
-                data = (self.amplitudes_truth_test - self.amplitudes_pred_test) / self.amplitudes_truth_test * 100
-                plot_single_histogram(file, data, title=title,
+                data_test = (self.amplitudes_truth_test - self.amplitudes_pred_test) / self.amplitudes_truth_test
+                data_train = (self.amplitudes_truth_train - self.amplitudes_pred_train) / self.amplitudes_truth_train
+
+                plot_single_histogram(file, data_test*100, title=title,
                            xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$ [\%]",
                            logx=False, xrange=(-10, 10), bins=200)
-                data /= 100
-                plot_single_histogram(file, data, title=title,
-                           xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$",
-                           logx=False, xrange=(-.3, .3), bins=50)
-                
-                data = (self.amplitudes_truth_train - self.amplitudes_pred_train) / self.amplitudes_truth_train * 100
-                plot_single_histogram(file, data, title=title,
+                plot_single_histogram(file, data_train*100, title=title,
                            xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$ [\%] (train)",
                            logx=False, xrange=(-10, 10), bins=200)
-                data /= 100
-                plot_single_histogram(file, data, title=title,
+                
+                plot_single_histogram(file, data_test, title=title,
+                           xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$",
+                           logx=False, xrange=(-.3, .3), bins=50)
+                plot_single_histogram(file, data_train, title=title,
                            xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$ (train)",
                            logx=False, xrange=(-.3, .3), bins=50)
 
+                plot_single_histogram(file, data_test, title=title,
+                           xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$",
+                           logx=False, xrange=(-1., 1.), bins=50)
+                plot_single_histogram(file, data_train, title=title,
+                           xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$ (train)",
+                           logx=False, xrange=(-1., 1.), bins=50)
+
+                plot_single_histogram(file, data_test, title=title,
+                           xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$",
+                           logx=False, xrange=(-10., 10.), bins=50)
+                plot_single_histogram(file, data_train, title=title,
+                           xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$ (train)",
+                           logx=False, xrange=(-10., 10.), bins=50)
+
+        if self.cfg.plotting.delta_prepd and self.cfg.evaluate:
+            out = f"{plot_path}/delta_prepd.pdf"
+            with PdfPages(out) as file:
+                data_test = (self.amplitudes_truth_test_prepd - self.amplitudes_pred_test_prepd) / self.amplitudes_truth_test_prepd
+                data_train = (self.amplitudes_truth_train_prepd - self.amplitudes_pred_train_prepd) / self.amplitudes_truth_train_prepd
+
+                plot_single_histogram(file, data_test*100, title=title,
+                           xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$ [\%]",
+                           logx=False, xrange=(-10, 10), bins=200)
+                plot_single_histogram(file, data_train*100, title=title,
+                           xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$ [\%] (train)",
+                           logx=False, xrange=(-10, 10), bins=200)
+                
+                plot_single_histogram(file, data_test, title=title,
+                           xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$",
+                           logx=False, xrange=(-.3, .3), bins=50)
+                plot_single_histogram(file, data_train, title=title,
+                           xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$ (train)",
+                           logx=False, xrange=(-.3, .3), bins=50)
+
+                plot_single_histogram(file, data_test, title=title,
+                           xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$",
+                           logx=False, xrange=(-1., 1.), bins=50)
+                plot_single_histogram(file, data_train, title=title,
+                           xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$ (train)",
+                           logx=False, xrange=(-1., 1.), bins=50)
+
+                plot_single_histogram(file, data_test, title=title,
+                           xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$",
+                           logx=False, xrange=(-10., 10.), bins=50)
+                plot_single_histogram(file, data_train, title=title,
+                           xlabel=r"$\Delta = \frac{A_\mathrm{truth} - A_\mathrm{pred}}{A_\mathrm{truth}}$ (train)",
+                           logx=False, xrange=(-10., 10.), bins=50)
     def _init_experiment(self):
-        self.warm_start = False if self.cfg.warm_start_path is None else True
+        self.warm_start = False if self.cfg.warm_start_idx is None else True
 
         modelname = self.cfg.model.net._target_.rsplit(".", 1)[-1]
         with open_dict(self.cfg):
@@ -250,24 +298,17 @@ class AmplitudeExperiment:
             rnd_number = np.random.randint(low=0, high=9999)
             exp_name = f"{self.cfg.exp_name}_{rnd_number:04}"
             self.exp_dir = os.path.join(self.cfg.base_dir, "runs", exp_name)
+            exp_idx = 0
             LOGGER.info(f"Creating new experiment {self.exp_dir}")
             
-            self.exp_idx = 0
-            
         else:
-            config_path = os.path.join(self.cfg.warm_start_path, "config.yaml")
-            try:
-                warm_start_cfg = OmegaConf.load(config_path) # overwrite self.cfg
-            except FileNotFoundError:
-                raise ValueError(f"Cannot load config from {config_path}")
-            self.cfg = OmegaConf.merge(warm_start_cfg, self.cfg) # warm_start_cfg overrides others
-            self.exp_idx = self.cfg.exp_idx + 1
-            LOGGER.info(f"Warm-starting from existing experiment {self.cfg.exp_dir} for {self.exp_idx}th time")
+            exp_idx = self.cfg.exp_idx + 1
+            LOGGER.info(f"Warm-starting from existing experiment {self.cfg.exp_dir} for run {exp_idx}")
 
         with open_dict(self.cfg):
-            self.cfg.exp_idx = self.exp_idx
-            self.cfg.warm_start = self.warm_start
+            self.cfg.exp_idx = exp_idx
             if not self.warm_start:
+                self.cfg.warm_start_idx = 0
                 self.cfg.exp_dir = self.exp_dir
 
         LOGGER.debug(OmegaConf.to_yaml(self.cfg))
@@ -286,9 +327,24 @@ class AmplitudeExperiment:
             exit()
         os.makedirs(exp_dir, exist_ok=True)
         os.makedirs(os.path.join(exp_dir, "models"), exist_ok=True)
-            
-        self._save_config("config.yaml")
-        self._save_config(f"config_{self.cfg.exp_idx}.yaml")
+
+        # save config
+        self._save_config("amplitudes.yaml")
+        self._save_config(f"amplitudes_{self.cfg.exp_idx}.yaml")
+
+        # save source
+        if self.cfg.save_source:
+            zip_name = os.path.join(self.cfg.exp_dir, "source.zip")
+            zipf = zipfile.ZipFile(zip_name, "w", zipfile.ZIP_DEFLATED)
+            path_gatr = os.path.join(self.cfg.base_dir, "gatr")
+            path_experiment = os.path.join(self.cfg.base_dir, "experiments")
+            for path in [path_gatr, path_experiment]:
+                for root, dirs, files in os.walk(path):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        zipf.write(file_path, os.path.relpath(file_path, path))
+            zipf.close()
+            LOGGER.info(f"Saved source to {zip_name}")
 
     def _init_logger(self):
         if experiments.logger.logging_initialized:
@@ -296,17 +352,15 @@ class AmplitudeExperiment:
             return
         
         LOGGER.setLevel(logging.DEBUG if self.cfg.debug else logging.INFO)
-        formatter = logging.Formatter("[%(asctime)-19.19s %(levelname)-1.1s] %(message)s",
-                                      datefmt="%Y-%m-%d %H:%M:%S")
         
         # init file_handler
         file_handler = logging.FileHandler(Path(self.cfg.exp_dir) / f"out_{self.cfg.exp_idx}.log")
-        file_handler.setFormatter(formatter)
+        file_handler.setFormatter(FORMATTER)
 
         # init stream_handler
         stream_handler = logging.StreamHandler()
         stream_handler.setLevel(logging.DEBUG)
-        stream_handler.setFormatter(formatter)
+        stream_handler.setFormatter(FORMATTER)
 
         # flush memory to stream_handler
         # this allows to catch logs that were created before the logger was initialized
@@ -342,7 +396,7 @@ class AmplitudeExperiment:
             LOGGER.debug("Forcing use of xformers' attention implementation")
             gatr.primitives.attention.FORCE_XFORMERS = True
         
-    def _save_config(self, filename="config.yaml"):
+    def _save_config(self, filename="amplitudes.yaml"):
         # Save config
         config_filename = Path(self.cfg.exp_dir) / filename
         LOGGER.info(f"Saving config at {config_filename}")

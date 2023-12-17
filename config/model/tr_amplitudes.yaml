@@ -1,13 +1,10 @@
 _target_: experiments.amplitudes.wrappers.AmplitudeTransformerWrapper
-mlp_blocks: 1
-mlp_channels: ${model.net.out_channels}
-average: false
 
 net:
   _target_: experiments.baselines.Transformer
 
   in_channels: 8
-  out_channels: 128
+  out_channels: 1
   hidden_channels: 128
 
   num_blocks: 4

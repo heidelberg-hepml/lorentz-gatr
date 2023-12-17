@@ -1,6 +1,5 @@
 exp_name: amplitudes
 base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
-warm_start_path : null
 
 data:
  dataset : zjj

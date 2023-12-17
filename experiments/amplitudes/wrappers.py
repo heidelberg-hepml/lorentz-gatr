@@ -9,6 +9,12 @@ from gatr.interface import embed_vector, extract_scalar
 from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity
 from experiments.amplitudes.preprocessing import preprocess_particles
 
+def encode_type_token(type_token, batchsize, device):
+    type_token = torch.tensor(type_token, device=device)
+    type_token = nn.functional.one_hot(type_token, num_classes=type_token.max()+1)
+    type_token = type_token.unsqueeze(0).expand(batchsize, *type_token.shape).float()
+    return type_token
+
 class AmplitudeMLPWrapper(nn.Module):
 
     def __init__(self, net):
@@ -22,35 +28,39 @@ class AmplitudeMLPWrapper(nn.Module):
 
 class AmplitudeTransformerWrapper(nn.Module):
 
-    def __init__(self, net,
-                 mlp_blocks, mlp_channels, average):
+    def __init__(self, net, average=False):
         super().__init__()
         self.net = net
         self.average = average
-
-        layers = [nn.GELU()] # start with activation, because the transformer finished with a linear layer
-        for _ in range(mlp_blocks):
-            layers.append(nn.Linear(mlp_channels, mlp_channels))
-            layers.append(nn.GELU())
-        layers.append(nn.Linear(mlp_channels, 1))
-        self.mlp = nn.Sequential(*layers)
 
     def forward(self, inputs, type_token):
         batchsize, num_inputs = inputs.shape
         inputs = inputs.reshape(batchsize, num_inputs//4, 4)
 
-        type_token = torch.tensor(type_token, device=inputs.device)
-        type_token = nn.functional.one_hot(type_token, num_classes=type_token.max()+1)
-        type_token = type_token.unsqueeze(0).expand(batchsize, *type_token.shape)
+        type_token = encode_type_token(type_token, batchsize, inputs.device)
         inputs = torch.cat((inputs, type_token), dim=-1)
         
         outputs = self.net(inputs)
-        if self.average:
-            outputs = outputs.mean(dim=1) # average over transformer set elements
-        else:
-            outputs = outputs[:,0,:] # pick first transformer set element
-        amplitudes = self.mlp(outputs)
+        amplitudes = outputs.mean(dim=1) if self.average else outputs[:,0,:]
         
+        return amplitudes
+
+class AmplitudeCLSTrWrapper(nn.Module):
+
+    def __init__(self, net):
+        super().__init__()
+        self.net = net
+
+    def forward(self, inputs, type_token):
+        batchsize, num_inputs = inputs.shape
+        inputs = inputs.reshape(batchsize, num_inputs//4, 4)
+
+        type_token = encode_type_token(type_token, batchsize, inputs.device)
+        inputs = torch.cat((inputs, type_token), dim=-1)
+        outputs = self.net(inputs)
+
+        assert outputs.shape[1] == 1
+        amplitudes = outputs[:,0,:]
         return amplitudes
 
 class AmplitudeGAMLPWrapper(nn.Module):
@@ -90,26 +100,10 @@ class AmplitudeGAMLPWrapper(nn.Module):
 
 class AmplitudeGATrWrapper(nn.Module):
 
-    def __init__(self, net,
-                 mlp_blocks, mlp_channels_mv, mlp_channels_s, average, mlp_activation="gelu"):
+    def __init__(self, net, average=False):
         super().__init__()
         self.net = net
         self.average = average
-
-        #layers = [nn.GELU()] # start with activation, because the transformer finished with a linear layer
-        #for _ in range(mlp_blocks):
-        #    layers.append(nn.Linear(mlp_channels, mlp_channels))
-        #    layers.append(nn.GELU())
-        #layers.append(nn.Linear(mlp_channels, 1))
-
-        layers = [ScalarGatedNonlinearity(mlp_activation)]
-        for _ in range(mlp_blocks):
-            layers.append(EquiLinear(mlp_channels_mv, mlp_channels_mv,
-                                     in_s_channels=mlp_channels_s, out_s_channels=mlp_channels_s))
-            layers.append(ScalarGatedNonlinearity(mlp_activation))
-        layers.append(EquiLinear(mlp_channels_mv, 1, in_s_channels=mlp_channels_s, out_s_channels=1))
-
-        self.mlp = nn.ModuleList(layers)
 
     def forward(self, inputs: torch.Tensor, type_token):
         batchsize, num_features = inputs.shape
@@ -118,19 +112,9 @@ class AmplitudeGATrWrapper(nn.Module):
         multivector, scalars = self.embed_into_ga(inputs, type_token)
 
         multivector_outputs, scalar_outputs = self.net(multivector, scalars=scalars)
-        #mv_outputs = self.extract_from_ga(multivector_outputs, scalar_outputs)
+        mv_outputs = self.extract_from_ga(multivector_outputs, scalar_outputs)
 
-        #outputs = mv_outputs
-        #if self.average:
-        #    outputs = outputs.mean(dim=1)
-        #else:
-        #    outputs = outputs[:,0,:]
-        #amplitude = self.mlp(outputs)
-        
-        mlp_mv, mlp_scalar = multivector_outputs[:,0,...], scalar_outputs[:,0,...]
-        for layer in self.mlp:
-            mlp_mv, mlp_scalar = layer(mlp_mv, scalars=mlp_scalar)
-        amplitude = extract_scalar(mlp_mv)[...,0]
+        amplitude = mv_outputs.mean(dim=1) if self.average else mv_outputs[:,0,:]
 
         return amplitude
 
@@ -142,9 +126,7 @@ class AmplitudeGATrWrapper(nn.Module):
         multivector = multivector.unsqueeze(2)
 
         # encode type_token in scalars
-        type_token = torch.tensor(type_token, device=inputs.device)
-        scalars = nn.functional.one_hot(type_token, num_classes=type_token.max()+1)
-        scalars = scalars.unsqueeze(0).expand(batchsize, *scalars.shape).to(inputs.dtype)
+        scalars = encode_type_token(type_token, batchsize, inputs.device)
 
         return multivector, scalars
 

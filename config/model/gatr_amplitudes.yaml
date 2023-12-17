@@ -1,8 +1,4 @@
 _target_: experiments.amplitudes.wrappers.AmplitudeGATrWrapper
-mlp_blocks: 1
-mlp_channels_mv: ${model.net.out_mv_channels}
-mlp_channels_s: ${model.net.out_s_channels}
-average: false
 
 net:
  _target_: gatr.nets.GATr
@@ -12,7 +8,7 @@ net:
  hidden_mv_channels: 4
 
  in_s_channels: 4
- out_s_channels: 16
+ out_s_channels: 1
  hidden_s_channels: 16
 
  num_blocks: 4
