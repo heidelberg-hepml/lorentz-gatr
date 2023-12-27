@@ -1,7 +1,7 @@
-_target_: experiments.amplitudes.wrappers.AmplitudeGAMLPWrapper
+_target_: experiments.amplitudes.wrappers.AmplitudeGAPWrapper
 
 net:
- _target_: gatr.nets.GAMLP
+ _target_: gatr.nets.GAP
 
  in_mv_channels: 4
  out_mv_channels: 1

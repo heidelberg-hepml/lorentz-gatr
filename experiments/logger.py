@@ -12,4 +12,4 @@ MEMORY_HANDLER.setFormatter(FORMATTER)
 LOGGER = logging.getLogger("gatr")
 LOGGER.setLevel(logging.INFO)
 LOGGER.addHandler(MEMORY_HANDLER)
-logging_initialized = False
+LOGGING_INITIALIZED = False

@@ -4,7 +4,7 @@ import numpy as np
 plt.rcParams["font.family"] = "serif"
 plt.rcParams["font.serif"] = "Charter"
 plt.rcParams["text.usetex"] = True
-plt.rcParams['text.latex.preamble'] = r'\usepackage[bitstream-charter]{mathdesign} \usepackage{amsmath}'
+plt.rcParams['text.latex.preamble'] = r'\usepackage[bitstream-charter]{mathdesign} \usepackage{amsmath} \usepackage{siunitx}'
 
 FONTSIZE=14
 FONTSIZE_LEGEND=13
@@ -59,30 +59,42 @@ def plot_histograms(file, data, labels, bins=60, xlabel=None,
     fig.savefig(file, format="pdf", bbox_inches="tight")
     plt.close()
     
-def plot_single_histogram(file, data, bins=60, xlabel=None,
-                   title=None, logx=False, logy=False, xrange=None):
-    assert xrange is not None
-    data = np.clip(data, xrange[0], xrange[1])
-    hist, bins = np.histogram(data, bins=bins-1, range=xrange)
-    scale = 1/np.sum((bins[1:] - bins[:-1]) * hist)
+def plot_delta_histogram(file, datas, labels, title, xrange,
+                         bins=60, xlabel=None, logy=False):
+    assert len(datas) == 2
     dup_last = lambda a: np.append(a, a[-1])
+    _, bins = np.histogram(datas[0], bins=bins-1, range=xrange)
+    hists, scales, mses = [], [], []
+    for data in datas:
+        mse = np.mean(data**2)
 
+        data = np.clip(data, xrange[0], xrange[1])
+        hist, _ = np.histogram(data, bins=bins, range=xrange)
+        scale = 1/np.sum((bins[1:] - bins[:-1]) * hist)
+        mses.append(mse)
+        hists.append(hist)
+        scales.append(scale)
+    
     fig, axs = plt.subplots(figsize=(6,4))
-    axs.step(bins, dup_last(hist)*scale, colors[2], where="post")
-    axs.fill_between(bins, dup_last(hist)*scale, 0.*dup_last(hist)*scale, facecolor=colors[2],
+    for hist, mse, label, color in zip(hists, mses, labels, colors[1:3][::-1]):
+        axs.step(bins, dup_last(hist)*scale, color, where="post",
+                 label=label + r" ($\overline{\Delta^2} = \num{%.2g})$" % mse)
+        axs.fill_between(bins, dup_last(hist)*scale, 0.*dup_last(hist)*scale, facecolor=color,
                                 alpha=.1, step="post")
-
-    if logx:
-        axs[0].set_xscale("log")
+    
+    if logy:
+        axs.set_yscale("log")
+    ymin, ymax=axs.get_ylim()
+    if not logy:
+        ymin = 0.
+    axs.vlines(0., ymin, ymax, color="k", linestyle="--", lw=.5)
+    axs.set_ylim(ymin, ymax)
+    axs.set_xlim(xrange)
 
     axs.set_xlabel(xlabel, fontsize = FONTSIZE)
-
-    _, ymax=axs.get_ylim()
-    axs.vlines(0., 0., ymax, color="k", linestyle="--", lw=.5)
-    axs.set_ylim(0., ymax)
-    axs.set_xlim(xrange)
     axs.tick_params(axis="both", labelsize=FONTSIZE_TICK)
-    axs.text(.04, .95, s=title, horizontalalignment="left", verticalalignment="top",
+    axs.legend(frameon=False, loc="upper left", fontsize=FONTSIZE * .7)
+    axs.text(.95, .95, s=title, horizontalalignment="right", verticalalignment="top",
                 transform=axs.transAxes, fontsize=FONTSIZE)
 
     fig.savefig(file, format="pdf", bbox_inches="tight")
@@ -92,8 +104,13 @@ def plot_loss(file, losses, lr, labels=None, logy=True):
     labels = [None for _ in range(len(losses))] if labels is None else labels
     iterations = range(1, len(losses[0])+1)
     fig, ax = plt.subplots()
-    for loss, label in zip(losses, labels):
-        ax.plot(iterations, loss, label=label)
+    for i, loss, label in zip(range(len(losses)), losses, labels):
+        if len(loss) == len(iterations):
+            its = iterations
+        else:
+            frac = len(losses[0]) / len(loss)
+            its = np.arange(1, len(loss)+1) * frac
+        ax.plot(its, loss, label=label)
 
     if logy:
         ax.set_yscale("log")

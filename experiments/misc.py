@@ -15,3 +15,29 @@ def get_device() -> torch.device:
 def to_nd(tensor, d):
     """Make tensor n-dimensional, group extra dimensions in first."""
     return tensor.view(-1, *(1,) * (max(0, d - 1 - tensor.dim())), *tensor.shape[-(d - 1) :])
+
+def frequency_check(step, every_n_steps, skip_initial=False):
+    """Checks whether an action should be performed at a given step and frequency.
+
+    Parameters
+    ----------
+    step : int
+        Step number (one-indexed)
+    every_n_steps : None or int
+        Desired action frequency. None or 0 correspond to never executing the action.
+    skip_initial : bool
+        If True, frequency_check returns False at step 0.
+
+    Returns
+    -------
+    decision : bool
+        Whether the action should be executed.
+    """
+
+    if every_n_steps is None or every_n_steps == 0:
+        return False
+
+    if skip_initial and step == 0:
+        return False
+
+    return step % every_n_steps == 0

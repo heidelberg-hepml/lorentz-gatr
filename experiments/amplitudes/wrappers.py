@@ -23,6 +23,8 @@ class AmplitudeMLPWrapper(nn.Module):
 
     def forward(self, inputs, type_token):
         # ignore type_token (architecture is not permutation invariant)
+        batchsize, num_particles, num_components = inputs.shape
+        inputs = inputs.reshape(batchsize, num_particles * num_components)
         out = self.net(inputs)
         return out
 
@@ -34,8 +36,7 @@ class AmplitudeTransformerWrapper(nn.Module):
         self.average = average
 
     def forward(self, inputs, type_token):
-        batchsize, num_inputs = inputs.shape
-        inputs = inputs.reshape(batchsize, num_inputs//4, 4)
+        batchsize, _, _ = inputs.shape
 
         type_token = encode_type_token(type_token, batchsize, inputs.device)
         inputs = torch.cat((inputs, type_token), dim=-1)
@@ -52,8 +53,7 @@ class AmplitudeCLSTrWrapper(nn.Module):
         self.net = net
 
     def forward(self, inputs, type_token):
-        batchsize, num_inputs = inputs.shape
-        inputs = inputs.reshape(batchsize, num_inputs//4, 4)
+        batchsize, _, _ = inputs.shape
 
         type_token = encode_type_token(type_token, batchsize, inputs.device)
         inputs = torch.cat((inputs, type_token), dim=-1)
@@ -63,7 +63,7 @@ class AmplitudeCLSTrWrapper(nn.Module):
         amplitudes = outputs[:,0,:]
         return amplitudes
 
-class AmplitudeGAMLPWrapper(nn.Module):
+class AmplitudeGAPWrapper(nn.Module):
 
     def __init__(self, net):
         super().__init__()
@@ -71,8 +71,7 @@ class AmplitudeGAMLPWrapper(nn.Module):
 
     def forward(self, inputs: torch.Tensor, type_token):
         # ignore type token
-        batchsize, num_features = inputs.shape
-        inputs = inputs.reshape(batchsize, num_features // 4, 4)
+        batchsize, _, _ = inputs.shape
 
         multivector, scalars = self.embed_into_ga(inputs)
 
@@ -106,8 +105,7 @@ class AmplitudeGATrWrapper(nn.Module):
         self.average = average
 
     def forward(self, inputs: torch.Tensor, type_token):
-        batchsize, num_features = inputs.shape
-        inputs = inputs.reshape(batchsize, num_features // 4, 4)
+        batchsize, _, _ = inputs.shape
 
         multivector, scalars = self.embed_into_ga(inputs, type_token)
 

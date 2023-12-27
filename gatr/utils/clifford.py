@@ -128,6 +128,12 @@ class SlowRandomPinTransform:
         super().__init__()
         self._u = sample_pin_multivector(spin, rng)
         self._u_inverse = self._u.shirokov_inverse()
+        '''
+        if rng is None:
+            self.rng = np.random.default_rng()
+        else:
+            self.rng = rng
+        '''
 
     def __call__(self, inputs: torch.Tensor) -> torch.Tensor:
         """Apply Pin transformation to multivector inputs."""
@@ -140,7 +146,17 @@ class SlowRandomPinTransform:
 
         # Transform
         outputs_mv = [sandwich(self._u, x) for x in inputs_mv]
-
+        '''
+        outputs_mv = []
+        for input_mv in inputs_mv:
+            eta = self.rng.normal(size=1) # rapidity
+            n = self.rng.normal(size=3)
+            n /= np.linalg.norm(n) # direction
+            output_mv = clifford.MultiVector(LAYOUT, value=np.zeros(16))
+            output_mv[1] = np.cosh(eta) * (input_mv[1] - np.tanh(eta) * np.dot(n, input_mv[2:5]) )
+            output_mv[2:5] = input_mv[2:5] + (np.cosh(eta) -1) * np.dot(n, input_mv[2:5]) * n - input_mv[1] * np.sinh(eta) * n
+            outputs_mv.append(output_mv)
+        '''
         # Back to tensor
         outputs = mv_list_to_tensor(outputs_mv, batch_shape=batch_dims)
 

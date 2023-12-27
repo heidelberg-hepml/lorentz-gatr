@@ -2,15 +2,14 @@ exp_name: amplitudes
 base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
 
 data:
- dataset : zjj
+ dataset : zgg
  data_path : /media/jspinner/shared/Studium/project3/data/
  subsample : 10000
  include_permsym: false
 
 train: true
 training:
- nepochs : 1
- split : .5
+ nepochs : 5
 
  loss_delta : true
 

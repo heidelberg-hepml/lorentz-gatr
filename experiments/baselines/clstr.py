@@ -207,6 +207,7 @@ class CLSTr(nn.Module):
         num_sa_blocks: int = 5,
         num_ca_blocks: int = 5,
         num_heads: int = 8,
+        num_classes: int = 1,
         pos_encoding: bool = False,
         pos_encoding_base: int = 4096,
         checkpoint_blocks: bool = False,
@@ -245,7 +246,7 @@ class CLSTr(nn.Module):
         )
         self.linear_out = nn.Linear(hidden_channels, out_channels)
 
-        self.class_token = nn.Parameter(torch.randn(1,1,hidden_channels))
+        self.class_token = nn.Parameter(torch.randn(1,num_classes,hidden_channels))
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         """Forward pass.
@@ -269,7 +270,7 @@ class CLSTr(nn.Module):
             else:
                 h = block(h)
 
-        class_token = self.class_token.expand(h.shape[0], 1, h.shape[2])
+        class_token = self.class_token.expand(h.shape[0], self.class_token.shape[1], self.class_token.shape[2])
         for block in self.ca_blocks:
             if self.checkpoint_blocks:
                 fn = partial(block)

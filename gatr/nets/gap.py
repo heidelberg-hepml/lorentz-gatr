@@ -13,8 +13,9 @@ from gatr.layers.linear import EquiLinear
 from gatr.layers.mlp import MLPConfig, GeoMLP
 
 
-class GAMLP(nn.Module):
-    """GAMLP network for a data with a single token dimension. It combines `num_blocks` GeoMLP blocks.
+class GAP(nn.Module):
+    """Geometric Algebra Perceptron network for a data with a single token dimension.
+    It combines `num_blocks` GeoMLP blocks.
 
     Assumes input has shape `(..., in_channels, 16)`, output has shape
     `(..., out_channels, 16)`, will create hidden representations with shape

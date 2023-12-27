@@ -2,6 +2,7 @@ seed: null
 debug: false
 
 warm_start_idx: null
+save: true
 save_source: true
 
 data:
@@ -10,8 +11,9 @@ data:
 train: true
 training:
  n_epochs : 100
- split : .5
+ train_test_val: [.3, .5, .1]
  subsample: null
+ es_patience: 10
 
  loss_delta: false
 
