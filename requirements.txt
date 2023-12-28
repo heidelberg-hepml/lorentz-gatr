@@ -19,6 +19,7 @@ torch==2.0.1
 
 ## Experiment management
 hydra-core
+mlflow==2.4.1 # avoid database version issues
 
 ## Project-specific: general
 clifford==1.4.0

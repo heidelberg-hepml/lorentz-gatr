@@ -1,6 +1,7 @@
 # Copyright (c) 2023 Qualcomm Technologies, Inc.
 # All rights reserved.
 
+from collections.abc import Mapping
 import numpy as np
 import torch
 
@@ -15,6 +16,17 @@ def get_device() -> torch.device:
 def to_nd(tensor, d):
     """Make tensor n-dimensional, group extra dimensions in first."""
     return tensor.view(-1, *(1,) * (max(0, d - 1 - tensor.dim())), *tensor.shape[-(d - 1) :])
+
+def flatten_dict(d, parent_key="", sep="."):
+    """Flattens a nested dictionary with str keys."""
+    items = []
+    for k, v in d.items():
+        new_key = parent_key + sep + k if parent_key else k
+        if isinstance(v, Mapping):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
 
 def frequency_check(step, every_n_steps, skip_initial=False):
     """Checks whether an action should be performed at a given step and frequency.

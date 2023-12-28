@@ -8,6 +8,7 @@ from pathlib import Path
 from omegaconf import OmegaConf, open_dict, errors
 from hydra.core.config_store import ConfigStore
 from hydra.utils import instantiate
+import mlflow
 from matplotlib.backends.backend_pdf import PdfPages
 
 from experiments.amplitudes.wrappers import AmplitudeMLPWrapper, AmplitudeTransformerWrapper, \
@@ -15,9 +16,12 @@ from experiments.amplitudes.wrappers import AmplitudeMLPWrapper, AmplitudeTransf
 from experiments.amplitudes.dataset import AmplitudeDataset
 from experiments.amplitudes.preprocessing import preprocess_particles, preprocess_amplitude, undo_preprocess_amplitude
 from experiments.amplitudes.plots import plot_histograms, plot_loss, plot_delta_histogram
-from experiments.misc import get_device
+from experiments.misc import get_device, flatten_dict
 import experiments.logger
 from experiments.logger import LOGGER, MEMORY_HANDLER, FORMATTER
+from experiments.mlflow import log_mlflow
+
+import alembic
 
 from gatr.layers import MLPConfig, SelfAttentionConfig
 cs = ConfigStore.instance()
@@ -42,7 +46,7 @@ class AmplitudeExperiment:
     def __call__(self):
         # pass all exceptions to the logger
         try:
-            self.full_run()
+            self.run_mlflow()
         except errors.ConfigAttributeError:
             LOGGER.exception("Tried to access key that is not specified in the config files")
         except:
@@ -54,16 +58,25 @@ class AmplitudeExperiment:
             stream_handler.setLevel(logging.DEBUG)
             MEMORY_HANDLER.setTarget(stream_handler)
             MEMORY_HANDLER.close()
+
+    def run_mlflow(self):
+        experiment_id, run_name = self._init()
+        LOGGER.info(f"### Starting experiment {self.cfg.exp_name}/{run_name} (id={experiment_id}) ###")
+        if self.cfg.use_mlflow:
+            with mlflow.start_run(experiment_id=experiment_id, run_name=run_name):            
+                self.full_run()
+        else:
+            # dont use mlflow
+            self.full_run()
                 
     def full_run(self):
         # implement all ml boilerplate as private methods (_name)
         t0 = time.time()
-        
-        # initialize environment
-        self._init_experiment()
-        self._init_directory()
-        self._init_logger()
-        self._init_backend()
+
+        # save config
+        LOGGER.debug(OmegaConf.to_yaml(self.cfg))
+        self._save_config("amplitudes.yaml", to_mlflow=True)
+        self._save_config(f"amplitudes_{self.cfg.run_idx}.yaml")        
 
         self.init_physics()
         self.init_model()
@@ -113,11 +126,13 @@ class AmplitudeExperiment:
         # initialize model
         self.model = instantiate(self.cfg.model) # hydra magic
         num_parameters = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        if self.cfg.use_mlflow:
+            log_mlflow("num_parameters", float(num_parameters), step=0)
         LOGGER.info(f"Instantiated model {type(self.model.net).__name__} with {num_parameters} learnable parameters")
 
         # load existing model if specified
         if self.warm_start:
-            model_path = os.path.join(self.cfg.exp_dir, "models", f"model_{self.cfg.warm_start_idx}.pt")
+            model_path = os.path.join(self.cfg.run_dir, "models", f"model_{self.cfg.warm_start_idx}.pt")
             try:
                 state_dict = torch.load(model_path, map_location="cpu")
             except FileNotFoundError:
@@ -197,10 +212,16 @@ class AmplitudeExperiment:
         LOGGER.info(f"rate of events in delta interval on {title} dataset:\t"\
                     f"{[f'{delta_rates[i]:.4f} ({delta_maxs[i]})' for i in range(len(delta_maxs))]}")
 
+        if self.cfg.use_mlflow:
+            log_dict = {f"eval.mse_{title}": mse_prepd,
+                        f"eval.mse_{title}_unprepd": mse}
+            for key, value in log_dict.items():
+                log_mlflow(key, value)
+
         return amplitudes_pred, amplitudes_truth, amplitudes_truth_prepd, amplitudes_pred_prepd
 
     def plot(self):
-        plot_path = os.path.join(self.cfg.exp_dir, f"plots_{self.cfg.exp_idx}")
+        plot_path = os.path.join(self.cfg.run_dir, f"plots_{self.cfg.run_idx}")
         os.makedirs(plot_path)
         dataset_title = DATASET_TITLE_DICT[self.cfg.data.dataset]
         model_title = MODEL_TITLE_DICT[type(self.model.net).__name__]
@@ -278,33 +299,50 @@ class AmplitudeExperiment:
                                          labels=["Test", "Train"], title=title, 
                                          xlabel=r"$\Delta = \frac{A_\mathrm{pred} - A_\mathrm{true}}{A_\mathrm{true}}$ [\%]",
                                          xrange=xrange, bins=bins, logy=False)
+
+    def _init(self):
+        run_name = self._init_experiment()
+        self._init_directory()
+
+        if self.cfg.use_mlflow:
+            experiment_id = self._init_mlflow()
+        else:
+            experiment_id = None
+        
+        # initialize environment
+        self._init_logger()
+        self._init_backend()
+
+        return experiment_id, run_name
                     
     def _init_experiment(self):
         self.warm_start = False if self.cfg.warm_start_idx is None else True
 
-        modelname = self.cfg.model.net._target_.rsplit(".", 1)[-1]
-        with open_dict(self.cfg):
-            # append modelname to exp_name
-            self.cfg.exp_name = f"{self.cfg.exp_name}_{modelname}"
-
         if not self.warm_start:
-            rnd_number = np.random.randint(low=0, high=9999)
-            exp_name = f"{self.cfg.exp_name}_{rnd_number:04}"
-            self.exp_dir = os.path.join(self.cfg.base_dir, "runs", exp_name)
-            exp_idx = 0
-            LOGGER.info(f"Creating new experiment {self.exp_dir}")
+            if self.cfg.run_name is None:
+                modelname = self.cfg.model.net._target_.rsplit(".", 1)[-1]
+                rnd_number = np.random.randint(low=0, high=9999)
+                run_name = f"{modelname}_{rnd_number:04}"
+            else:
+                run_name = self.cfg.run_name
+
+            run_dir = os.path.join(self.cfg.base_dir, "runs", self.cfg.exp_name, run_name)
+            run_idx = 0
+            LOGGER.info(f"Creating new experiment {self.cfg.exp_name}/{run_name}")
             
         else:
-            exp_idx = self.cfg.exp_idx + 1
-            LOGGER.info(f"Warm-starting from existing experiment {self.cfg.exp_dir} for run {exp_idx}")
+            run_idx = self.cfg.run_idx + 1
+            LOGGER.info(f"Warm-starting from existing experiment {self.cfg.exp_name}/{self.cfg.run_name} for run {run_idx}")
 
         with open_dict(self.cfg):
-            self.cfg.exp_idx = exp_idx
+            self.cfg.run_idx = run_idx
             if not self.warm_start:
                 self.cfg.warm_start_idx = 0
-                self.cfg.exp_dir = self.exp_dir
+                self.cfg.run_name = run_name
+                self.cfg.run_dir = run_dir
 
-        LOGGER.debug(OmegaConf.to_yaml(self.cfg))
+            # only use mlflow if save=True
+            self.cfg.use_mlflow = self.cfg.use_mlflow if self.cfg.use_mlflow==False else self.cfg.save
 
         # set seed
         if self.cfg.seed is not None:
@@ -312,25 +350,48 @@ class AmplitudeExperiment:
             torch.random.manual_seed(self.cfg.seed)
             np.random.seed(self.cfg.seed)
 
+        return run_name
+
+    def _init_mlflow(self):
+        # mlflow tracking location
+        Path(self.cfg.mlflow.db).parent.mkdir(exist_ok=True)
+        mlflow.set_tracking_uri(f"sqlite:///{Path(self.cfg.mlflow.db).resolve()}")
+
+        Path(self.cfg.mlflow.artifacts).mkdir(exist_ok=True)
+        try:
+            # artifacts not supported
+            # mlflow call triggers alembic.runtime.migration logger to shout -> shut it down (happy for suggestions on how to do this nicer)
+            logging.disable(logging.WARNING)
+            experiment_id = mlflow.create_experiment(self.cfg.exp_name,
+                        artifact_location=f"file:{Path(self.cfg.mlflow.artifacts).resolve()}")
+            logging.disable(logging.DEBUG)
+            LOGGER.info(f"Created mlflow experiment {self.cfg.exp_name} with id {experiment_id}")
+        except mlflow.exceptions.MlflowException:
+            LOGGER.info(f"Using existing mlflow experiment {self.cfg.exp_name}")
+            logging.disable(logging.DEBUG)
+        
+
+        experiment = mlflow.set_experiment(self.cfg.exp_name)
+        experiment_id = experiment.experiment_id
+
+        LOGGER.info(f"Set experiment {self.cfg.exp_name} with id {experiment_id}")
+        return experiment_id
+
     def _init_directory(self):
         if not self.cfg.save:
             LOGGER.info(f"Running with save=False, i.e. no outputs will be saved")
             return
         
         # create experiment directory
-        exp_dir = Path(self.cfg.exp_dir).resolve()
-        if exp_dir.exists() and not self.warm_start:
-            raise ValueError(f"Experiment in directory {self.cfg.exp_dir} alredy exists. Aborting.")
-        os.makedirs(exp_dir, exist_ok=True)
-        os.makedirs(os.path.join(exp_dir, "models"), exist_ok=True)
-
-        # save config
-        self._save_config("amplitudes.yaml")
-        self._save_config(f"amplitudes_{self.cfg.exp_idx}.yaml")
+        run_dir = Path(self.cfg.run_dir).resolve()
+        if run_dir.exists() and not self.warm_start:
+            raise ValueError(f"Experiment in directory {self.cfg.run_dir} alredy exists. Aborting.")
+        os.makedirs(run_dir, exist_ok=True)
+        os.makedirs(os.path.join(run_dir, "models"), exist_ok=True)
 
         # save source
         if self.cfg.save_source:
-            zip_name = os.path.join(self.cfg.exp_dir, "source.zip")
+            zip_name = os.path.join(self.cfg.run_dir, "source.zip")
             LOGGER.debug(f"Saving source to {zip_name}")
             zipf = zipfile.ZipFile(zip_name, "w", zipfile.ZIP_DEFLATED)
             path_gatr = os.path.join(self.cfg.base_dir, "gatr")
@@ -343,6 +404,12 @@ class AmplitudeExperiment:
             zipf.close()
 
     def _init_logger(self):
+        # silence other loggers
+        # (every app has a logger, eg hydra, torch, mlflow, matplotlib, fontTools...)
+        for name, other_logger in logging.root.manager.loggerDict.items():
+            if not "lorentz-gatr" in name:
+                other_logger.level = logging.WARNING
+
         if experiments.logger.LOGGING_INITIALIZED:
             LOGGER.info("Logger already initialized")
             return
@@ -351,7 +418,7 @@ class AmplitudeExperiment:
         
         # init file_handler
         if self.cfg.save:
-            file_handler = logging.FileHandler(Path(self.cfg.exp_dir) / f"out_{self.cfg.exp_idx}.log")
+            file_handler = logging.FileHandler(Path(self.cfg.run_dir) / f"out_{self.cfg.run_idx}.log")
             file_handler.setFormatter(FORMATTER)
             LOGGER.addHandler(file_handler)
 
@@ -394,13 +461,17 @@ class AmplitudeExperiment:
             LOGGER.debug("Forcing use of xformers' attention implementation")
             gatr.primitives.attention.FORCE_XFORMERS = True
         
-    def _save_config(self, filename="amplitudes.yaml"):
+    def _save_config(self, filename="amplitudes.yaml", to_mlflow=False):
         # Save config
         assert self.cfg.save
-        config_filename = Path(self.cfg.exp_dir) / filename
+        config_filename = Path(self.cfg.run_dir) / filename
         LOGGER.debug(f"Saving config at {config_filename}")
         with open(config_filename, "w", encoding="utf-8") as file:
             file.write(OmegaConf.to_yaml(self.cfg))
+
+        if to_mlflow and self.cfg.use_mlflow:
+            for key, value in flatten_dict(self.cfg).items():
+                log_mlflow(key, value, kind="param")
 
     def _init_optimizer(self):
         if self.cfg.training.optimizer == "Adam":
@@ -469,11 +540,11 @@ class AmplitudeExperiment:
 
             # train
             self.model.train()
-            for data in self.train_loader:
-                self._step(data)
+            for it, data in enumerate(self.train_loader):
+                self._step(data, epoch * len(self.train_loader) + it)
 
             # validate
-            val_loss = self._validate()
+            val_loss = self._validate(epoch)
             if val_loss < smallest_val_loss:
                 smallest_val_loss = val_loss
                 patience = 0
@@ -495,11 +566,14 @@ class AmplitudeExperiment:
         dt = time.time() - self.training_start_time
         LOGGER.info(f"Finished training after {dt/60:.2f}min = {dt/60**2:.2f}h")
 
-    def _step(self, data):
+    def _step(self, data, step):
         loss = self._batch_loss(data)
 
         self.optimizer.zero_grad()
         loss.backward()
+        grad_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(),
+                                                   self.cfg.training.clip_grad_norm,
+                                                   error_if_nonfinite=True).cpu().item()
         self.optimizer.step()
 
         if self.scheduler is not None:
@@ -508,7 +582,17 @@ class AmplitudeExperiment:
         self.train_metrics["mse"].append(loss.item())
         self.train_metrics["lr"].append(self.optimizer.param_groups[0]["lr"])
 
-    def _validate(self):
+        # log to mlflow
+        if self.cfg.use_mlflow and self.cfg.training.log_every_n_steps!=0 \
+           and step%self.cfg.training.log_every_n_steps==0:
+            log_dict = {"mse": self.train_metrics["mse"][-1],
+                        "grad_norm": grad_norm,
+                        "lr": self.train_metrics["lr"][-1],
+                        "time_per_step": (time.time() - self.training_start_time) / (step+1)}
+            for key, values in log_dict.items():
+                log_mlflow(f"train.{key}", values, step=step)
+
+    def _validate(self, epoch):
         losses = []
         
         self.model.eval()
@@ -518,6 +602,8 @@ class AmplitudeExperiment:
                 losses.append(loss.item())
         val_loss = np.mean(losses)
         self.val_metrics["mse"].append(val_loss)
+        if self.cfg.use_mlflow:
+            log_mlflow("val.mse", val_loss, step=epoch)
         return val_loss
 
     def _batch_loss(self, data):
@@ -530,7 +616,7 @@ class AmplitudeExperiment:
 
     def _save_model(self):
         assert self.cfg.save
-        filename = f"model_{self.cfg.exp_idx}.pt"
-        model_path = os.path.join(self.cfg.exp_dir, "models", filename)
+        filename = f"model_{self.cfg.run_idx}.pt"
+        model_path = os.path.join(self.cfg.run_dir, "models", filename)
         LOGGER.debug(f"Saving model at {model_path}")
         torch.save(self.model.state_dict(), model_path)

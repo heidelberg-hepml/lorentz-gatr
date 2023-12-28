@@ -1,8 +1,11 @@
+exp_name: ???
+
 seed: null
 debug: false
 
 warm_start_idx: null
 save: true
+use_mlflow: true
 save_source: true
 
 data:
@@ -16,6 +19,8 @@ training:
  es_patience: 10
 
  loss_delta: false
+ clip_grad_norm: 1e3
+ log_every_n_steps: 1
 
  optimizer : Adam
  lr: 3.e-4
@@ -40,3 +45,7 @@ plotting:
  histograms: true
  delta: true
  delta_prepd: true
+
+mlflow:
+ db: '${base_dir}/runs/tracking/mlflow.db'
+ artifacts: '${base_dir}/runs/artifacts'
