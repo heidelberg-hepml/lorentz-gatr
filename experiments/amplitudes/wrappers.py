@@ -30,19 +30,30 @@ class AmplitudeMLPWrapper(nn.Module):
 
 class AmplitudeTransformerWrapper(nn.Module):
 
-    def __init__(self, net, average=False):
+    def __init__(self, net, extract_mode="mean"):
         super().__init__()
         self.net = net
-        self.average = average
+        assert extract_mode in ["global_token", "mean"]
+        self.extract_mode = extract_mode
 
     def forward(self, inputs, type_token):
         batchsize, _, _ = inputs.shape
 
+        # type_token
         type_token = encode_type_token(type_token, batchsize, inputs.device)
         inputs = torch.cat((inputs, type_token), dim=-1)
+
+        # global_token (collect information here)
+        if self.extract_mode == "global_token":
+            global_token = torch.zeros((batchsize, 1, inputs.shape[-1]), device=inputs.device, dtype=inputs.dtype)
+            global_token[:,:,0] = 1. # encode something
+            inputs = torch.cat((global_token, inputs), dim=1)
         
         outputs = self.net(inputs)
-        amplitudes = outputs.mean(dim=1) if self.average else outputs[:,0,:]
+        if self.extract_mode == "global_token":
+            amplitudes = outputs[:,0,:]
+        elif self.extract_mode == "mean":
+            amplitudes = outputs.mean(dim=1)
         
         return amplitudes
 
@@ -99,10 +110,11 @@ class AmplitudeGAPWrapper(nn.Module):
 
 class AmplitudeGATrWrapper(nn.Module):
 
-    def __init__(self, net, average=False):
+    def __init__(self, net, extract_mode="mean"):
         super().__init__()
         self.net = net
-        self.average = average
+        assert extract_mode in ["mean", "global_token"]
+        self.extract_mode = extract_mode
 
     def forward(self, inputs: torch.Tensor, type_token):
         batchsize, _, _ = inputs.shape
@@ -110,9 +122,7 @@ class AmplitudeGATrWrapper(nn.Module):
         multivector, scalars = self.embed_into_ga(inputs, type_token)
 
         multivector_outputs, scalar_outputs = self.net(multivector, scalars=scalars)
-        mv_outputs = self.extract_from_ga(multivector_outputs, scalar_outputs)
-
-        amplitude = mv_outputs.mean(dim=1) if self.average else mv_outputs[:,0,:]
+        amplitude = self.extract_from_ga(multivector_outputs, scalar_outputs)
 
         return amplitude
 
@@ -126,10 +136,25 @@ class AmplitudeGATrWrapper(nn.Module):
         # encode type_token in scalars
         scalars = encode_type_token(type_token, batchsize, inputs.device)
 
+        # global token
+        if self.extract_mode == "global_token":
+            global_token_mv = torch.zeros((batchsize, 1, multivector.shape[2], multivector.shape[3]),
+                                          dtype=multivector.dtype, device=multivector.device)
+            global_token_s = torch.zeros((batchsize, 1, scalars.shape[2]),
+                                         dtype=multivector.dtype, device=multivector.device)
+            global_token_s[:,:,0] = 1.
+            multivector = torch.cat((global_token_mv, multivector), dim=1)
+            scalars = torch.cat((global_token_s, scalars), dim=1)
+
         return multivector, scalars
 
     def extract_from_ga(self, multivector, scalars):
         # Extract scalars from GA representation
-        outputs = extract_scalar(multivector)[...,0]
+        lorentz_scalars = extract_scalar(multivector)[...,0]
+        
+        if self.extract_mode == "global_token":
+            amplitude = lorentz_scalars[:,0,:]
+        elif self.extract_mode == "mean":
+            amplitude = lorentz_scalars.mean(dim=1)
 
-        return outputs
+        return amplitude

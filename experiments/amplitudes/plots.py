@@ -76,9 +76,9 @@ def plot_delta_histogram(file, datas, labels, title, xrange,
         scales.append(scale)
     
     fig, axs = plt.subplots(figsize=(6,4))
-    for hist, mse, label, color in zip(hists, mses, labels, colors[1:3][::-1]):
+    for hist, scale, mse, label, color in zip(hists, scales, mses, labels, colors[1:3][::-1]):
         axs.step(bins, dup_last(hist)*scale, color, where="post",
-                 label=label + r" ($\overline{\Delta^2} = \num{%.2g})$" % mse)
+                 label=label + r" ($\overline{\Delta^2} = \num{%.2g})$" % mse * 1e-4) # need 1e-4 to compensate for initial *100
         axs.fill_between(bins, dup_last(hist)*scale, 0.*dup_last(hist)*scale, facecolor=color,
                                 alpha=.1, step="post")
     

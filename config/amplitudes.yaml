@@ -1,4 +1,4 @@
-exp_name: amplitudes
+exp_name: amp_debug
 run_name: null
 base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
 
@@ -11,8 +11,6 @@ data:
 train: true
 training:
  nepochs : 5
-
- loss_delta : true
 
 defaults:
  - model: gatr_amplitudes

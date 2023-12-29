@@ -18,7 +18,6 @@ training:
  subsample: null
  es_patience: 10
 
- loss_delta: false
  clip_grad_norm: 1e3
  log_every_n_steps: 1
 
@@ -47,5 +46,5 @@ plotting:
  delta_prepd: true
 
 mlflow:
- db: '${base_dir}/runs/tracking/mlflow.db'
- artifacts: '${base_dir}/runs/artifacts'
+ db: '${base_dir}/runs/mlflow/mlflow_local.db'
+ artifacts: '${base_dir}/runs/mlflow/artifacts_local'

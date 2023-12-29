@@ -87,8 +87,7 @@ class AmplitudeExperiment:
             self._init_optimizer()
             self._init_scheduler()
             self.train()
-            if self.cfg.save:
-                self._save_model()
+            self._save_model()
 
         if self.cfg.evaluate:
             self.evaluate()
@@ -258,6 +257,10 @@ class AmplitudeExperiment:
                 xranges = [(-10.,10.), (-30., 30.), (-100., 100.)] # in %
                 binss = [100, 50, 50]
                 for xrange, bins in zip(xranges, binss):
+                    plot_delta_histogram(file, [data_test*100, data_train*100],
+                                         labels=["Test", "Train"], title=title, 
+                                         xlabel=r"$\Delta = \frac{A_\mathrm{pred} - A_\mathrm{true}}{A_\mathrm{true}}$ [\%]",
+                                         xrange=xrange, bins=bins, logy=False)
                     plot_delta_histogram(file, [data_test*100, data_test[largest_mask]*100],
                                          labels=["Test", "Largest 1\%"], title=title, 
                                          xlabel=r"$\Delta = \frac{A_\mathrm{pred} - A_\mathrm{true}}{A_\mathrm{true}}$ [\%]",
@@ -266,10 +269,6 @@ class AmplitudeExperiment:
                                          labels=["Test", "Largest 1\%"], title=title, 
                                          xlabel=r"$\Delta = \frac{A_\mathrm{pred} - A_\mathrm{true}}{A_\mathrm{true}}$ [\%]",
                                          xrange=xrange, bins=bins, logy=True)
-                    plot_delta_histogram(file, [data_test*100, data_train*100],
-                                         labels=["Test", "Train"], title=title, 
-                                         xlabel=r"$\Delta = \frac{A_\mathrm{pred} - A_\mathrm{true}}{A_\mathrm{true}}$ [\%]",
-                                         xrange=xrange, bins=bins, logy=False)
                     
         if self.cfg.plotting.delta_prepd and self.cfg.evaluate:
             out = f"{plot_path}/delta_prepd.pdf"
@@ -287,6 +286,10 @@ class AmplitudeExperiment:
                 xranges = [(-10.,10.), (-30., 30.), (-100., 100.)] # in %
                 binss = [100, 50, 50]
                 for xrange, bins in zip(xranges, binss):
+                    plot_delta_histogram(file, [data_test*100, data_train*100],
+                                         labels=["Test", "Train"], title=title, 
+                                         xlabel=r"$\Delta = \frac{A_\mathrm{pred} - A_\mathrm{true}}{A_\mathrm{true}}$ [\%]",
+                                         xrange=xrange, bins=bins, logy=False)
                     plot_delta_histogram(file, [data_test*100, data_test[largest_mask]*100],
                                          labels=["Test", "Largest 1\%"], title=title, 
                                          xlabel=r"$\Delta = \frac{A_\mathrm{pred} - A_\mathrm{true}}{A_\mathrm{true}}$ [\%]",
@@ -295,10 +298,6 @@ class AmplitudeExperiment:
                                          labels=["Test", "Largest 1\%"], title=title, 
                                          xlabel=r"$\Delta = \frac{A_\mathrm{pred} - A_\mathrm{true}}{A_\mathrm{true}}$ [\%]",
                                          xrange=xrange, bins=bins, logy=True)
-                    plot_delta_histogram(file, [data_test*100, data_train*100],
-                                         labels=["Test", "Train"], title=title, 
-                                         xlabel=r"$\Delta = \frac{A_\mathrm{pred} - A_\mathrm{true}}{A_\mathrm{true}}$ [\%]",
-                                         xrange=xrange, bins=bins, logy=False)
 
     def _init(self):
         run_name = self._init_experiment()
@@ -331,8 +330,9 @@ class AmplitudeExperiment:
             LOGGER.info(f"Creating new experiment {self.cfg.exp_name}/{run_name}")
             
         else:
+            run_name = self.cfg.run_name
             run_idx = self.cfg.run_idx + 1
-            LOGGER.info(f"Warm-starting from existing experiment {self.cfg.exp_name}/{self.cfg.run_name} for run {run_idx}")
+            LOGGER.info(f"Warm-starting from existing experiment {self.cfg.exp_name}/{run_name} for run {run_idx}")
 
         with open_dict(self.cfg):
             self.cfg.run_idx = run_idx
@@ -342,7 +342,7 @@ class AmplitudeExperiment:
                 self.cfg.run_dir = run_dir
 
             # only use mlflow if save=True
-            self.cfg.use_mlflow = self.cfg.use_mlflow if self.cfg.use_mlflow==False else self.cfg.save
+            self.cfg.use_mlflow = False if self.cfg.save==False else self.cfg.use_mlflow
 
         # set seed
         if self.cfg.seed is not None:
@@ -420,11 +420,12 @@ class AmplitudeExperiment:
         if self.cfg.save:
             file_handler = logging.FileHandler(Path(self.cfg.run_dir) / f"out_{self.cfg.run_idx}.log")
             file_handler.setFormatter(FORMATTER)
+            file_handler.setLevel(logging.DEBUG)
             LOGGER.addHandler(file_handler)
 
         # init stream_handler
         stream_handler = logging.StreamHandler()
-        stream_handler.setLevel(logging.DEBUG)
+        stream_handler.setLevel(LOGGER.level)
         stream_handler.setFormatter(FORMATTER)
         LOGGER.addHandler(stream_handler)
 
@@ -437,12 +438,14 @@ class AmplitudeExperiment:
         # add new handlers to logger
         LOGGER.propagate = False # avoid duplicate log outputs
 
+        LOGGER.setLevel(logging.DEBUG if self.cfg.debug else logging.INFO)
+
         experiments.logger.LOGGING_INITIALIZED = True
         LOGGER.debug("Logger initialized")
 
     def _init_backend(self):
         self.device = get_device()
-        LOGGER.debug(f"Using device {self.device}")
+        LOGGER.info(f"Using device {self.device}")
         
         if self.cfg.training.float16 and self.device=="cuda" and torch.cuda.is_bf16_supported():
             self.dtype = torch.bfloat16
@@ -463,7 +466,9 @@ class AmplitudeExperiment:
         
     def _save_config(self, filename="amplitudes.yaml", to_mlflow=False):
         # Save config
-        assert self.cfg.save
+        if not self.cfg.save:
+            return
+        
         config_filename = Path(self.cfg.run_dir) / filename
         LOGGER.debug(f"Saving config at {config_filename}")
         with open(config_filename, "w", encoding="utf-8") as file:
@@ -495,17 +500,18 @@ class AmplitudeExperiment:
         self.train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
                                                         batch_size=self.cfg.training.batchsize, shuffle=True)
 
-        test_dataset = AmplitudeDataset(self.particles_prepd[self.split_test:], self.amplitudes_prepd[self.split_test:],
+        test_dataset = AmplitudeDataset(self.particles_prepd[self.split_train:self.split_test], self.amplitudes_prepd[self.split_train:self.split_test],
                                         dtype=self.dtype)
         self.test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
                                                         batch_size=self.cfg.evaluation.batchsize, shuffle=False)
 
-        val_dataset = AmplitudeDataset(self.particles_prepd[self.split_val:], self.amplitudes_prepd[self.split_val:],
+        val_dataset = AmplitudeDataset(self.particles_prepd[self.split_test:self.split_val], self.amplitudes_prepd[self.split_test:self.split_val],
                                         dtype=self.dtype)
         self.val_loader = torch.utils.data.DataLoader(dataset=val_dataset,
                                                         batch_size=self.cfg.training.batchsize, shuffle=False)
         LOGGER.debug(f"Constructed dataloaders with train_test_val={self.cfg.training.train_test_val}, "\
-                    f"batch_size={self.cfg.training.batchsize}")
+                     f"train_batches={len(self.train_loader)}, test_batches={len(self.test_loader)}, val_batches={len(self.val_loader)}, "\
+                     f"batch_size={self.cfg.training.batchsize}")
 
     def _init_scheduler(self):
         if self.cfg.training.scheduler is None:
@@ -561,7 +567,7 @@ class AmplitudeExperiment:
                             f"training time estimate: {dt*self.cfg.training.nepochs/60:.2f}min "\
                             f"= {dt*self.cfg.training.nepochs/60**2:.2f}h")
             else:
-                LOGGER.debug(f"Finished epoch {epoch} after {dt:.2f}s with val_loss={val_loss}")
+                LOGGER.debug(f"Finished epoch {epoch} after {dt:.2f}s with val_loss={val_loss:.4f}")
 
         dt = time.time() - self.training_start_time
         LOGGER.info(f"Finished training after {dt/60:.2f}min = {dt/60**2:.2f}h")
@@ -615,7 +621,9 @@ class AmplitudeExperiment:
         return loss
 
     def _save_model(self):
-        assert self.cfg.save
+        if not self.cfg.save:
+            return
+        
         filename = f"model_{self.cfg.run_idx}.pt"
         model_path = os.path.join(self.cfg.run_dir, "models", filename)
         LOGGER.debug(f"Saving model at {model_path}")
