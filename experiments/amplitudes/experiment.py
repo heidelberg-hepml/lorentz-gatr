@@ -86,6 +86,7 @@ class AmplitudeExperiment:
         if self.cfg.train:
             self._init_optimizer()
             self._init_scheduler()
+            self._init_loss()
             self.train()
             self._save_model()
 
@@ -110,9 +111,9 @@ class AmplitudeExperiment:
         modelname = self.cfg.model.net._target_.rsplit(".", 1)[-1]
         with open_dict(self.cfg):
             # specify shape of type_token
-            if modelname == "GATr" or modelname == "CLSGATr":
+            if modelname == "GATr":
                 self.cfg.model.net.in_s_channels = n_tokens
-            elif modelname == "Transformer" or modelname == "CLSTr":
+            elif modelname in ["Transformer", "CLSTr"]:
                 self.cfg.model.net.in_channels = 4 + n_tokens
             elif modelname == "GAP":
                 self.cfg.model.net.in_mv_channels = len(TYPE_TOKEN_DICT[self.cfg.data.dataset])
@@ -120,6 +121,14 @@ class AmplitudeExperiment:
                 self.cfg.model.net.in_shape = 4 * len(TYPE_TOKEN_DICT[self.cfg.data.dataset])
             else:
                 raise ValueError(f"model {modelname} not implemented")
+
+            if self.cfg.training.heteroscedastic:
+                if modelname == "MLP":
+                    self.cfg.model.net.out_shape = 2  
+                elif modelname in ["Transformer", "CLSTr"]:
+                    self.cfg.model.net.out_channels = 2
+                elif modelname in ["GATr", "GAP"]:
+                    self.cfg.model.net.out_mv_channels = 2
 
     def init_model(self):
         # initialize model
@@ -178,6 +187,8 @@ class AmplitudeExperiment:
         with torch.no_grad():
             for x, y in loader:
                 y_pred = self.model(x.to(self.device), type_token=self.type_token)
+                if self.cfg.training.heteroscedastic:
+                    y_pred = y_pred[...,[0]]
                 amplitudes_pred_prepd = np.concatenate((amplitudes_pred_prepd,
                                                         y_pred.cpu().float().numpy()), axis=0)
                 amplitudes_truth_prepd = np.concatenate((amplitudes_truth_prepd,
@@ -527,11 +538,22 @@ class AmplitudeExperiment:
 
         LOGGER.debug(f"Using learning rate scheduler {self.cfg.training.scheduler}")
 
+    def _init_loss(self):
+        if self.cfg.training.heteroscedastic:
+            def heteroscedastic_loss(x_true, pred):
+                x_pred, logsigma = pred[...,[0]], pred[...,[1]]
+                # note: drop constant term log(2 pi)/2 because it does not affect optimization
+                expression = (x_pred - x_true)**2 / (2 * logsigma.exp()) + logsigma
+                return expression.mean()
+
+            self.loss = heteroscedastic_loss
+        else:
+            self.loss = torch.nn.MSELoss()
+
     def train(self):
         # performance metrics
         self.train_metrics = {"mse": [], "lr": []}
         self.val_metrics = {"mse": []}
-        self.loss = torch.nn.MSELoss()
 
         # early stopping
         smallest_val_loss = 1e10
@@ -571,6 +593,9 @@ class AmplitudeExperiment:
 
         dt = time.time() - self.training_start_time
         LOGGER.info(f"Finished training after {dt/60:.2f}min = {dt/60**2:.2f}h")
+        if self.cfg.use_mlflow:
+            log_mlflow("es_epoch", epoch)
+            log_mlflow("traintime", dt / 3600)
 
     def _step(self, data, step):
         loss = self._batch_loss(data)
@@ -616,7 +641,8 @@ class AmplitudeExperiment:
         x, y = data
         x, y = x.to(self.device), y.to(self.device)
         y_pred = self.model(x, type_token=self.type_token)
-        loss = self.loss(y_pred, y)
+        #y_pred = y_pred[:,[0]]
+        loss = self.loss(y, y_pred)
         assert torch.isfinite(loss).all()
         return loss
 

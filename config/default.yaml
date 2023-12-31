@@ -13,10 +13,11 @@ data:
 
 train: true
 training:
- n_epochs : 100
+ nepochs : 100
  train_test_val: [.3, .5, .1]
  subsample: null
  es_patience: 10
+ heteroscedastic: false
 
  clip_grad_norm: 1e3
  log_every_n_steps: 1
@@ -46,5 +47,5 @@ plotting:
  delta_prepd: true
 
 mlflow:
- db: '${base_dir}/runs/mlflow/mlflow_local.db'
- artifacts: '${base_dir}/runs/mlflow/artifacts_local'
+ db: '${base_dir}/runs/${exp_name}/mlflow/mlflow.db'
+ artifacts: '${base_dir}/runs/${exp_name}/mlflow/artifacts'

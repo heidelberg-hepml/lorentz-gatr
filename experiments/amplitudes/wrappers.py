@@ -30,11 +30,12 @@ class AmplitudeMLPWrapper(nn.Module):
 
 class AmplitudeTransformerWrapper(nn.Module):
 
-    def __init__(self, net, extract_mode="mean"):
+    def __init__(self, net, extract_mode="mean", use_momcons=False):
         super().__init__()
         self.net = net
         assert extract_mode in ["global_token", "mean"]
         self.extract_mode = extract_mode
+        self.use_momcons = use_momcons
 
     def forward(self, inputs, type_token):
         batchsize, _, _ = inputs.shape
@@ -42,6 +43,10 @@ class AmplitudeTransformerWrapper(nn.Module):
         # type_token
         type_token = encode_type_token(type_token, batchsize, inputs.device)
         inputs = torch.cat((inputs, type_token), dim=-1)
+
+        # remove one particle if use_momentum_conservation
+        if self.use_momcons:
+            inputs = inputs[:,:-1,:]
 
         # global_token (collect information here)
         if self.extract_mode == "global_token":
@@ -110,11 +115,12 @@ class AmplitudeGAPWrapper(nn.Module):
 
 class AmplitudeGATrWrapper(nn.Module):
 
-    def __init__(self, net, extract_mode="mean"):
+    def __init__(self, net, extract_mode="mean", use_momcons=False):
         super().__init__()
         self.net = net
         assert extract_mode in ["mean", "global_token"]
         self.extract_mode = extract_mode
+        self.use_momcons = use_momcons
 
     def forward(self, inputs: torch.Tensor, type_token):
         batchsize, _, _ = inputs.shape
@@ -135,6 +141,11 @@ class AmplitudeGATrWrapper(nn.Module):
 
         # encode type_token in scalars
         scalars = encode_type_token(type_token, batchsize, inputs.device)
+
+        # remove one particle if use_momentum_conservation
+        if self.use_momcons:
+            scalars = scalars[:,:-1,:]
+            multivector = multivector[:,:-1,:,:]
 
         # global token
         if self.extract_mode == "global_token":
