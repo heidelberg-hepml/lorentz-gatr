@@ -213,7 +213,6 @@ class BaselineSelfAttention(nn.Module):
             "... num_heads num_items hidden_channels -> ... num_items (num_heads hidden_channels)",
         )
         outputs = self.out_linear(h)  # (..., num_items, out_channels)
-
         return outputs
 
     @staticmethod

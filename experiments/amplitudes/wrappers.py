@@ -115,12 +115,14 @@ class AmplitudeGAPWrapper(nn.Module):
 
 class AmplitudeGATrWrapper(nn.Module):
 
-    def __init__(self, net, extract_mode="mean", use_momcons=False):
+    def __init__(self, net, extract_mode="mean", use_momcons=False, reinsert_type_token=False):
         super().__init__()
         self.net = net
         assert extract_mode in ["mean", "global_token"]
         self.extract_mode = extract_mode
         self.use_momcons = use_momcons
+
+        # reinsert_type_token is processed in the experiment class
 
     def forward(self, inputs: torch.Tensor, type_token):
         batchsize, _, _ = inputs.shape

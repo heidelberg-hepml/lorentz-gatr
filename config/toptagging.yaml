@@ -1,17 +1,16 @@
-exp_type: amplitudes
-exp_name: amp_local_debug
+exp_type: toptagging
+exp_name: topt_local_debug
 run_name: null
 base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
 
 data:
- dataset : zgg
- data_path : /media/jspinner/shared/Studium/project3/data/
- subsample : 10000
- include_permsym: false
+ data_path : /media/jspinner/shared/Studium/project3/data/toptagging_mini.npz
 
 train: true
 training:
  nepochs : 5
+ batchsize: 128
+ lr: 1e-3
 
 defaults:
  - model: gatr_amplitudes
