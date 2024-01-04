@@ -100,6 +100,7 @@ class AmplitudeExperiment(BaseExperiment):
         # note: shuffle=True or False does not matter, because we take the predictions directly from the dataloader and not from the dataset
         amplitudes_truth_prepd, amplitudes_pred_prepd = np.zeros((0, 1)), np.zeros((0, 1))
         LOGGER.info(f"### Starting to evaluate model on {title} dataset with {loader.dataset.amplitudes.shape[0]} elements ###")
+        self.model.eval()
         with torch.no_grad():
             for x, y in loader:
                 y_pred = self.model(x.to(self.device), type_token=self.type_token)
@@ -272,8 +273,10 @@ class AmplitudeExperiment(BaseExperiment):
         loss = self.loss(y, y_pred)
         assert torch.isfinite(loss).all()
 
-        mse = torch.mean( (y_pred-y)**2)
-        rmse = torch.mean( (y_pred/y - 1)**2)
+        if self.cfg.training.heteroscedastic:
+            y_pred = y_pred[...,[0]]
+        mse = torch.mean( (y_pred-y)**2).cpu().item()
+        rmse = torch.mean( (y_pred/y - 1)**2).cpu().item()
         metrics = {"mse": mse, "rmse": rmse}
         return loss, metrics
 

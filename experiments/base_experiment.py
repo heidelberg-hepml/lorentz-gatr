@@ -395,7 +395,7 @@ class BaseExperiment:
         with torch.no_grad():
             for data in self.val_loader:
                 loss, metric = self._batch_loss(data)
-                losses.append(loss.item())
+                losses.append(loss.cpu().item())
                 for key, value in metric.items():
                     metrics[key].append(value)
         val_loss = np.mean(losses)
@@ -407,6 +407,9 @@ class BaseExperiment:
             for key, values in self.val_metrics.items():
                 log_mlflow(f"val.{key}", values[-1], step=epoch)
         return val_loss
+
+    def _batch_loss(self, data):
+        raise NotImplementedError()
 
     def _init_metrics(self):
         raise NotImplementedError()

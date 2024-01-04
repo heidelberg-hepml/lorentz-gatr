@@ -8,9 +8,13 @@ data:
 
 train: true
 training:
- nepochs : 5
- batchsize: 128
+ nepochs : 1
+ batchsize: 512
  lr: 1e-3
+
+plotting:
+ roc: true
+ loss: true
 
 defaults:
  - model: gatr_amplitudes
