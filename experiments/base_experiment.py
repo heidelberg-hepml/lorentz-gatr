@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-import os, sys, time
+import os, time
 import zipfile
 import logging
 from pathlib import Path
@@ -19,9 +19,6 @@ from gatr.layers import MLPConfig, SelfAttentionConfig
 cs = ConfigStore.instance()
 cs.store(name="base_attention", node=SelfAttentionConfig)
 cs.store(name="base_mlp", node=MLPConfig)
-
-
-torch.autograd.set_detect_anomaly(True) # debugging
 
 class BaseExperiment:
 
@@ -84,9 +81,6 @@ class BaseExperiment:
         dt = time.time() - t0
         LOGGER.info(f"Finished experiment after {dt/60:.2f}min = {dt/60**2:.2f}h")
 
-    def init_physics(self):
-        raise NotImplementedError()
-
     def init_model(self):
         # initialize model
         self.model = instantiate(self.cfg.model) # hydra magic
@@ -106,15 +100,6 @@ class BaseExperiment:
             self.model.load_state_dict(state_dict)
 
         self.model.to(self.device, dtype=self.dtype)
-
-    def init_data(self):
-        raise NotImplementedError()
-
-    def evaluate(self):
-        raise NotImplementedError()
-
-    def plot(self):
-        raise NotImplementedError()
 
     def _init(self):
         run_name = self._init_experiment()
@@ -289,9 +274,6 @@ class BaseExperiment:
             raise ValueError(f"Optimizer {self.cfg.training.optimizer} not implemented")
         LOGGER.debug(f"Using optimizer {self.cfg.training.optimizer} with lr={self.cfg.training.lr}")
 
-    def _init_dataloader(self):
-        raise NotImplementedError()
-
     def _init_scheduler(self):
         if self.cfg.training.scheduler is None:
             self.scheduler = None # constant lr
@@ -304,9 +286,6 @@ class BaseExperiment:
             raise ValueError(f"Learning rate scheduler {self.cfg.training.scheduler} not implemented")
 
         LOGGER.debug(f"Using learning rate scheduler {self.cfg.training.scheduler}")
-
-    def _init_loss(self):
-        raise NotImplementedError()
 
     def train(self):
         # performance metrics
@@ -408,12 +387,6 @@ class BaseExperiment:
                 log_mlflow(f"val.{key}", values[-1], step=epoch)
         return val_loss
 
-    def _batch_loss(self, data):
-        raise NotImplementedError()
-
-    def _init_metrics(self):
-        raise NotImplementedError()
-
     def _save_config(self, filename="amplitudes.yaml", to_mlflow=False):
         # Save config
         if not self.cfg.save:
@@ -436,3 +409,28 @@ class BaseExperiment:
         model_path = os.path.join(self.cfg.run_dir, "models", filename)
         LOGGER.debug(f"Saving model at {model_path}")
         torch.save(self.model.state_dict(), model_path)
+
+
+    def init_physics(self):
+        raise NotImplementedError()
+    
+    def init_data(self):
+        raise NotImplementedError()
+
+    def evaluate(self):
+        raise NotImplementedError()
+
+    def plot(self):
+        raise NotImplementedError()
+
+    def _init_dataloader(self):
+        raise NotImplementedError()
+
+    def _init_loss(self):
+        raise NotImplementedError()
+    
+    def _batch_loss(self, data):
+        raise NotImplementedError()
+
+    def _init_metrics(self):
+        raise NotImplementedError()

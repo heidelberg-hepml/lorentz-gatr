@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-import os, sys, time
+import os, time
 from omegaconf import OmegaConf, open_dict
 from matplotlib.backends.backend_pdf import PdfPages
 
@@ -12,7 +12,6 @@ from experiments.amplitudes.wrappers import AmplitudeMLPWrapper, AmplitudeTransf
 from experiments.amplitudes.dataset import AmplitudeDataset
 from experiments.amplitudes.preprocessing import preprocess_particles, preprocess_amplitude, undo_preprocess_amplitude
 from experiments.amplitudes.plots import plot_histograms, plot_delta_histogram
-from experiments.misc import get_device, flatten_dict
 from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
 

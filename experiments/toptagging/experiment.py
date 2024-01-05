@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-import os, sys, time
+import os, time
 from omegaconf import OmegaConf, open_dict
 from matplotlib.backends.backend_pdf import PdfPages
 
@@ -12,11 +12,10 @@ from experiments.base_plots import plot_loss
 from experiments.toptagging.wrappers import TopTaggingTransformerWrapper, TopTaggingGATrWrapper
 from experiments.toptagging.dataset import TopTaggingDataset
 from experiments.toptagging.plots import plot_roc
-from experiments.misc import get_device, flatten_dict
 from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
 
-MODEL_TITLE_DICT = {"GATr": "GATr", "Transformer": "Tr", "MLP": "MLP", "CLSTr": "CLSTr", "GAP": "GAP"}
+MODEL_TITLE_DICT = {"GATr": "GATr", "Transformer": "Tr"}
 
 class TopTaggingExperiment(BaseExperiment):
 
