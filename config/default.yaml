@@ -18,6 +18,7 @@ training:
  train_test_val: [.3, .5, .1]
  subsample: null
  es_patience: 10
+ es_load_best_model: true
  heteroscedastic: false
 
  clip_grad_norm: 1e3

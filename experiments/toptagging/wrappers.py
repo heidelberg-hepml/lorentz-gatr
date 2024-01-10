@@ -48,13 +48,13 @@ class TopTaggingGATrWrapper(nn.Module):
         # encode momenta in multivectors
         multivector = embed_vector(inputs)
         multivector = multivector.unsqueeze(2)
-        scalars = torch.zeros(batchsize, num_objects, 1)
+        scalars = torch.zeros(batchsize, num_objects, 1, device=inputs.device, dtype=inputs.dtype)
 
         # global token
         global_token_mv = torch.zeros((batchsize, 1, multivector.shape[2], multivector.shape[3]),
                                           dtype=multivector.dtype, device=multivector.device)
         global_token_s = torch.zeros((batchsize, 1, scalars.shape[2]),
-                                         dtype=multivector.dtype, device=multivector.device)
+                                         dtype=scalars.dtype, device=scalars.device)
         global_token_s[:,:,0] = 1.
         multivector = torch.cat((global_token_mv, multivector), dim=1)
         scalars = torch.cat((global_token_s, scalars), dim=1)
