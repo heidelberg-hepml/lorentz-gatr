@@ -1,6 +1,5 @@
 _target_: experiments.amplitudes.wrappers.AmplitudeGATrWrapper
 reinsert_type_token: false
-extract_mode: mean
 
 net:
  _target_: gatr.nets.GATr

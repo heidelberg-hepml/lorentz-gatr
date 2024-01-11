@@ -2,4 +2,3 @@
 # All rights reserved.
 from .mlp import MLP
 from .transformer import Transformer
-from .clstr import CLSTr
