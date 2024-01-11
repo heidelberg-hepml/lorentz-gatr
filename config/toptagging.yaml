@@ -1,6 +1,5 @@
 exp_type: toptagging
 exp_name: topt_local_debug
-run_name: null
 base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
 
 data:
@@ -17,7 +16,7 @@ plotting:
  loss: true
 
 defaults:
- - model: gatr_amplitudes
+ - model: gatr_toptagging
  - default
  - hydra
  - _self_

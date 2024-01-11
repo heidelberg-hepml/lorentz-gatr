@@ -1,6 +1,5 @@
 exp_type: amplitudes
 exp_name: amp_local_debug
-run_name: null
 base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
 
 data:
@@ -9,9 +8,18 @@ data:
  subsample : 10000
  include_permsym: false
 
+heteroscedastic: false
+
 train: true
 training:
- nepochs : 5
+ train_test_val: [.4, .5, .1]
+
+plot: true
+plotting:
+ histograms: true
+ delta: true
+ delta_prepd: true
+ pull: true
 
 defaults:
  - model: gatr_amplitudes

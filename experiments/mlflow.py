@@ -60,7 +60,7 @@ def log_mlflow(
                 BASE_WAIT_TIME * WAIT_TIME_FACTOR**attempt + WAIT_TIME_RANDOM * np.random.rand()
             )
             LOGGER.warning(
-                f"Exception when logging to MLflow at step {step} (attempt {attempt + 1}). "
+                f"Exception when logging key {key} to MLflow at step {step} (attempt {attempt + 1}). "
                 f"Waiting for {wait_time:.1f}s before trying again."
             )
             time.sleep(wait_time)

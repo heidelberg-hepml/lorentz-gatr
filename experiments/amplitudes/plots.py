@@ -99,3 +99,39 @@ def plot_delta_histogram(file, datas, labels, title, xrange,
 
     fig.savefig(file, format="pdf", bbox_inches="tight")
     plt.close()
+
+def plot_pull(file, pulls, labels, xlabel, title=None, xrange=None, bins=60, logy=False):
+    assert len(pulls) == 2
+    dup_last = lambda a: np.append(a, a[-1])
+    _, bins = np.histogram(pulls[0], bins=bins-1, range=xrange)
+    hists, scales = [], []
+    for data in pulls:
+        data = np.clip(data, xrange[0], xrange[1])
+        hist, _ = np.histogram(data, bins=bins, range=xrange)
+        scale = 1/np.sum((bins[1:] - bins[:-1]) * hist)
+        hists.append(hist)
+        scales.append(scale)
+    
+    fig, axs = plt.subplots(figsize=(6,4))
+    for hist, scale, label, color in zip(hists, scales, labels, colors[1:3][::-1]):
+        axs.step(bins, dup_last(hist)*scale, color, where="post",
+                 label=label)
+    
+    if logy:
+        axs.set_yscale("log")
+    ymin, ymax=axs.get_ylim()
+    if not logy:
+        ymin = 0.
+    axs.vlines(0., ymin, ymax, color="k", linestyle="--", lw=.5)
+    axs.set_ylim(ymin, ymax)
+    axs.set_xlim(xrange)
+
+    axs.set_xlabel(xlabel, fontsize = FONTSIZE)
+    axs.tick_params(axis="both", labelsize=FONTSIZE_TICK)
+    axs.legend(frameon=False, loc="upper left", fontsize=FONTSIZE * .7)
+    axs.text(.95, .95, s=title, horizontalalignment="right", verticalalignment="top",
+                transform=axs.transAxes, fontsize=FONTSIZE)
+
+    fig.savefig(file, format="pdf", bbox_inches="tight")
+    plt.close()
+    
