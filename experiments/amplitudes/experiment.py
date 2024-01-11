@@ -536,7 +536,7 @@ class AmplitudeExperiment:
             self.prepd_std.append(prepd_std)
 
     def _init_dataloader(self):
-        assert sum(self.cfg.training.train_test_val) <= 1
+        assert sum(self.cfg.data.train_test_val) <= 1
 
         # seperate data into train, test and validation subsets for each dataset
         train_sets, test_sets, val_sets = {"particles": [], "amplitudes": []}, \
@@ -570,7 +570,7 @@ class AmplitudeExperiment:
             dataset=AmplitudeDataset(val_sets["particles"], val_sets["amplitudes"], dtype=self.dtype),
             batch_size=self.cfg.evaluation.batchsize, shuffle=False)
 
-        LOGGER.info(f"Constructed dataloaders with train_test_val={self.cfg.training.train_test_val}, "\
+        LOGGER.info(f"Constructed dataloaders with train_test_val={self.cfg.data.train_test_val}, "\
                      f"train_batches={len(self.train_loader)}, test_batches={len(self.test_loader)}, val_batches={len(self.val_loader)}, "\
                      f"batch_size={self.cfg.training.batchsize} (training), {self.cfg.evaluation.batchsize} (evaluation)")
 
