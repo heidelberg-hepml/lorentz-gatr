@@ -91,7 +91,7 @@ class BaseExperiment:
 
         # load existing model if specified
         if self.warm_start:
-            model_path = os.path.join(self.cfg.run_dir, "models", f"model_{self.cfg.warm_start_idx}.pt")
+            model_path = os.path.join(self.cfg.run_dir, "models", f"model_run{self.cfg.warm_start_idx}.pt")
             try:
                 state_dict = torch.load(model_path, map_location="cpu")
             except FileNotFoundError:
@@ -294,7 +294,7 @@ class BaseExperiment:
         self.val_metrics = self._init_metrics()
 
         # early stopping
-        smallest_val_loss = 1e10
+        smallest_val_loss, smallest_val_loss_epoch = 1e10, 0
         patience = 0
         
         # main train loop
@@ -313,7 +313,12 @@ class BaseExperiment:
             val_loss = self._validate(epoch)
             if val_loss < smallest_val_loss:
                 smallest_val_loss = val_loss
+                smallest_val_loss_epoch = epoch
                 patience = 0
+
+                # save best model
+                if self.cfg.training.es_load_best_model:
+                    self._save_model(f"model_run{self.cfg.run_idx}_ep{smallest_val_loss_epoch}.pt")
             else:
                 patience += 1
                 if patience > self.cfg.training.es_patience:
@@ -334,6 +339,17 @@ class BaseExperiment:
         if self.cfg.use_mlflow:
             log_mlflow("es_epoch", epoch)
             log_mlflow("traintime", dt / 3600)
+
+        # wrap up early stopping
+        if self.cfg.training.es_load_best_model:
+            model_path = os.path.join(self.cfg.run_dir, "models",
+                                      f"model_run{self.cfg.run_idx}_ep{smallest_val_loss_epoch}.pt")
+            try:
+                state_dict = torch.load(model_path, map_location=self.device)
+                LOGGER.info(f"Loading model from {model_path}")
+                self.model.load_state_dict(state_dict)
+            except FileNotFoundError:
+                LOGGER.warning(f"Cannot load best model (epoch {smallest_val_loss_epoch}) from {model_path}")
 
     def _step(self, data, step):
         loss, metrics = self._batch_loss(data)
@@ -401,16 +417,16 @@ class BaseExperiment:
             for key, value in flatten_dict(self.cfg).items():
                 log_mlflow(key, value, kind="param")
 
-    def _save_model(self):
+    def _save_model(self, filename=None):
         if not self.cfg.save:
             return
         
-        filename = f"model_{self.cfg.run_idx}.pt"
+        if filename is None:
+            filename = f"model_run{self.cfg.run_idx}.pt"
         model_path = os.path.join(self.cfg.run_dir, "models", filename)
         LOGGER.debug(f"Saving model at {model_path}")
         torch.save(self.model.state_dict(), model_path)
-
-
+        
     def init_physics(self):
         raise NotImplementedError()
     
