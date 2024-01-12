@@ -152,7 +152,8 @@ class AmplitudeGATrWrapper(nn.Module):
     def extract_from_ga(self, multivector, scalars):
         # Extract scalars from GA representation
         lorentz_scalars = extract_scalar(multivector)[...,0]
-        
+
         amplitude = lorentz_scalars[:,0,:]
 
+        # last dimension has 2 (cfg.heteroscedastic=True) or 1 entries, with 0=amplitude and 1=log(variance)
         return amplitude

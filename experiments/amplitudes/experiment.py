@@ -3,15 +3,13 @@ import torch
 
 import os, time
 from omegaconf import OmegaConf, open_dict
-from matplotlib.backends.backend_pdf import PdfPages
 
 from experiments.base_experiment import BaseExperiment
-from experiments.base_plots import plot_loss
 from experiments.amplitudes.wrappers import AmplitudeMLPWrapper, AmplitudeTransformerWrapper, \
      AmplitudeGATrWrapper, AmplitudeGAPWrapper
 from experiments.amplitudes.dataset import AmplitudeDataset
 from experiments.amplitudes.preprocessing import preprocess_particles, preprocess_amplitude, undo_preprocess_amplitude
-from experiments.amplitudes.plots import plot_histograms, plot_delta_histogram, plot_pull
+from experiments.amplitudes.plots import plot_mixer
 from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
 
@@ -37,7 +35,7 @@ class AmplitudeExperiment(BaseExperiment):
             else:
                 self.type_token.append(list(range(len(TYPE_TOKEN_DICT[dataset]))))
             
-        n_tokens = max([max(token) for token in self.type_token]) + 1
+        n_type_tokens = max([max(token) for token in self.type_token]) + 1
         OmegaConf.set_struct(self.cfg, True)
         modelname = self.cfg.model.net._target_.rsplit(".", 1)[-1]
         if modelname in ["GAP", "MLP"]:
@@ -47,9 +45,9 @@ class AmplitudeExperiment(BaseExperiment):
         with open_dict(self.cfg):
             # specify shape for type_token and MLPs
             if modelname == "GATr":
-                self.cfg.model.net.in_s_channels = n_tokens
+                self.cfg.model.net.in_s_channels = n_type_tokens
             elif modelname == "Transformer":
-                self.cfg.model.net.in_channels = 4 + n_tokens
+                self.cfg.model.net.in_channels = 4 + n_type_tokens
             elif modelname == "GAP":
                 self.cfg.model.net.in_mv_channels = len(TYPE_TOKEN_DICT[self.cfg.data.dataset[0]])
             elif modelname == "MLP":
@@ -59,7 +57,7 @@ class AmplitudeExperiment(BaseExperiment):
 
             # reinsert_type_token
             if modelname == "GATr" and self.cfg.model.reinsert_type_token:
-                self.cfg.model.net.reinsert_s_channels = list(range(n_tokens))
+                self.cfg.model.net.reinsert_s_channels = list(range(n_type_tokens))
 
             # extra outputs for heteroscedastic loss
             if self.cfg.heteroscedastic:
@@ -148,8 +146,10 @@ class AmplitudeExperiment(BaseExperiment):
                      f"batch_size={self.cfg.training.batchsize} (training), {self.cfg.evaluation.batchsize} (evaluation)")
 
     def evaluate(self):
-        self.results_train = self._evaluate_single(self.train_loader, "train")
-        self.results_test = self._evaluate_single(self.test_loader, "test")
+        with torch.no_grad():
+            self.results_train = self._evaluate_single(self.train_loader, "train")
+            self.results_val = self._evaluate_single(self.val_loader, "val")
+            self.results_test = self._evaluate_single(self.test_loader, "test")
 
     def _evaluate_single(self, loader, title):
         # compute predictions
@@ -161,20 +161,19 @@ class AmplitudeExperiment(BaseExperiment):
         LOGGER.info(f"### Starting to evaluate model on {title} dataset ###")
         self.model.eval()
         t0 = time.time()
-        with torch.no_grad():
-            for data in loader:
-                for idataset, data_onedataset in enumerate(data):
-                    x, y = data_onedataset
-                    pred = self.model(x.to(self.device),
+        for data in loader:
+            for idataset, data_onedataset in enumerate(data):
+                x, y = data_onedataset
+                pred = self.model(x.to(self.device),
                                       type_token=self.type_token[idataset],
                                       global_token=idataset)
-                    y_pred = pred[...,0]
-                    if self.cfg.heteroscedastic:
-                        std_prepd = torch.exp(pred[...,1] / 2) # extract sigma from log(sigma^2)
-                        std_pred_prepd[idataset].append(std_prepd.cpu().float().numpy())
+                y_pred = pred[...,0]
+                if self.cfg.heteroscedastic:
+                    std_prepd = torch.exp(pred[...,1] / 2) # extract sigma from log(sigma^2)
+                    std_pred_prepd[idataset].append(std_prepd.cpu().float().numpy())
                     
-                    amplitudes_pred_prepd[idataset].append(y_pred.cpu().float().numpy())
-                    amplitudes_truth_prepd[idataset].append(y.flatten().cpu().float().numpy())
+                amplitudes_pred_prepd[idataset].append(y_pred.cpu().float().numpy())
+                amplitudes_truth_prepd[idataset].append(y.flatten().cpu().float().numpy())
         amplitudes_pred_prepd = [np.concatenate(individual) for individual in amplitudes_pred_prepd]
         amplitudes_truth_prepd = [np.concatenate(individual) for individual in amplitudes_truth_prepd]
         if self.cfg.heteroscedastic:
@@ -245,96 +244,14 @@ class AmplitudeExperiment(BaseExperiment):
         model_title = MODEL_TITLE_DICT[type(self.model.net).__name__]
         title = [f"{model_title}: {dataset_title}" for dataset_title in dataset_titles]
         LOGGER.info(f"Creating plots in {plot_path}")
-        
-        if self.cfg.plotting.loss and self.cfg.train:
-            file = f"{plot_path}/loss.pdf"
-            plot_loss(file, [self.train_loss, self.val_loss], self.train_lr,
-                      labels=["train loss", "val loss"],
-                      logy=False if self.cfg.heteroscedastic else True) # loss can become negative when heteroscedastic
 
-        if self.cfg.plotting.histograms and self.cfg.evaluate:
-            out = f"{plot_path}/histograms.pdf"
-            with PdfPages(out) as file:
-                labels = ["Test", "Train", "Prediction"]
-
-                for idataset, dataset in enumerate(self.cfg.data.dataset):
-                    data = [np.log(self.results_test[dataset]["raw"]["truth"]),
-                        np.log(self.results_train[dataset]["raw"]["truth"]),
-                        np.log(self.results_test[dataset]["raw"]["prediction"])]
-                    plot_histograms(file, data, labels, title=title[idataset],
-                           xlabel=r"$\log A$", logx=False)
-
-        if self.cfg.plotting.delta and self.cfg.evaluate:
-            out = f"{plot_path}/delta.pdf"
-            with PdfPages(out) as file:
-                for idataset, dataset in enumerate(self.cfg.data.dataset):
-                    delta_test = (self.results_test[dataset]["raw"]["prediction"] - self.results_test[dataset]["raw"]["truth"]) / self.results_test[dataset]["raw"]["truth"]
-                    delta_train = (self.results_train[dataset]["raw"]["prediction"] - self.results_train[dataset]["raw"]["truth"]) / self.results_train[dataset]["raw"]["truth"]
-
-                    # determine 1% largest amplitudes
-                    scale = self.results_test[dataset]["raw"]["truth"]
-                    largest_idx = round(.01 * len(scale) )
-                    sort_idx = np.argsort(scale)
-                    largest_min = scale[sort_idx][-largest_idx-1]
-                    largest_mask = (scale > largest_min)
-
-                    xranges = [(-10.,10.), (-30., 30.), (-100., 100.)] # in %
-                    binss = [100, 50, 50]
-                    for xrange, bins in zip(xranges, binss):
-                        plot_delta_histogram(file, [delta_test*100, delta_train*100],
-                                         labels=["Test", "Train"], title=title[idataset], 
-                                         xlabel=r"$\Delta = \frac{A_\mathrm{pred} - A_\mathrm{true}}{A_\mathrm{true}}$ [\%]",
-                                         xrange=xrange, bins=bins, logy=False)
-                        plot_delta_histogram(file, [delta_test*100, delta_test[largest_mask]*100],
-                                         labels=["Test", "Largest 1\%"], title=title[idataset], 
-                                         xlabel=r"$\Delta = \frac{A_\mathrm{pred} - A_\mathrm{true}}{A_\mathrm{true}}$ [\%]",
-                                         xrange=xrange, bins=bins, logy=False)
-                        plot_delta_histogram(file, [delta_test*100, delta_test[largest_mask]*100],
-                                         labels=["Test", "Largest 1\%"], title=title[idataset], 
-                                         xlabel=r"$\Delta = \frac{A_\mathrm{pred} - A_\mathrm{true}}{A_\mathrm{true}}$ [\%]",
-                                         xrange=xrange, bins=bins, logy=True)
-                    
-        if self.cfg.plotting.delta_prepd and self.cfg.evaluate:
-            out = f"{plot_path}/delta_prepd.pdf"
-            with PdfPages(out) as file:
-                for idataset, dataset in enumerate(self.cfg.data.dataset):
-                    delta_test = (self.results_test[dataset]["preprocessed"]["prediction"] - self.results_test[dataset]["preprocessed"]["truth"]) / self.results_test[dataset]["preprocessed"]["truth"]
-                    delta_train = (self.results_train[dataset]["preprocessed"]["prediction"] - self.results_train[dataset]["preprocessed"]["truth"]) / self.results_train[dataset]["preprocessed"]["truth"]
-
-                    # determine 1% largest amplitudes
-                    scale = self.results_test[dataset]["preprocessed"]["truth"]
-                    largest_idx = round(.01 * len(scale) )
-                    sort_idx = np.argsort(scale)
-                    largest_min = scale[sort_idx][-largest_idx-1]
-                    largest_mask = (scale > largest_min)
-
-                    xranges = [(-10.,10.), (-30., 30.), (-100., 100.)] # in %
-                    binss = [100, 50, 50]
-                    for xrange, bins in zip(xranges, binss):
-                        plot_delta_histogram(file, [delta_test*100, delta_train*100],
-                                         labels=["Test", "Train"], title=title[idataset], 
-                                         xlabel=r"$\tilde\Delta = \frac{\tilde A_\mathrm{pred} - \tilde A_\mathrm{true}}{\tilde A_\mathrm{true}}$ [\%]",
-                                         xrange=xrange, bins=bins, logy=False)
-                        plot_delta_histogram(file, [delta_test*100, delta_test[largest_mask]*100],
-                                         labels=["Test", "Largest 1\%"], title=title[idataset], 
-                                         xlabel=r"$\tilde\Delta = \frac{\tilde A_\mathrm{pred} - \tilde A_\mathrm{true}}{\tilde A_\mathrm{true}}$ [\%]",
-                                         xrange=xrange, bins=bins, logy=False)
-                        plot_delta_histogram(file, [delta_test*100, delta_test[largest_mask]*100],
-                                         labels=["Test", "Largest 1\%"], title=title[idataset], 
-                                         xlabel=r"$\tilde\Delta = \frac{\tilde A_\mathrm{pred} - \tilde A_\mathrm{true}}{\tilde A_\mathrm{true}}$ [\%]",
-                                         xrange=xrange, bins=bins, logy=True)
-
-        if self.cfg.plotting.pull and self.cfg.evaluate and self.cfg.heteroscedastic:
-            out = f"{plot_path}/pull.pdf"
-            with PdfPages(out) as file:
-                for idataset, dataset in enumerate(self.cfg.data.dataset):
-                    pulls = [self.results_train[dataset]["preprocessed"]["pull"], self.results_test[dataset]["preprocessed"]["pull"]]
-                    plot_pull(file, pulls, ["Train", "Test"], r"$\frac{\tilde A_\mathrm{pred} - \tilde A_\mathrm{true}}{\tilde \sigma_\mathrm{pred}}$",
-                          title=title[idataset], xrange=(-5,5), bins=60, logy=False)
-                
-                    pulls = [self.results_train[dataset]["raw"]["pull"], self.results_test[dataset]["raw"]["pull"]]
-                    plot_pull(file, pulls, ["Train", "Test"], r"$\frac{A_\mathrm{pred} - A_\mathrm{true}}{\sigma_\mathrm{pred}}$",
-                          title=title[idataset], xrange=(-5,5), bins=60, logy=False)
+        plot_dict = {"train_loss": self.train_loss,
+                     "val_loss": self.val_loss,
+                     "train_lr": self.train_lr,
+                     "results_test": self.results_test,
+                     "results_train": self.results_train}
+                     
+        plot_mixer(self.cfg, plot_path, title, plot_dict)
 
     def _init_loss(self):
         if self.cfg.heteroscedastic:
@@ -352,7 +269,7 @@ class AmplitudeExperiment(BaseExperiment):
 
     def _batch_loss(self, data):
         # average over contributions from different datasets
-        loss = torch.empty(self.n_datasets)
+        loss = 0.0
         mse = []
         for idataset, data_onedataset in enumerate(data):
             x, y = data_onedataset
@@ -360,9 +277,8 @@ class AmplitudeExperiment(BaseExperiment):
             y_pred = self.model(x,
                                 type_token=self.type_token[idataset],
                                 global_token=idataset)
-            loss[idataset] = self.loss(y, y_pred)
+            loss += self.loss(y, y_pred) / self.n_datasets
             mse.append(torch.mean( (y_pred[:,0]-y[:,0])**2).cpu().item())
-        loss = loss.mean()
         assert torch.isfinite(loss).all()
 
         metrics = {f"{dataset}.mse": mse[i] for (i, dataset) in enumerate(self.cfg.data.dataset)}

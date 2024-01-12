@@ -294,8 +294,9 @@ class BaseExperiment:
         self.val_metrics = self._init_metrics()
 
         # early stopping
-        smallest_val_loss, smallest_val_loss_epoch = 1e10, 0
-        patience = 0
+        self.smallest_val_loss, self.smallest_val_loss_step = 1e10, 0
+        self.patience = 0
+        early_stop = False
         
         # main train loop
         LOGGER.info(f"Starting to train for {self.cfg.training.nepochs} epochs "\
@@ -307,32 +308,17 @@ class BaseExperiment:
             # train
             self.model.train()
             for it, data in enumerate(self.train_loader):
-                self._step(data, epoch * len(self.train_loader) + it)
-
-            # validate
-            val_loss = self._validate(epoch)
-            if val_loss < smallest_val_loss:
-                smallest_val_loss = val_loss
-                smallest_val_loss_epoch = epoch
-                patience = 0
-
-                # save best model
-                if self.cfg.training.es_load_best_model:
-                    self._save_model(f"model_run{self.cfg.run_idx}_ep{smallest_val_loss_epoch}.pt")
-            else:
-                patience += 1
-                if patience > self.cfg.training.es_patience:
-                    LOGGER.info(f"Early stopping in epoch {epoch}")
+                early_stop = self._step(data, epoch * len(self.train_loader) + it)
+                if early_stop:
                     break
-
-            # output
+            if early_stop:
+                break
+                
             dt = time.time() - t0
             if epoch==0:
                 LOGGER.info(f"Finished first epoch after {dt:.2f}s, "\
                             f"training time estimate: {dt*self.cfg.training.nepochs/60:.2f}min "\
                             f"= {dt*self.cfg.training.nepochs/60**2:.2f}h")
-            else:
-                LOGGER.debug(f"Finished epoch {epoch} after {dt:.2f}s with val_loss={val_loss:.4f}")
 
         dt = time.time() - self.training_start_time
         LOGGER.info(f"Finished training after {dt/60:.2f}min = {dt/60**2:.2f}h")
@@ -343,27 +329,29 @@ class BaseExperiment:
         # wrap up early stopping
         if self.cfg.training.es_load_best_model:
             model_path = os.path.join(self.cfg.run_dir, "models",
-                                      f"model_run{self.cfg.run_idx}_ep{smallest_val_loss_epoch}.pt")
+                                      f"model_run{self.cfg.run_idx}_ep{self.smallest_val_loss_step}.pt")
             try:
                 state_dict = torch.load(model_path, map_location=self.device)
                 LOGGER.info(f"Loading model from {model_path}")
                 self.model.load_state_dict(state_dict)
             except FileNotFoundError:
-                LOGGER.warning(f"Cannot load best model (epoch {smallest_val_loss_epoch}) from {model_path}")
+                LOGGER.warning(f"Cannot load best model (epoch {self.smallest_val_loss_step}) from {model_path}")
 
     def _step(self, data, step):
+        t0 = time.time()
+
+        # actual update step
         loss, metrics = self._batch_loss(data)
-        
         self.optimizer.zero_grad()
         loss.backward()
         grad_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(),
                                                    self.cfg.training.clip_grad_norm,
                                                    error_if_nonfinite=True).cpu().item()
         self.optimizer.step()
-
         if self.scheduler is not None:
             self.scheduler.step()
 
+        # collect metrics
         self.train_loss.append(loss.item())
         self.train_lr.append(self.optimizer.param_groups[0]["lr"])
         for key, value in metrics.items():
@@ -380,9 +368,34 @@ class BaseExperiment:
 
             for key, values in metrics.items():
                 log_mlflow(f"train.{key}", values, step=step)
-                
 
-    def _validate(self, epoch):
+        # validate
+        if step & self.cfg.training.validate_period == 0:
+            
+            val_loss = self._validate(step)
+            if val_loss < self.smallest_val_loss:
+                self.smallest_val_loss = val_loss
+                self.smallest_val_loss_step = step
+                self.patience = 0
+
+                # save best model
+                if self.cfg.training.es_load_best_model:
+                    self._save_model(f"model_run{self.cfg.run_idx}_ep{self.smallest_val_loss_step}.pt")
+            else:
+                self.patience += 1
+                if self.patience > self.cfg.training.es_patience:
+                    LOGGER.info(f"Early stopping in epoch {step * len(self.train_loader)}")
+                    return False
+
+        # output
+        dt = time.time() - t0
+        if step==0:
+            dt_estimate = dt*self.cfg.training.nepochs * len(self.train_loader)
+            LOGGER.info(f"Finished first iteration after {dt:.4f}s, "\
+                            f"training time estimate: {dt_estimate/60:.2f}min "\
+                            f"= {dt_estimate/60**2:.2f}h")
+
+    def _validate(self, step):
         losses = []
         metrics = self._init_metrics()
         
@@ -398,9 +411,9 @@ class BaseExperiment:
         for key, values in metrics.items():
             self.val_metrics[key].append(np.mean(values))
         if self.cfg.use_mlflow:
-            log_mlflow("val.loss", val_loss, step=epoch)
+            log_mlflow("val.loss", val_loss, step=step)
             for key, values in self.val_metrics.items():
-                log_mlflow(f"val.{key}", values[-1], step=epoch)
+                log_mlflow(f"val.{key}", values[-1], step=step)
         return val_loss
 
     def _save_config(self, filename="amplitudes.yaml", to_mlflow=False):
