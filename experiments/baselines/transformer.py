@@ -12,7 +12,7 @@ from torch.utils.checkpoint import checkpoint
 
 from gatr.layers import ApplyRotaryPositionalEncoding
 from gatr.primitives.attention import scaled_dot_product_attention
-from gatr.utils.tensors import to_nd
+from experiments.misc import to_nd
 
 
 class BaselineLayerNorm(nn.Module):
@@ -320,7 +320,7 @@ class BaselineTransformerBlock(nn.Module):
         return outputs
 
 
-class BaselineTransformer(nn.Module):
+class Transformer(nn.Module):
     """Baseline transformer.
 
     Combines num_blocks transformer blocks, each consisting of multi-head self-attention layers, an
@@ -407,7 +407,7 @@ class BaselineTransformer(nn.Module):
         return outputs
 
 
-class BaselineAxialTransformer(nn.Module):
+class AxialTransformer(nn.Module):
     """Baseline axial transformer for data with two token dimensions.
 
     Combines num_blocks transformer blocks, each consisting of multi-head self-attention layers, an

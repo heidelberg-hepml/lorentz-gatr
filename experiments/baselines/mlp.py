@@ -13,7 +13,8 @@ class MLP(nn.Module):
     Flattens all dimensions except batch and uses GELU nonlinearities.
     """
 
-    def __init__(self, in_shape, out_shape, hidden_channels, hidden_layers):
+    def __init__(self, in_shape, out_shape, hidden_channels, hidden_layers,
+                 dropout_prob=None):
         super().__init__()
 
         if not hidden_layers > 0:
@@ -23,9 +24,13 @@ class MLP(nn.Module):
         self.out_shape = out_shape
 
         layers: List[nn.Module] = [nn.Linear(np.product(in_shape), hidden_channels)]
+        if dropout_prob is not None:
+            layers.append(nn.Dropout(dropout_prob))
         for _ in range(hidden_layers - 1):
             layers.append(nn.GELU())
             layers.append(nn.Linear(hidden_channels, hidden_channels))
+            if dropout_prob is not None:
+                layers.append(nn.Dropout(dropout_prob))
 
         layers.append(nn.GELU())
         layers.append(nn.Linear(hidden_channels, np.product(self.out_shape)))
@@ -33,8 +38,4 @@ class MLP(nn.Module):
 
     def forward(self, inputs: torch.Tensor):
         """Forward pass of baseline MLP."""
-        batchsize = inputs.shape[0]
-        inputs = inputs.reshape(batchsize, -1)
-        outputs = self.mlp(inputs)
-        outputs = outputs.reshape(batchsize, *self.out_shape)
-        return outputs
+        return self.mlp(inputs)
