@@ -21,7 +21,16 @@ pip install -r requirements.txt
 
 ## 2. Running experiments
 
-TBD
+You can run an experiment with the following command
+```
+python run.py model=gatr_amplitudes ++exp_name=amplitudes ++run_name=hello_world
+```
+
+We use hydra for configuration management, allowing to quickly override parameters in config/amplitudes.yaml with the ++ operator. Further, we use mlflow for tracking. You can start a mlflow server based on the saved results in runs/tracking/mlflow.db on port 4242 of your machine with the following command
+
+```
+mlflow ui --port 4242 --backend-store-uri sqlite:///runs/tracking/mlflow.db
+```
 
 ## Using GATr (copied from the original GATr)
 
