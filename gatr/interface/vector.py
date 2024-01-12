@@ -22,10 +22,12 @@ def embed_vector(vector: torch.Tensor) -> torch.Tensor:
 
     # Create multivector tensor with same batch shape, same device, same dtype as input
     batch_shape = vector.shape[:-1]
-    multivector = torch.zeros(*batch_shape, 16, dtype=vector.dtype, device=vector.device)
+    multivector = torch.zeros(
+        *batch_shape, 16, dtype=vector.dtype, device=vector.device
+    )
 
     # Embedding into Lorentz vectors
-    multivector[...,1:5] = vector
+    multivector[..., 1:5] = vector
 
     return multivector
 
@@ -44,6 +46,6 @@ def extract_vector(multivector: torch.Tensor) -> torch.Tensor:
         Lorentz vector
     """
 
-    vector = multivector[...,1:5]
+    vector = multivector[..., 1:5]
 
     return vector

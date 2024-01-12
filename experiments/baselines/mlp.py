@@ -13,8 +13,9 @@ class MLP(nn.Module):
     Flattens all dimensions except batch and uses GELU nonlinearities.
     """
 
-    def __init__(self, in_shape, out_shape, hidden_channels, hidden_layers,
-                 dropout_prob=None):
+    def __init__(
+        self, in_shape, out_shape, hidden_channels, hidden_layers, dropout_prob=None
+    ):
         super().__init__()
 
         if not hidden_layers > 0:

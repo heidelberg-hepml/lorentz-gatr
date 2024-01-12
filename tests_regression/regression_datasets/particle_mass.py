@@ -10,7 +10,7 @@ from tests_regression.regression_datasets.constants import DATASET_SIZE, DEVICE
 class ParticleMassDataset(torch.utils.data.Dataset):
     """Toy dataset that maps a particle (E, px, py, pz) to its mass m = sqrt(E**2-px**2-py**2-pz**2)."""
 
-    def __init__(self, mass_min=0.01, mass_max=1., p_mu=0., p_std=1.):
+    def __init__(self, mass_min=0.01, mass_max=1.0, p_mu=0.0, p_std=1.0):
         super().__init__()
         self.mass = torch.rand(DATASET_SIZE, 1, 1) * (mass_max - mass_min) + mass_min
         pxyz = torch.randn(DATASET_SIZE, 1, 3) * p_std + p_mu
@@ -70,7 +70,9 @@ class ParticleMassWrapper(BaseWrapper):
         multivector = embed_vector(inputs)  # (batchsize, 1, 16)
         multivector = multivector.unsqueeze(1)  # (batchsize, 1, 1, 16)
 
-        scalars = torch.zeros((batchsize, 1, 1), device=inputs.device)  # (batchsize, 1, 1)
+        scalars = torch.zeros(
+            (batchsize, 1, 1), device=inputs.device
+        )  # (batchsize, 1, 1)
         return multivector, scalars
 
     def extract_from_ga(self, multivector, scalars):

@@ -26,7 +26,9 @@ class ScalarGatedNonlinearity(nn.Module):
 
         gated_fn_dict = dict(relu=gated_relu, gelu=gated_gelu, sigmoid=gated_sigmoid)
         scalar_fn_dict = dict(
-            relu=nn.functional.relu, gelu=nn.functional.gelu, sigmoid=nn.functional.sigmoid
+            relu=nn.functional.relu,
+            gelu=nn.functional.gelu,
+            sigmoid=nn.functional.sigmoid,
         )
         try:
             self.gated_nonlinearity = gated_fn_dict[nonlinearity]

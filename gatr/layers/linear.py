@@ -84,7 +84,9 @@ class EquiLinear(nn.Module):
 
         # MV -> MV
         self.weight = nn.Parameter(
-            torch.empty((out_mv_channels, in_mv_channels, NUM_PIN_LINEAR_BASIS_ELEMENTS))
+            torch.empty(
+                (out_mv_channels, in_mv_channels, NUM_PIN_LINEAR_BASIS_ELEMENTS)
+            )
         )
 
         # We only need a separate bias here if that isn't already covered by the linear map from
@@ -206,7 +208,12 @@ class EquiLinear(nn.Module):
         """
 
         # Prefactors depending on initialization scheme
-        mv_component_factors, mv_factor, mvs_bias_shift, s_factor = self._compute_init_factors(
+        (
+            mv_component_factors,
+            mv_factor,
+            mvs_bias_shift,
+            s_factor,
+        ) = self._compute_init_factors(
             initialization, gain, additional_factor, use_mv_heuristics
         )
 
@@ -225,13 +232,20 @@ class EquiLinear(nn.Module):
         self._init_scalars(s_factor)
 
     @staticmethod
-    def _compute_init_factors(initialization, gain, additional_factor, use_mv_heuristics):
+    def _compute_init_factors(
+        initialization, gain, additional_factor, use_mv_heuristics
+    ):
         """Computes prefactors for the initialization.
 
         See self.reset_parameters().
         """
 
-        if initialization not in {"default", "small", "unit_scalar", "almost_unit_scalar"}:
+        if initialization not in {
+            "default",
+            "small",
+            "unit_scalar",
+            "almost_unit_scalar",
+        }:
             raise ValueError(f"Unknown initialization scheme {initialization}")
 
         if initialization == "default":
@@ -310,7 +324,9 @@ class EquiLinear(nn.Module):
             fan_in, _ = nn.init._calculate_fan_in_and_fan_out(
                 self.s2mvs.weight
             )  # pylint:disable=protected-access
-            fan_in = max(fan_in, 1)  # Since in theory we could have 0-channel scalar "data"
+            fan_in = max(
+                fan_in, 1
+            )  # Since in theory we could have 0-channel scalar "data"
             bound = mv_component_factors[0] * mv_factor / np.sqrt(fan_in) / np.sqrt(2)
             nn.init.uniform_(self.s2mvs.weight, a=-bound, b=bound)
 
@@ -322,7 +338,9 @@ class EquiLinear(nn.Module):
                     + self._in_mv_channels
                 )
                 bound = mv_component_factors[0] / np.sqrt(fan_in) if fan_in > 0 else 0
-                nn.init.uniform_(self.s2mvs.bias, mvs_bias_shift - bound, mvs_bias_shift + bound)
+                nn.init.uniform_(
+                    self.s2mvs.bias, mvs_bias_shift - bound, mvs_bias_shift + bound
+                )
 
     def _init_scalars(self, s_factor):
         """Weight initialization for maps to multivector outputs."""
@@ -338,7 +356,9 @@ class EquiLinear(nn.Module):
             fan_in, _ = nn.init._calculate_fan_in_and_fan_out(
                 model.weight
             )  # pylint:disable=protected-access
-            fan_in = max(fan_in, 1)  # Since in theory we could have 0-channel scalar "data"
+            fan_in = max(
+                fan_in, 1
+            )  # Since in theory we could have 0-channel scalar "data"
             bound = s_factor / np.sqrt(fan_in) / np.sqrt(len(models))
             nn.init.uniform_(model.weight, a=-bound, b=bound)
         # Bias needs to be adapted, as the overall fan in is different (need to account for MV and

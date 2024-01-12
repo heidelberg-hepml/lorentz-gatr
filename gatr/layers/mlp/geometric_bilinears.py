@@ -94,7 +94,6 @@ class GeometricBilinear(nn.Module):
         right, _ = self.linear_right(multivectors, scalars=scalars)
         gp_outputs = geometric_product(left, right)
 
-
         # Output linear
         outputs_mv, outputs_s = self.linear_out(gp_outputs, scalars=scalars)
 

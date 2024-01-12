@@ -50,7 +50,9 @@ def test_opt_einsum_shape() -> None:
     op_shape = tuple(x.size() for x in operands)
     assert (
         opt_einsum.contract_path(einsum_eq, *operands, optimize="optimal")[0]
-        == opt_einsum.contract_path(einsum_eq, *op_shape, optimize="optimal", shapes=True)[0]
+        == opt_einsum.contract_path(
+            einsum_eq, *op_shape, optimize="optimal", shapes=True
+        )[0]
     )
 
 

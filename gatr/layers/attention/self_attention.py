@@ -34,7 +34,9 @@ class SelfAttention(nn.Module):
         self.config = config
 
         # QKV computation
-        self.qkv_module = MultiQueryQKVModule(config) if config.multi_query else QKVModule(config)
+        self.qkv_module = (
+            MultiQueryQKVModule(config) if config.multi_query else QKVModule(config)
+        )
 
         # Output projection
         self.out_linear = EquiLinear(
@@ -124,13 +126,17 @@ class SelfAttention(nn.Module):
         k_s = self.pos_encoding(k_s)
 
         # Attention layer
-        h_mv, h_s = self.attention(q_mv, k_mv, v_mv, q_s, k_s, v_s, attention_mask=attention_mask)
+        h_mv, h_s = self.attention(
+            q_mv, k_mv, v_mv, q_s, k_s, v_s, attention_mask=attention_mask
+        )
 
         h_mv = rearrange(
-            h_mv, "... n_heads n_items hidden_channels x -> ... n_items (n_heads hidden_channels) x"
+            h_mv,
+            "... n_heads n_items hidden_channels x -> ... n_items (n_heads hidden_channels) x",
         )
         h_s = rearrange(
-            h_s, "... n_heads n_items hidden_channels -> ... n_items (n_heads hidden_channels)"
+            h_s,
+            "... n_heads n_items hidden_channels -> ... n_items (n_heads hidden_channels)",
         )
 
         # Transform linearly one more time

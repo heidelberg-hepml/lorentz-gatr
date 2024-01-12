@@ -41,7 +41,9 @@ class GeoMLP(nn.Module):
 
         assert config.mv_channels is not None
         s_channels = (
-            [None for _ in config.mv_channels] if config.s_channels is None else config.s_channels
+            [None for _ in config.mv_channels]
+            if config.s_channels is None
+            else config.s_channels
         )
 
         layers: List[nn.Module] = []
@@ -59,10 +61,15 @@ class GeoMLP(nn.Module):
                 layers.append(GradeDropout(config.dropout_prob))
 
             for in_, out, in_s, out_s in zip(
-                config.mv_channels[1:-1], config.mv_channels[2:], s_channels[1:-1], s_channels[2:]
+                config.mv_channels[1:-1],
+                config.mv_channels[2:],
+                s_channels[1:-1],
+                s_channels[2:],
             ):
                 layers.append(ScalarGatedNonlinearity(config.activation))
-                layers.append(EquiLinear(in_, out, in_s_channels=in_s, out_s_channels=out_s))
+                layers.append(
+                    EquiLinear(in_, out, in_s_channels=in_s, out_s_channels=out_s)
+                )
                 if config.dropout_prob is not None:
                     layers.append(GradeDropout(config.dropout_prob))
 

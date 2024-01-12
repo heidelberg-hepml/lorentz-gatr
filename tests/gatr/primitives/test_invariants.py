@@ -5,7 +5,12 @@
 import pytest
 import torch
 
-from gatr.primitives import inner_product, squared_norm, abs_squared_norm, pin_invariants
+from gatr.primitives import (
+    inner_product,
+    squared_norm,
+    abs_squared_norm,
+    pin_invariants,
+)
 from tests.helpers import BATCH_DIMS, TOLERANCES, check_pin_invariance
 
 
@@ -35,7 +40,7 @@ def test_squared_norm_of_vector(vector, true_squared_norm):
     # If vector is None, randomly sample it
     if vector is None:
         vector = torch.randn(4)
-        true_squared_norm = vector[0]**2 - torch.sum(vector[1:]**2)
+        true_squared_norm = vector[0] ** 2 - torch.sum(vector[1:] ** 2)
 
     # Construct multivector
     inputs = torch.zeros(16)
@@ -60,6 +65,7 @@ def test_inner_product_invariance(batch_dims):
 def test_squared_norm_invariance(batch_dims):
     """Tests the squared_norm() primitive for equivariance."""
     check_pin_invariance(squared_norm, 1, batch_dims=batch_dims, **TOLERANCES)
+
 
 @pytest.mark.parametrize("batch_dims", BATCH_DIMS)
 def test_abs_squared_norm_invariance(batch_dims):

@@ -33,10 +33,10 @@ def _load_geometric_product_tensor(
     if device not in [torch.device("cpu"), "cpu"] and dtype != torch.float32:
         gmt = _load_geometric_product_tensor()
     else:
-        layout, _ = clifford.Cl(1,3)
+        layout, _ = clifford.Cl(1, 3)
         gmt = torch.tensor(layout.gmt, dtype=torch.float32)
         gmt = torch.transpose(gmt, 1, 0)
-        
+
         # Convert to dense tensor
         # The reason we do that is that einsum is not defined for sparse tensors
         gmt = gmt.to_dense()

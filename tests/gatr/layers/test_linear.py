@@ -8,7 +8,9 @@ from tests.helpers import BATCH_DIMS, TOLERANCES, check_pin_equivariance
 
 
 @pytest.mark.parametrize("batch_dims", [(100,)])
-@pytest.mark.parametrize("in_mv_channels, out_mv_channels", [(200, 5), (16, 16), (5, 200)])
+@pytest.mark.parametrize(
+    "in_mv_channels, out_mv_channels", [(200, 5), (16, 16), (5, 200)]
+)
 @pytest.mark.parametrize(
     "in_s_channels, out_s_channels", [(None, None), (None, 100), (100, None), (32, 32)]
 )
@@ -44,7 +46,9 @@ def test_linear_layer_initialization(
 
     # Inputs
     inputs_mv = torch.randn(*batch_dims, in_mv_channels, 16)
-    inputs_s = torch.randn(*batch_dims, in_s_channels) if in_s_channels is not None else None
+    inputs_s = (
+        torch.randn(*batch_dims, in_s_channels) if in_s_channels is not None else None
+    )
 
     # Compute outputs
     outputs_mv, outputs_s = layer(inputs_mv, scalars=inputs_s)
@@ -96,7 +100,12 @@ def test_linear_layer_initialization(
 @pytest.mark.parametrize("in_s_channels", [None, 3])
 @pytest.mark.parametrize("out_s_channels", [None, 4])
 def test_linear_layer_linearity(
-    batch_dims, in_mv_channels, out_mv_channels, in_s_channels, out_s_channels, rescaling
+    batch_dims,
+    in_mv_channels,
+    out_mv_channels,
+    in_s_channels,
+    out_s_channels,
+    rescaling,
 ):
     """Tests that the EquiLinear layer indeed describes a linear map (when the bias is deactivated).
 
