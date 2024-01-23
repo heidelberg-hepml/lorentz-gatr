@@ -57,14 +57,14 @@ class GAP(nn.Module):
         **kwargs,
     ) -> None:
         super().__init__()
-        
+
         self.linear_in = EquiLinear(
             in_mv_channels,
             hidden_mv_channels,
             in_s_channels=in_s_channels,
             out_s_channels=hidden_s_channels,
         )
-        
+
         mlp = MLPConfig.cast(mlp)
         mlp = replace(
             mlp,
@@ -73,7 +73,7 @@ class GAP(nn.Module):
             dropout_prob=dropout_prob,
         )
         self.blocks = nn.ModuleList([GeoMLP(mlp) for _ in range(num_blocks)])
-        
+
         self.linear_out = EquiLinear(
             hidden_mv_channels,
             out_mv_channels,

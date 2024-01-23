@@ -51,7 +51,9 @@ class ApplyRotaryPositionalEncoding(torch.nn.Module):
             num_channels % 2 == 0
         ), "Number of channels needs to be even for rotary position embeddings"
 
-        inv_freq = 1.0 / (base ** (torch.arange(0, num_channels, 2).float() / num_channels))
+        inv_freq = 1.0 / (
+            base ** (torch.arange(0, num_channels, 2).float() / num_channels)
+        )
         self.register_buffer("inv_freq", inv_freq)
         self.seq_len_cached = None
         self.device_cached = None
@@ -87,7 +89,9 @@ class ApplyRotaryPositionalEncoding(torch.nn.Module):
         self._compute_embeddings(scalars)
 
         # Apply embeddings
-        outputs = scalars * self.cos_cached + self._rotate_half(scalars) * self.sin_cached
+        outputs = (
+            scalars * self.cos_cached + self._rotate_half(scalars) * self.sin_cached
+        )
 
         return outputs
 
@@ -127,5 +131,8 @@ class ApplyRotaryPositionalEncoding(torch.nn.Module):
     @staticmethod
     def _rotate_half(inputs):
         """Utility function that "rotates" a tensor, as required for rotary embeddings."""
-        x1, x2 = inputs[..., : inputs.shape[-1] // 2], inputs[..., inputs.shape[-1] // 2 :]
+        x1, x2 = (
+            inputs[..., : inputs.shape[-1] // 2],
+            inputs[..., inputs.shape[-1] // 2 :],
+        )
         return torch.cat((-x2, x1), dim=-1)

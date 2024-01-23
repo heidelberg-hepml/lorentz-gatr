@@ -13,7 +13,7 @@ heteroscedastic: false
 
 train: true
 training:
- nepochs: 5
+ lr: 3e-4
 
 plot: true
 plotting:

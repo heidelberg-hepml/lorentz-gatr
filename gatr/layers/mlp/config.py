@@ -30,7 +30,10 @@ class MLPConfig:
 
     def __post_init__(self):
         """Type checking / conversion."""
-        if isinstance(self.dropout_prob, str) and self.dropout_prob.lower() in ["null", "none"]:
+        if isinstance(self.dropout_prob, str) and self.dropout_prob.lower() in [
+            "null",
+            "none",
+        ]:
             self.dropout_prob = None
 
     @classmethod

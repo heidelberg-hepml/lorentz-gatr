@@ -8,7 +8,8 @@ import clifford
 import numpy as np
 import torch
 
-LAYOUT, BLADES = clifford.Cl(1,3)
+LAYOUT, BLADES = clifford.Cl(1, 3)
+
 
 def np_to_mv(array):
     """Shorthand to transform a numpy array to a Pin(1,3) multivector."""
@@ -32,14 +33,18 @@ def tensor_to_mv_list(tensor):
 def mv_list_to_tensor(multivectors, batch_shape=None):
     """Transforms a list of multivector objects to a torch.Tensor."""
 
-    tensor = torch.from_numpy(np.array([mv.value for mv in multivectors])).to(torch.float32)
+    tensor = torch.from_numpy(np.array([mv.value for mv in multivectors])).to(
+        torch.float32
+    )
     if batch_shape is not None:
         tensor = tensor.reshape(*batch_shape, 16)
 
     return tensor
 
 
-def sample_pin_multivector(spin: bool = False, rng: Optional[np.random.Generator] = None):
+def sample_pin_multivector(
+    spin: bool = False, rng: Optional[np.random.Generator] = None
+):
     """Samples from the Pin(1,3) group as a product of reflections."""
 
     if rng is None:
@@ -59,30 +64,16 @@ def sample_pin_multivector(spin: bool = False, rng: Optional[np.random.Generator
     for _ in range(i):
         # Sample reflection vector
         vector = np.zeros(16)
-        
-        #vector[1:5] = rng.normal(size=4)
-        
         vector[2:5] = rng.normal(size=3) * 2
         norm = np.linalg.norm(vector[2:5])
-        vector[1] = ( rng.uniform(size=1) - .5 ) * norm
-        
-        #norm = rng.normal(size=1) + 5.
-        #vector[2:5] = rng.normal(size=3) * 2
-        #vector[1] = (norm**2 + np.sum(vector[2:5]**2))**.5
-        
+        vector[1] = (rng.uniform(size=1) - 0.5) * norm
+
         vector_mv = np_to_mv(vector)
-        
         vector_mv = vector_mv / abs(vector_mv.mag2()) ** 0.5
 
         # Multiply together (geometric product)
         multivector = multivector * vector_mv
-    '''
-    mv_generator_vec = np.zeros(16)
-    mv_generator_vec[5:11] = rng.normal(size=6)
-    multivector = LAYOUT.MultiVector(mv_generator_vec).exp()
-    print("SAMPLED: ", multivector.mag2(), multivector)
-    '''
-    
+
     return multivector
 
 
@@ -128,12 +119,6 @@ class SlowRandomPinTransform:
         super().__init__()
         self._u = sample_pin_multivector(spin, rng)
         self._u_inverse = self._u.shirokov_inverse()
-        '''
-        if rng is None:
-            self.rng = np.random.default_rng()
-        else:
-            self.rng = rng
-        '''
 
     def __call__(self, inputs: torch.Tensor) -> torch.Tensor:
         """Apply Pin transformation to multivector inputs."""
@@ -146,17 +131,7 @@ class SlowRandomPinTransform:
 
         # Transform
         outputs_mv = [sandwich(self._u, x) for x in inputs_mv]
-        '''
-        outputs_mv = []
-        for input_mv in inputs_mv:
-            eta = self.rng.normal(size=1) # rapidity
-            n = self.rng.normal(size=3)
-            n /= np.linalg.norm(n) # direction
-            output_mv = clifford.MultiVector(LAYOUT, value=np.zeros(16))
-            output_mv[1] = np.cosh(eta) * (input_mv[1] - np.tanh(eta) * np.dot(n, input_mv[2:5]) )
-            output_mv[2:5] = input_mv[2:5] + (np.cosh(eta) -1) * np.dot(n, input_mv[2:5]) * n - input_mv[1] * np.sinh(eta) * n
-            outputs_mv.append(output_mv)
-        '''
+
         # Back to tensor
         outputs = mv_list_to_tensor(outputs_mv, batch_shape=batch_dims)
 

@@ -16,7 +16,9 @@ S_CHANNELS = [(None, None, 7, False), (4, 5, 6, True)]
     "num_items,in_mv_channels,out_mv_channels,hidden_mv_channels", [(8, 3, 4, 6)]
 )
 @pytest.mark.parametrize("num_heads,num_blocks", [(4, 1)])
-@pytest.mark.parametrize("in_s_channels,out_s_channels,hidden_s_channels,pos_encoding", S_CHANNELS)
+@pytest.mark.parametrize(
+    "in_s_channels,out_s_channels,hidden_s_channels,pos_encoding", S_CHANNELS
+)
 @pytest.mark.parametrize("dropout_prob", [None, 0.0, 0.3])
 @pytest.mark.parametrize("multi_query_attention", [False, True])
 def test_gatr_shape(
@@ -36,7 +38,11 @@ def test_gatr_shape(
 ):
     """Tests the output shape of EquiTransformer."""
     inputs = torch.randn(*batch_dims, num_items, in_mv_channels, 16)
-    scalars = None if in_s_channels is None else torch.randn(*batch_dims, num_items, in_s_channels)
+    scalars = (
+        None
+        if in_s_channels is None
+        else torch.randn(*batch_dims, num_items, in_s_channels)
+    )
 
     try:
         net = GATr(
@@ -47,7 +53,9 @@ def test_gatr_shape(
             out_s_channels=out_s_channels,
             hidden_s_channels=hidden_s_channels,
             attention=SelfAttentionConfig(
-                num_heads=num_heads, pos_encoding=pos_encoding, multi_query=multi_query_attention
+                num_heads=num_heads,
+                pos_encoding=pos_encoding,
+                multi_query=multi_query_attention,
             ),
             num_blocks=num_blocks,
             mlp=MLPConfig(),
@@ -69,7 +77,9 @@ def test_gatr_shape(
     "num_items,in_mv_channels,out_mv_channels,hidden_mv_channels", [(8, 3, 4, 6)]
 )
 @pytest.mark.parametrize("num_heads,num_blocks", [(4, 1)])
-@pytest.mark.parametrize("in_s_channels,out_s_channels,hidden_s_channels,pos_encoding", S_CHANNELS)
+@pytest.mark.parametrize(
+    "in_s_channels,out_s_channels,hidden_s_channels,pos_encoding", S_CHANNELS
+)
 @pytest.mark.parametrize("multi_query_attention", [False, True])
 def test_gatr_equivariance(
     batch_dims,
@@ -95,7 +105,9 @@ def test_gatr_equivariance(
             out_s_channels=out_s_channels,
             hidden_s_channels=hidden_s_channels,
             attention=SelfAttentionConfig(
-                num_heads=num_heads, pos_encoding=pos_encoding, multi_query=multi_query_attention
+                num_heads=num_heads,
+                pos_encoding=pos_encoding,
+                multi_query=multi_query_attention,
             ),
             num_blocks=num_blocks,
             mlp=MLPConfig(),
@@ -104,7 +116,11 @@ def test_gatr_equivariance(
         # Some features require scalar inputs, and failing without them is fine
         return
 
-    scalars = None if in_s_channels is None else torch.randn(*batch_dims, num_items, in_s_channels)
+    scalars = (
+        None
+        if in_s_channels is None
+        else torch.randn(*batch_dims, num_items, in_s_channels)
+    )
     data_dims = tuple(list(batch_dims) + [num_items, in_mv_channels])
     check_pin_equivariance(
         net, 1, batch_dims=data_dims, fn_kwargs=dict(scalars=scalars), **MILD_TOLERANCES

@@ -25,7 +25,7 @@ def sdp_attention(
     q_s: Tensor,
     k_s: Tensor,
     v_s: Tensor,
-    attn_mask : Optional[Tensor] = None,
+    attn_mask: Optional[Tensor] = None,
 ) -> Tuple[Tensor, Tensor]:
     """Equivariant geometric attention based on scaled dot products.
 
@@ -67,8 +67,17 @@ def sdp_attention(
     """
 
     # Construct queries and keys by concatenating relevant MV components and aux scalars
-    q = torch.cat([rearrange(q_mv * _load_inner_product_factors(device=q_mv.device, dtype=q_mv.dtype),
-                             "... c x -> ... (c x)"), q_s], -1)
+    q = torch.cat(
+        [
+            rearrange(
+                q_mv
+                * _load_inner_product_factors(device=q_mv.device, dtype=q_mv.dtype),
+                "... c x -> ... (c x)",
+            ),
+            q_s,
+        ],
+        -1,
+    )
     k = torch.cat([rearrange(k_mv, "... c x -> ... (c x)"), k_s], -1)
 
     num_channels_out = v_mv.shape[-2]
@@ -76,7 +85,9 @@ def sdp_attention(
 
     v_out = scaled_dot_product_attention(q, k, v, attn_mask)
 
-    v_out_mv = rearrange(v_out[..., : num_channels_out * 16], "... (c x) -> ...  c x", x=16)
+    v_out_mv = rearrange(
+        v_out[..., : num_channels_out * 16], "... (c x) -> ...  c x", x=16
+    )
     v_out_s = v_out[..., num_channels_out * 16 :]
 
     return v_out_mv, v_out_s
@@ -110,7 +121,9 @@ def scaled_dot_product_attention(
         of shape [batch, head, item, d]
     """
     if FORCE_XFORMERS or isinstance(attn_mask, AttentionBias):
-        query = query.transpose(1, 2)  # [batch, head, item, d] -> [batch, item, head, d]
+        query = query.transpose(
+            1, 2
+        )  # [batch, head, item, d] -> [batch, item, head, d]
         key = key.transpose(1, 2)
         value = value.transpose(1, 2)
         out = memory_efficient_attention(

@@ -82,7 +82,9 @@ class GATr(nn.Module):
             additional_qk_mv_channels=0
             if reinsert_mv_channels is None
             else len(reinsert_mv_channels),
-            additional_qk_s_channels=0 if reinsert_s_channels is None else len(reinsert_s_channels),
+            additional_qk_s_channels=0
+            if reinsert_s_channels is None
+            else len(reinsert_s_channels),
         )
         mlp = MLPConfig.cast(mlp)
         self.blocks = nn.ModuleList(
@@ -133,9 +135,10 @@ class GATr(nn.Module):
         """
 
         # Channels that will be re-inserted in any query / key computation
-        additional_qk_features_mv, additional_qk_features_s = self._construct_reinserted_channels(
-            multivectors, scalars
-        )
+        (
+            additional_qk_features_mv,
+            additional_qk_features_s,
+        ) = self._construct_reinserted_channels(multivectors, scalars)
 
         # Pass through the blocks
         h_mv, h_s = self.linear_in(multivectors, scalars=scalars)

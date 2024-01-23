@@ -1,5 +1,6 @@
 ## Code quality
 pytest==7.0.1
+black=22.3.0
 
 ## Standard science stack
 h5py

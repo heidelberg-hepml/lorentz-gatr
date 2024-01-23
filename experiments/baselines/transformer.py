@@ -51,10 +51,9 @@ class MultiHeadQKVLinear(nn.Module):
     def __init__(self, in_channels, hidden_channels, num_heads):
         super().__init__()
         self.num_heads = num_heads
-        self.linear_q = nn.Linear(in_channels, hidden_channels * num_heads)
-        self.linear_kv = nn.Linear(in_channels, 2 * hidden_channels * num_heads)
+        self.linear = nn.Linear(in_channels, 3 * hidden_channels * num_heads)
 
-    def forward(self, inputs_q, inputs_kv):
+    def forward(self, inputs):
         """Forward pass.
 
         Returns
@@ -66,18 +65,12 @@ class MultiHeadQKVLinear(nn.Module):
         v : Tensor
             Values
         """
-        q = self.linear_q(inputs_q)
-        kv = self.linear_kv(inputs_kv)
-        q = rearrange(
-            q,
-            "... items (hidden_channels num_heads) -> ... num_heads items hidden_channels",
+        qkv = self.linear(inputs)  # (..., num_items, 3 * hidden_channels * num_heads)
+        q, k, v = rearrange(
+            qkv,
+            "... items (qkv hidden_channels num_heads) -> qkv ... num_heads items hidden_channels",
             num_heads=self.num_heads,
-        )
-        k, v = rearrange(
-            kv,
-            "... items (kv hidden_channels num_heads) -> kv ... num_heads items hidden_channels",
-            num_heads=self.num_heads,
-            kv=2,
+            qkv=3,
         )
         return q, k, v
 
@@ -102,7 +95,7 @@ class MultiQueryQKVLinear(nn.Module):
         self.k_linear = nn.Linear(in_channels, hidden_channels)
         self.v_linear = nn.Linear(in_channels, hidden_channels)
 
-    def forward(self, inputs_q, inputs_kv):
+    def forward(self, inputs):
         """Forward pass.
 
         Parameters
@@ -120,12 +113,14 @@ class MultiQueryQKVLinear(nn.Module):
             Values
         """
         q = rearrange(
-            self.q_linear(inputs_q),
+            self.q_linear(inputs),
             "... items (hidden_channels num_heads) -> ... num_heads items hidden_channels",
             num_heads=self.num_heads,
         )
-        k = self.k_linear(inputs_kv)[..., None, :, :]  # (..., head=1, item, hidden_channels)
-        v = self.v_linear(inputs_kv)[..., None, :, :]
+        k = self.k_linear(inputs)[
+            ..., None, :, :
+        ]  # (..., head=1, item, hidden_channels)
+        v = self.v_linear(inputs)[..., None, :, :]
         return q, k, v
 
 
@@ -197,7 +192,9 @@ class BaselineSelfAttention(nn.Module):
         outputs : Tensor
             Outputs
         """
-        q, k, v = self.qkv_linear(inputs, inputs)  # each: (..., num_heads, num_items, num_channels, 16)
+        q, k, v = self.qkv_linear(
+            inputs
+        )  # each: (..., num_heads, num_items, num_channels, 16)
 
         # Rotary positional encoding
         if self.pos_encoding is not None:
@@ -213,6 +210,7 @@ class BaselineSelfAttention(nn.Module):
             "... num_heads num_items hidden_channels -> ... num_items (num_heads hidden_channels)",
         )
         outputs = self.out_linear(h)  # (..., num_items, out_channels)
+
         return outputs
 
     @staticmethod
@@ -227,7 +225,10 @@ class BaselineSelfAttention(nn.Module):
 
         # SDPA
         outputs = scaled_dot_product_attention(
-            q.contiguous(), k.expand_as(q).contiguous(), v.expand_as(q), attn_mask=attention_mask
+            q.contiguous(),
+            k.expand_as(q).contiguous(),
+            v.expand_as(q),
+            attn_mask=attention_mask,
         )
 
         # Return batch dimensions to inputs
