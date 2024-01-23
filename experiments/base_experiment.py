@@ -319,9 +319,18 @@ class BaseExperiment:
             self.scheduler = torch.optim.lr_scheduler.OneCycleLR(
                 self.optimizer,
                 self.cfg.training.lr * 10,
-                epochs=self.cfg.training.nepochs,
-                steps_per_epoch=len(self.train_loader),
+                total_steps=self.cfg.training.iterations
             )
+        elif self.cfg.training.scheduler == "CosineAnnealingLR":
+            self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                self.optimizer,
+                T_max=self.cfg.training.iterations,
+                eta_min=self.cfg.training.lr_eta_min)
+        elif self.cfg.training.scheduler == "ReduceLROnPlateau":
+            self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                self.optimizer,
+                factor=self.cfg.training.lr_factor,
+                patience=self.cfg.training.lr_patience)
         else:
             raise ValueError(
                 f"Learning rate scheduler {self.cfg.training.scheduler} not implemented"
@@ -336,40 +345,71 @@ class BaseExperiment:
         self.val_metrics = self._init_metrics()
 
         # early stopping
-        self.smallest_val_loss, self.smallest_val_loss_step = 1e10, 0
-        self.patience = 0
-        early_stop = False
+        smallest_val_loss, smallest_val_loss_step = 1e10, 0
+        patience = 0
 
         # main train loop
         LOGGER.info(
-            f"Starting to train for {self.cfg.training.nepochs} epochs "
-            f"using early stopping with patience {self.cfg.training.es_patience}"
+            f"Starting to train for {self.cfg.training.iterations} iterations "
+            f"= {self.cfg.training.iterations / len(self.train_loader):.1f} epochs "
+            f"using early stopping with patience {self.cfg.training.es_patience} "
+            f"while validating every {self.cfg.training.validate_every_n_steps} iterations"
         )
         self.training_start_time = time.time()
-        for epoch in range(self.cfg.training.nepochs):
-            t0 = time.time()
-
-            # train
+        # recycle trainloader, thanks Pim :)
+        def cycle(iterable):
+            while True:
+                for x in iterable:
+                    yield x
+        iterator = iter(cycle(self.train_loader))
+        for step in range(self.cfg.training.iterations):
+            
+            # training
             self.model.train()
-            for it, data in enumerate(self.train_loader):
-                early_stop = self._step(data, epoch * len(self.train_loader) + it)
-                if early_stop:
-                    break
-            if early_stop:
-                break
+            data = next(iterator)
+            self._step(data, step)
 
-            dt = time.time() - t0
-            if epoch == 0:
+            # validation (and early stopping)
+            if step % self.cfg.training.validate_every_n_steps == 0:
+
+                val_loss = self._validate(step)
+                if val_loss < smallest_val_loss:
+                    smallest_val_loss = val_loss
+                    smallest_val_loss_step = step
+                    patience = 0
+
+                    # save best model
+                    if self.cfg.training.es_load_best_model:
+                        self._save_model(
+                            f"model_run{self.cfg.run_idx}_it{smallest_val_loss_step}.pt"
+                        )
+                else:
+                    patience += 1
+                    if patience > self.cfg.training.es_patience:
+                        LOGGER.info(
+                            f"Early stopping in iteration {step} = epoch {step / len(self.train_loader):.1f}"
+                        )
+                        break # early stopping
+
+                if self.cfg.training.scheduler in ["ReduceLROnPlateau"]:
+                    self.scheduler.step(val_loss)
+
+            # output
+            dt = time.time() - self.training_start_time
+            if step in [0, 999]:
+                dt_estimate = dt * self.cfg.training.iterations / (step+1)
                 LOGGER.info(
-                    f"Finished first epoch after {dt:.2f}s, "
-                    f"training time estimate: {dt*self.cfg.training.nepochs/60:.2f}min "
-                    f"= {dt*self.cfg.training.nepochs/60**2:.2f}h"
+                    f"Finished iteration {step+1} after {dt:.2f}s, "
+                    f"training time estimate: {dt_estimate/60:.2f}min "
+                    f"= {dt_estimate/60**2:.2f}h"
                 )
 
         dt = time.time() - self.training_start_time
-        LOGGER.info(f"Finished training after {dt/60:.2f}min = {dt/60**2:.2f}h")
+        LOGGER.info(f"Finished training for {step} iterations = {step / len(self.train_loader):.1f} epochs "
+                    f"after {dt/60:.2f}min = {dt/60**2:.2f}h")
         if self.cfg.use_mlflow:
-            log_mlflow("es_epoch", epoch)
+            log_mlflow("iterations", step)
+            log_mlflow("epochs", step / len(self.train_loader))
             log_mlflow("traintime", dt / 3600)
 
         # wrap up early stopping
@@ -377,7 +417,7 @@ class BaseExperiment:
             model_path = os.path.join(
                 self.cfg.run_dir,
                 "models",
-                f"model_run{self.cfg.run_idx}_ep{self.smallest_val_loss_step}.pt",
+                f"model_run{self.cfg.run_idx}_it{smallest_val_loss_step}.pt",
             )
             try:
                 state_dict = torch.load(model_path, map_location=self.device)
@@ -385,12 +425,11 @@ class BaseExperiment:
                 self.model.load_state_dict(state_dict)
             except FileNotFoundError:
                 LOGGER.warning(
-                    f"Cannot load best model (epoch {self.smallest_val_loss_step}) from {model_path}"
+                    f"Cannot load best model (epoch {smallest_val_loss_step}) from {model_path}"
                 )
 
     def _step(self, data, step):
-        t0 = time.time()
-
+        
         # actual update step
         loss, metrics = self._batch_loss(data)
         self.optimizer.zero_grad()
@@ -405,7 +444,8 @@ class BaseExperiment:
             .item()
         )
         self.optimizer.step()
-        if self.scheduler is not None:
+        
+        if self.cfg.training.scheduler in ["OneCycleLR", "CosineAnnealingLR"]:
             self.scheduler.step()
 
         # collect metrics
@@ -431,38 +471,6 @@ class BaseExperiment:
 
             for key, values in metrics.items():
                 log_mlflow(f"train.{key}", values, step=step)
-
-        # validate
-        if step & self.cfg.training.validate_period == 0:
-
-            val_loss = self._validate(step)
-            if val_loss < self.smallest_val_loss:
-                self.smallest_val_loss = val_loss
-                self.smallest_val_loss_step = step
-                self.patience = 0
-
-                # save best model
-                if self.cfg.training.es_load_best_model:
-                    self._save_model(
-                        f"model_run{self.cfg.run_idx}_ep{self.smallest_val_loss_step}.pt"
-                    )
-            else:
-                self.patience += 1
-                if self.patience > self.cfg.training.es_patience:
-                    LOGGER.info(
-                        f"Early stopping in epoch {step * len(self.train_loader)}"
-                    )
-                    return False
-
-        # output
-        dt = time.time() - t0
-        if step == 0:
-            dt_estimate = dt * self.cfg.training.nepochs * len(self.train_loader)
-            LOGGER.info(
-                f"Finished first iteration after {dt:.4f}s, "
-                f"training time estimate: {dt_estimate/60:.2f}min "
-                f"= {dt_estimate/60**2:.2f}h"
-            )
 
     def _validate(self, step):
         losses = []

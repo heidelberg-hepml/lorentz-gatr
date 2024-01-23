@@ -265,7 +265,6 @@ class AmplitudeExperiment(BaseExperiment):
 
         results = {}
         for idataset, dataset in enumerate(self.cfg.data.dataset):
-            print(f"STARTING {idataset}")
             amp_pred_prepd = amplitudes_pred_prepd[idataset]
             amp_truth_prepd = amplitudes_truth_prepd[idataset]
 
