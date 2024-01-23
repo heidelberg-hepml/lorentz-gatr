@@ -319,18 +319,20 @@ class BaseExperiment:
             self.scheduler = torch.optim.lr_scheduler.OneCycleLR(
                 self.optimizer,
                 self.cfg.training.lr * 10,
-                total_steps=self.cfg.training.iterations
+                total_steps=self.cfg.training.iterations,
             )
         elif self.cfg.training.scheduler == "CosineAnnealingLR":
             self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
                 self.optimizer,
                 T_max=self.cfg.training.iterations,
-                eta_min=self.cfg.training.lr_eta_min)
+                eta_min=self.cfg.training.lr_eta_min,
+            )
         elif self.cfg.training.scheduler == "ReduceLROnPlateau":
             self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 self.optimizer,
                 factor=self.cfg.training.lr_factor,
-                patience=self.cfg.training.lr_patience)
+                patience=self.cfg.training.lr_patience,
+            )
         else:
             raise ValueError(
                 f"Learning rate scheduler {self.cfg.training.scheduler} not implemented"
@@ -361,9 +363,10 @@ class BaseExperiment:
             while True:
                 for x in iterable:
                     yield x
+
         iterator = iter(cycle(self.train_loader))
         for step in range(self.cfg.training.iterations):
-            
+
             # training
             self.model.train()
             data = next(iterator)
@@ -389,7 +392,7 @@ class BaseExperiment:
                         LOGGER.info(
                             f"Early stopping in iteration {step} = epoch {step / len(self.train_loader):.1f}"
                         )
-                        break # early stopping
+                        break  # early stopping
 
                 if self.cfg.training.scheduler in ["ReduceLROnPlateau"]:
                     self.scheduler.step(val_loss)
@@ -397,7 +400,7 @@ class BaseExperiment:
             # output
             dt = time.time() - self.training_start_time
             if step in [0, 999]:
-                dt_estimate = dt * self.cfg.training.iterations / (step+1)
+                dt_estimate = dt * self.cfg.training.iterations / (step + 1)
                 LOGGER.info(
                     f"Finished iteration {step+1} after {dt:.2f}s, "
                     f"training time estimate: {dt_estimate/60:.2f}min "
@@ -405,8 +408,10 @@ class BaseExperiment:
                 )
 
         dt = time.time() - self.training_start_time
-        LOGGER.info(f"Finished training for {step} iterations = {step / len(self.train_loader):.1f} epochs "
-                    f"after {dt/60:.2f}min = {dt/60**2:.2f}h")
+        LOGGER.info(
+            f"Finished training for {step} iterations = {step / len(self.train_loader):.1f} epochs "
+            f"after {dt/60:.2f}min = {dt/60**2:.2f}h"
+        )
         if self.cfg.use_mlflow:
             log_mlflow("iterations", step)
             log_mlflow("epochs", step / len(self.train_loader))
@@ -429,7 +434,7 @@ class BaseExperiment:
                 )
 
     def _step(self, data, step):
-        
+
         # actual update step
         loss, metrics = self._batch_loss(data)
         self.optimizer.zero_grad()
@@ -444,7 +449,7 @@ class BaseExperiment:
             .item()
         )
         self.optimizer.step()
-        
+
         if self.cfg.training.scheduler in ["OneCycleLR", "CosineAnnealingLR"]:
             self.scheduler.step()
 
