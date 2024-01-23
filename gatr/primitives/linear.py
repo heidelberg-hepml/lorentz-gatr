@@ -40,11 +40,11 @@ def _compute_pin_equi_linear_basis(
         linear_basis = []
         for mult in [1, layout.pseudoScalar]:
             for grade in range(5):
-                w = np.stack([(x(grade)*mult).value for x in blades.values()], 1)
+                w = np.stack([(x(grade) * mult).value for x in blades.values()], 1)
                 w = w.astype(np.float32)
                 if normalize:
-                    #w /= np.linalg.norm(w) # straight-forward normalization
-                    w /= np.linalg.svd(w)[1].max() # alternative normalization
+                    # w /= np.linalg.norm(w) # straight-forward normalization
+                    w /= np.linalg.svd(w)[1].max()  # alternative normalization
                 linear_basis.append(w)
         linear_basis = np.stack(linear_basis)
 
@@ -74,7 +74,9 @@ def _compute_reversal(device=torch.device("cpu"), dtype=torch.float32) -> torch.
 
 
 @lru_cache()
-def _compute_grade_involution(device=torch.device("cpu"), dtype=torch.float32) -> torch.Tensor:
+def _compute_grade_involution(
+    device=torch.device("cpu"), dtype=torch.float32
+) -> torch.Tensor:
     """Constructs a matrix that computes multivector grade involution.
 
     Parameters
@@ -117,7 +119,9 @@ def equi_linear(x: torch.Tensor, coeffs: torch.Tensor) -> torch.Tensor:
         Result. Batch dimensions are result of broadcasting between x and coeffs.
     """
     basis = _compute_pin_equi_linear_basis(device=x.device, dtype=x.dtype)
-    return custom_einsum("y x a, a i j, ... x j -> ... y i", coeffs, basis, x, path=[0, 1, 0, 1])
+    return custom_einsum(
+        "y x a, a i j, ... x j -> ... y i", coeffs, basis, x, path=[0, 1, 0, 1]
+    )
 
 
 def grade_project(x: torch.Tensor) -> torch.Tensor:
@@ -139,7 +143,9 @@ def grade_project(x: torch.Tensor) -> torch.Tensor:
     """
 
     # Select kernel on correct device
-    basis = _compute_pin_equi_linear_basis(device=x.device, dtype=x.dtype, normalize=False)
+    basis = _compute_pin_equi_linear_basis(
+        device=x.device, dtype=x.dtype, normalize=False
+    )
 
     # First five basis elements are grade projections
     basis = basis[:5]

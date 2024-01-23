@@ -51,4 +51,6 @@ def test_scalar_attention_equivariance(batch_dims, key_dim, item_dim, num_scalar
     keys_scalar = torch.randn(*batch_dims, item_dim, num_scalars)
     values_scalar = torch.randn(*batch_dims, item_dim, num_scalars)
     kwargs = dict(q_s=queries_scalar, k_s=keys_scalar, v_s=values_scalar)
-    check_pin_equivariance(sdp_attention, 3, batch_dims=data_dims, fn_kwargs=kwargs, **TOLERANCES)
+    check_pin_equivariance(
+        sdp_attention, 3, batch_dims=data_dims, fn_kwargs=kwargs, **TOLERANCES
+    )

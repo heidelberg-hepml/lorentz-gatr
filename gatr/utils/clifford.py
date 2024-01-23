@@ -8,7 +8,8 @@ import clifford
 import numpy as np
 import torch
 
-LAYOUT, BLADES = clifford.Cl(1,3)
+LAYOUT, BLADES = clifford.Cl(1, 3)
+
 
 def np_to_mv(array):
     """Shorthand to transform a numpy array to a Pin(1,3) multivector."""
@@ -32,14 +33,18 @@ def tensor_to_mv_list(tensor):
 def mv_list_to_tensor(multivectors, batch_shape=None):
     """Transforms a list of multivector objects to a torch.Tensor."""
 
-    tensor = torch.from_numpy(np.array([mv.value for mv in multivectors])).to(torch.float32)
+    tensor = torch.from_numpy(np.array([mv.value for mv in multivectors])).to(
+        torch.float32
+    )
     if batch_shape is not None:
         tensor = tensor.reshape(*batch_shape, 16)
 
     return tensor
 
 
-def sample_pin_multivector(spin: bool = False, rng: Optional[np.random.Generator] = None):
+def sample_pin_multivector(
+    spin: bool = False, rng: Optional[np.random.Generator] = None
+):
     """Samples from the Pin(1,3) group as a product of reflections."""
 
     if rng is None:
@@ -61,8 +66,8 @@ def sample_pin_multivector(spin: bool = False, rng: Optional[np.random.Generator
         vector = np.zeros(16)
         vector[2:5] = rng.normal(size=3) * 2
         norm = np.linalg.norm(vector[2:5])
-        vector[1] = (rng.uniform(size=1) - .5) * norm
-        
+        vector[1] = (rng.uniform(size=1) - 0.5) * norm
+
         vector_mv = np_to_mv(vector)
         vector_mv = vector_mv / abs(vector_mv.mag2()) ** 0.5
 

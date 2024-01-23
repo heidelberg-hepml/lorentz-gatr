@@ -61,7 +61,8 @@ def test_dropout_expectation(training, p, batch_dims, num_trials=10000):
     mv = torch.randn(*batch_dims, 16)
     s = torch.randn(*batch_dims)
     out_mv, out_s = layer(
-        mv.unsqueeze(0).expand(num_trials, *mv.shape), s.unsqueeze(0).expand(num_trials, *s.shape)
+        mv.unsqueeze(0).expand(num_trials, *mv.shape),
+        s.unsqueeze(0).expand(num_trials, *s.shape),
     )
     out_mv = out_mv.mean(dim=0)
     out_s = out_s.mean(dim=0)
@@ -80,4 +81,6 @@ def test_dropout_equivariance(p, batch_dims):
     layer = GradeDropout(p=p)
     layer.eval()
     s = torch.randn(*batch_dims)
-    check_pin_equivariance(layer, 1, batch_dims=batch_dims, fn_kwargs=dict(scalars=s), **TOLERANCES)
+    check_pin_equivariance(
+        layer, 1, batch_dims=batch_dims, fn_kwargs=dict(scalars=s), **TOLERANCES
+    )

@@ -10,7 +10,9 @@ from gatr.utils.einsum import cached_einsum
 
 
 @lru_cache()
-def _load_inner_product_factors(device=torch.device("cpu"), dtype=torch.float32) -> torch.Tensor:
+def _load_inner_product_factors(
+    device=torch.device("cpu"), dtype=torch.float32
+) -> torch.Tensor:
     """Constructs an array of 1's and -1's for the metric of the space,
     used to compute the inner product.
 
@@ -26,13 +28,18 @@ def _load_inner_product_factors(device=torch.device("cpu"), dtype=torch.float32)
     ip_factors : torch.Tensor with shape (16,)
         Inner product factors
     """
-    
+
     _INNER_PRODUCT_FACTORS = [1, 1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, -1, -1]
-    factors = torch.tensor(_INNER_PRODUCT_FACTORS, dtype=torch.float32, device=torch.device("cpu")).to_dense()
+    factors = torch.tensor(
+        _INNER_PRODUCT_FACTORS, dtype=torch.float32, device=torch.device("cpu")
+    ).to_dense()
     return factors.to(device=device, dtype=dtype)
 
+
 @lru_cache()
-def _load_metric_grades(device=torch.device("cpu"), dtype=torch.float32) -> torch.Tensor:
+def _load_metric_grades(
+    device=torch.device("cpu"), dtype=torch.float32
+) -> torch.Tensor:
     """Generate tensor of the diagonal of the GA metric, combined with a grade projection.
 
     Parameters
@@ -55,7 +62,10 @@ def _load_metric_grades(device=torch.device("cpu"), dtype=torch.float32) -> torc
         offset += d
     return m_grades.to(device=device, dtype=dtype)
 
-def inner_product(x: torch.Tensor, y: torch.Tensor, channel_sum: bool = False) -> torch.Tensor:
+
+def inner_product(
+    x: torch.Tensor, y: torch.Tensor, channel_sum: bool = False
+) -> torch.Tensor:
     """Computes the inner product of multivectors f(x,y) = <x, y> = <~x y>_0.
 
     In addition to summing over the 16 multivector dimensions, this function also sums
@@ -138,9 +148,10 @@ def pin_invariants(x: torch.Tensor) -> torch.Tensor:
     # Outputs: scalar component of input and norms of four other grades
     return torch.cat((x[..., [0]], norms[..., 1:]), dim=-1)  # (..., 5)
 
+
 def abs_squared_norm(x: torch.Tensor) -> torch.Tensor:
     """Computes a modified version of the squared norm that is positive semidefinite and can
-    therefore be used in layer normalization. 
+    therefore be used in layer normalization.
 
     Parameters
     ----------
@@ -153,5 +164,7 @@ def abs_squared_norm(x: torch.Tensor) -> torch.Tensor:
         Geometric algebra norm of x.
     """
     m = _load_metric_grades(device=x.device)
-    abs_squared_norms = cached_einsum("... i, ... i, g i -> ... g", x, x, m).abs().sum(-1, keepdim=True)
+    abs_squared_norms = (
+        cached_einsum("... i, ... i, g i -> ... g", x, x, m).abs().sum(-1, keepdim=True)
+    )
     return abs_squared_norms

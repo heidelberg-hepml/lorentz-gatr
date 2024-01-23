@@ -19,7 +19,9 @@ def test_geo_mlp_shape(batch_dims, mv_channels, s_channels, activation):
     inputs = torch.randn(*batch_dims, mv_channels[0], 16)
     scalars = None if s_channels is None else torch.randn(*batch_dims, s_channels[0])
 
-    net = GeoMLP(MLPConfig(mv_channels=mv_channels, s_channels=s_channels, activation=activation))
+    net = GeoMLP(
+        MLPConfig(mv_channels=mv_channels, s_channels=s_channels, activation=activation)
+    )
     outputs, outputs_scalars = net(inputs, scalars=scalars)
     assert outputs.shape == (*batch_dims, mv_channels[-1], 16)
     assert outputs_scalars.shape == (*batch_dims, s_channels[-1])
@@ -30,7 +32,9 @@ def test_geo_mlp_shape(batch_dims, mv_channels, s_channels, activation):
 @pytest.mark.parametrize("mv_channels,s_channels", _CHANNELS)
 def test_geo_mlp_equivariance(batch_dims, mv_channels, s_channels, activation):
     """Tests GeoMLP() for Pin equivariance."""
-    net = GeoMLP(MLPConfig(mv_channels=mv_channels, s_channels=s_channels, activation=activation))
+    net = GeoMLP(
+        MLPConfig(mv_channels=mv_channels, s_channels=s_channels, activation=activation)
+    )
     data_dims = tuple(list(batch_dims) + [mv_channels[0]])
     scalars = torch.randn(*batch_dims, s_channels[0])
 

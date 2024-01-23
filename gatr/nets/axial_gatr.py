@@ -144,7 +144,9 @@ class AxialGATr(nn.Module):  # pylint: disable=duplicate-code
             # For first, third, ... block, we want to perform attention over the first token
             # dimension. We implement this by transposing the two item dimensions.
             if i % 2 == 1:
-                h_mv, h_s, input_batch_dims = self._reshape_data_before_odd_blocks(h_mv, h_s)
+                h_mv, h_s, input_batch_dims = self._reshape_data_before_odd_blocks(
+                    h_mv, h_s
+                )
             else:
                 input_batch_dims = None
 
@@ -171,7 +173,9 @@ class AxialGATr(nn.Module):  # pylint: disable=duplicate-code
 
             # Transposing back to standard axis order
             if i % 2 == 1:
-                h_mv, h_s = self._reshape_data_after_odd_blocks(h_mv, h_s, input_batch_dims)
+                h_mv, h_s = self._reshape_data_after_odd_blocks(
+                    h_mv, h_s, input_batch_dims
+                )
 
         outputs_mv, outputs_s = self.linear_out(h_mv, scalars=h_s)
 
@@ -182,11 +186,15 @@ class AxialGATr(nn.Module):  # pylint: disable=duplicate-code
         input_batch_dims = multivector.shape[:2]
         assert scalar.shape[:2] == input_batch_dims
 
-        multivector = rearrange(multivector, _MV_REARRANGE_PATTERN)  # (axis2, axis1, ...)
+        multivector = rearrange(
+            multivector, _MV_REARRANGE_PATTERN
+        )  # (axis2, axis1, ...)
         scalar = rearrange(scalar, _S_REARRANGE_PATTERN)  # (axis2, axis1, ...)
 
         if self._collapse_dims_for_odd_blocks:
-            multivector = multivector.reshape(-1, *multivector.shape[2:])  # (axis2 * axis1, ...)
+            multivector = multivector.reshape(
+                -1, *multivector.shape[2:]
+            )  # (axis2 * axis1, ...)
             scalar = scalar.reshape(-1, *scalar.shape[2:])  # (axis2 * axis1, ...)
 
         return multivector, scalar, input_batch_dims
@@ -198,9 +206,13 @@ class AxialGATr(nn.Module):  # pylint: disable=duplicate-code
             multivector = multivector.reshape(
                 *input_batch_dims, *multivector.shape[1:]
             )  # (axis2, axis1, ...)
-            scalar = scalar.reshape(*input_batch_dims, *scalar.shape[1:])  # (axis2, axis1, ...)
+            scalar = scalar.reshape(
+                *input_batch_dims, *scalar.shape[1:]
+            )  # (axis2, axis1, ...)
 
-        multivector = rearrange(multivector, _MV_REARRANGE_PATTERN)  # (axis1, axis2, ...)
+        multivector = rearrange(
+            multivector, _MV_REARRANGE_PATTERN
+        )  # (axis1, axis2, ...)
         scalar = rearrange(scalar, _S_REARRANGE_PATTERN)  # (axis1, axis2, ...)
 
         return multivector, scalar

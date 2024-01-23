@@ -65,7 +65,10 @@ class SelfAttentionConfig:
 
     def __post_init__(self):
         """Type checking / conversion."""
-        if isinstance(self.dropout_prob, str) and self.dropout_prob.lower() in ["null", "none"]:
+        if isinstance(self.dropout_prob, str) and self.dropout_prob.lower() in [
+            "null",
+            "none",
+        ]:
             self.dropout_prob = None
 
     @property
@@ -75,7 +78,9 @@ class SelfAttentionConfig:
         if self.in_mv_channels is None:
             return None
 
-        return max(self.increase_hidden_channels * self.in_mv_channels // self.num_heads, 1)
+        return max(
+            self.increase_hidden_channels * self.in_mv_channels // self.num_heads, 1
+        )
 
     @property
     def hidden_s_channels(self) -> Optional[int]:

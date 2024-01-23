@@ -10,7 +10,9 @@ from tests.helpers import BATCH_DIMS, TOLERANCES, check_pin_equivariance
 @pytest.mark.parametrize("batch_dims", BATCH_DIMS)
 @pytest.mark.parametrize("num_scalars", [9])
 @pytest.mark.parametrize("activation", ["gelu", "relu", "sigmoid"])
-def test_scalar_gated_nonlinearity_layer_equivariance(activation, batch_dims, num_scalars):
+def test_scalar_gated_nonlinearity_layer_equivariance(
+    activation, batch_dims, num_scalars
+):
     """Tests ScalarGatedNonlinearity() for equivariance."""
     layer = ScalarGatedNonlinearity(nonlinearity=activation)
     scalars = torch.randn(*batch_dims, num_scalars)

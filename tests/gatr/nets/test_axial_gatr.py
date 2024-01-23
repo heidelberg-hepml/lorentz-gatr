@@ -13,11 +13,14 @@ S_CHANNELS = [(None, None, 7, [False, False]), (4, 5, 6, [True, True])]
 
 @pytest.mark.parametrize("batch_dims", BATCH_DIMS)
 @pytest.mark.parametrize(
-    "num_items1,num_items2,in_mv_channels,out_mv_channels,hidden_mv_channels", [(8, 11, 6, 4, 8)]
+    "num_items1,num_items2,in_mv_channels,out_mv_channels,hidden_mv_channels",
+    [(8, 11, 6, 4, 8)],
 )
 @pytest.mark.parametrize("num_heads", [4])
 @pytest.mark.parametrize("num_blocks", [1])
-@pytest.mark.parametrize("in_s_channels,out_s_channels,hidden_s_channels,pos_encoding", S_CHANNELS)
+@pytest.mark.parametrize(
+    "in_s_channels,out_s_channels,hidden_s_channels,pos_encoding", S_CHANNELS
+)
 def test_axial_gatr_shape(
     batch_dims,
     num_items1,
@@ -56,16 +59,24 @@ def test_axial_gatr_shape(
 
     assert outputs.shape == (*batch_dims, num_items1, num_items2, out_mv_channels, 16)
     if in_s_channels is not None:
-        assert output_scalars.shape == (*batch_dims, num_items1, num_items2, out_s_channels)
+        assert output_scalars.shape == (
+            *batch_dims,
+            num_items1,
+            num_items2,
+            out_s_channels,
+        )
 
 
 @pytest.mark.parametrize("batch_dims", [(64,)])
 @pytest.mark.parametrize(
-    "num_items1,num_items2,in_mv_channels,out_mv_channels,hidden_mv_channels", [(3, 4, 5, 6, 10)]
+    "num_items1,num_items2,in_mv_channels,out_mv_channels,hidden_mv_channels",
+    [(3, 4, 5, 6, 10)],
 )
 @pytest.mark.parametrize("num_heads", [4])
 @pytest.mark.parametrize("num_blocks", [1])
-@pytest.mark.parametrize("in_s_channels,out_s_channels,hidden_s_channels,pos_encoding", S_CHANNELS)
+@pytest.mark.parametrize(
+    "in_s_channels,out_s_channels,hidden_s_channels,pos_encoding", S_CHANNELS
+)
 def test_axial_gatr_equivariance(
     batch_dims,
     num_items1,
@@ -108,5 +119,10 @@ def test_axial_gatr_equivariance(
     # We only test for Spin, not Pin, equivariance b/c AxialTransformer currently has some manual breaking of the
     # mirror symmetry
     check_pin_equivariance(
-        net, 1, batch_dims=data_dims, fn_kwargs=dict(scalars=scalars), **MILD_TOLERANCES, spin=True
+        net,
+        1,
+        batch_dims=data_dims,
+        fn_kwargs=dict(scalars=scalars),
+        **MILD_TOLERANCES,
+        spin=True
     )

@@ -1,0 +1,52 @@
+exp_name: ???
+exp_type: ???
+run_name: null
+
+seed: null
+debug: false
+
+warm_start_idx: null
+save: true
+use_mlflow: true
+save_source: true
+
+train: true
+training:
+ iterations : 20
+ train_test_val: [.4, .5, .1]
+ subsample: null
+ es_patience: 100
+ es_load_best_model: true
+ validate_every_n_steps: 10
+
+ clip_grad_norm: 1e1
+ log_every_n_steps: 100
+
+ optimizer : Adam
+ lr: 3.e-4
+ batchsize: 256
+ betas: [.9, .999]
+ eps: 1.e-8
+ 
+ scheduler: null
+ lr_eta_min: 0
+ lr_factor: 0.1
+ lr_patience: 50
+
+ float16: false
+ enable_flash_sdp: false
+ enable_math_sdp: true
+ enable_mem_efficient_sdp: false
+ force_xformers: false
+
+evaluate: true
+evaluation:
+ batchsize: 1024
+
+plot: true
+plotting:
+ loss: true
+
+mlflow:
+ db: '${base_dir}/runs/${exp_name}/mlflow/mlflow.db'
+ artifacts: '${base_dir}/runs/${exp_name}/mlflow/artifacts'

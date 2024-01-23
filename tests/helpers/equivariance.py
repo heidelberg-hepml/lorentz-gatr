@@ -80,10 +80,14 @@ def check_pin_equivariance(
 
         # First transformation, then function
         transformed_inputs = transform(inputs)
-        outputs_of_transformed = get_first_output(function(*transformed_inputs, **fn_kwargs))
+        outputs_of_transformed = get_first_output(
+            function(*transformed_inputs, **fn_kwargs)
+        )
 
         # Check equality
-        torch.testing.assert_close(transformed_outputs, outputs_of_transformed, **kwargs)
+        torch.testing.assert_close(
+            transformed_outputs, outputs_of_transformed, **kwargs
+        )
 
 
 def check_pin_invariance(
@@ -142,7 +146,9 @@ def check_pin_invariance(
 
         # Evaluate function on original and transformed inputs
         outputs = get_first_output(function(*inputs, **fn_kwargs))
-        outputs_of_transformed = get_first_output(function(*transformed_inputs, **fn_kwargs))
+        outputs_of_transformed = get_first_output(
+            function(*transformed_inputs, **fn_kwargs)
+        )
 
         # Check equality
         torch.testing.assert_close(outputs, outputs_of_transformed, **kwargs)

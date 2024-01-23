@@ -8,7 +8,8 @@ import torch
 
 from gatr.utils.clifford import mv_list_to_tensor
 
-LAYOUT, _ = clifford.Cl(1,3)
+LAYOUT, _ = clifford.Cl(1, 3)
+
 
 def _sample_list_of_mv(batch_dims, rng):
     """Utility function that samples a list of multivectors."""
@@ -19,7 +20,9 @@ def _sample_list_of_mv(batch_dims, rng):
     return xs
 
 
-def check_consistence_with_geometric_product(function, batch_dims=(1,), rng=None, **kwargs):
+def check_consistence_with_geometric_product(
+    function, batch_dims=(1,), rng=None, **kwargs
+):
     """Checks whether a callable computes the geometric product."""
 
     # Generate random inputs
@@ -57,7 +60,9 @@ def check_consistence_with_reversal(function, batch_dims=(1,), rng=None, **kwarg
     torch.testing.assert_close(reversed_x, reversed_x_true, **kwargs)
 
 
-def check_consistence_with_grade_involution(function, batch_dims=(1,), rng=None, **kwargs):
+def check_consistence_with_grade_involution(
+    function, batch_dims=(1,), rng=None, **kwargs
+):
     """Checks whether a callable computes the grade involution of a multivectors."""
 
     # Generate random inputs

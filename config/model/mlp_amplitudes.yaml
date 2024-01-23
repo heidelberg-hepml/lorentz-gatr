@@ -1,0 +1,10 @@
+_target_: experiments.amplitudes.wrappers.AmplitudeMLPWrapper
+
+net:
+  _target_: experiments.baselines.mlp.MLP
+
+  in_shape: 20
+  out_shape: 1
+
+  hidden_channels: 384
+  hidden_layers: 2

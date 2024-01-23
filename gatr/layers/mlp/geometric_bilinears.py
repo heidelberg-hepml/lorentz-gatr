@@ -9,6 +9,7 @@ from torch import nn
 
 from gatr.layers.linear import EquiLinear
 from gatr.primitives import geometric_product
+from gatr.layers.layer_norm import EquiLayerNorm
 
 
 class GeometricBilinear(nn.Module):
@@ -64,6 +65,7 @@ class GeometricBilinear(nn.Module):
         self.linear_out = EquiLinear(
             hidden_mv_channels, out_mv_channels, in_s_channels, out_s_channels
         )
+        self.norm = EquiLayerNorm()
 
     def forward(
         self,
@@ -92,8 +94,8 @@ class GeometricBilinear(nn.Module):
         right, _ = self.linear_right(multivectors, scalars=scalars)
         gp_outputs = geometric_product(left, right)
 
-
         # Output linear
         outputs_mv, outputs_s = self.linear_out(gp_outputs, scalars=scalars)
 
+        outputs_mv, outputs_s = self.norm(outputs_mv, outputs_s)
         return outputs_mv, outputs_s

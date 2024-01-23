@@ -43,7 +43,11 @@ class GradeDropout(nn.Module):
             Scalar inputs with dropout applied.
         """
 
-        out_mv = grade_dropout(multivectors, p=self._dropout_prob, training=self.training)
-        out_s = torch.nn.functional.dropout(scalars, p=self._dropout_prob, training=self.training)
+        out_mv = grade_dropout(
+            multivectors, p=self._dropout_prob, training=self.training
+        )
+        out_s = torch.nn.functional.dropout(
+            scalars, p=self._dropout_prob, training=self.training
+        )
 
         return out_mv, out_s

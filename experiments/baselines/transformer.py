@@ -12,7 +12,7 @@ from torch.utils.checkpoint import checkpoint
 
 from gatr.layers import ApplyRotaryPositionalEncoding
 from gatr.primitives.attention import scaled_dot_product_attention
-from gatr.utils.tensors import to_nd
+from experiments.misc import to_nd
 
 
 class BaselineLayerNorm(nn.Module):
@@ -117,7 +117,9 @@ class MultiQueryQKVLinear(nn.Module):
             "... items (hidden_channels num_heads) -> ... num_heads items hidden_channels",
             num_heads=self.num_heads,
         )
-        k = self.k_linear(inputs)[..., None, :, :]  # (..., head=1, item, hidden_channels)
+        k = self.k_linear(inputs)[
+            ..., None, :, :
+        ]  # (..., head=1, item, hidden_channels)
         v = self.v_linear(inputs)[..., None, :, :]
         return q, k, v
 
@@ -190,7 +192,9 @@ class BaselineSelfAttention(nn.Module):
         outputs : Tensor
             Outputs
         """
-        q, k, v = self.qkv_linear(inputs)  # each: (..., num_heads, num_items, num_channels, 16)
+        q, k, v = self.qkv_linear(
+            inputs
+        )  # each: (..., num_heads, num_items, num_channels, 16)
 
         # Rotary positional encoding
         if self.pos_encoding is not None:
@@ -221,7 +225,10 @@ class BaselineSelfAttention(nn.Module):
 
         # SDPA
         outputs = scaled_dot_product_attention(
-            q.contiguous(), k.expand_as(q).contiguous(), v.expand_as(q), attn_mask=attention_mask
+            q.contiguous(),
+            k.expand_as(q).contiguous(),
+            v.expand_as(q),
+            attn_mask=attention_mask,
         )
 
         # Return batch dimensions to inputs
@@ -320,7 +327,7 @@ class BaselineTransformerBlock(nn.Module):
         return outputs
 
 
-class BaselineTransformer(nn.Module):
+class Transformer(nn.Module):
     """Baseline transformer.
 
     Combines num_blocks transformer blocks, each consisting of multi-head self-attention layers, an
@@ -407,7 +414,7 @@ class BaselineTransformer(nn.Module):
         return outputs
 
 
-class BaselineAxialTransformer(nn.Module):
+class AxialTransformer(nn.Module):
     """Baseline axial transformer for data with two token dimensions.
 
     Combines num_blocks transformer blocks, each consisting of multi-head self-attention layers, an

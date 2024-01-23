@@ -30,7 +30,9 @@ def test_reverse_correctness(batch_dims):
 @pytest.mark.parametrize("batch_dims", BATCH_DIMS)
 def test_grade_involution_correctness(batch_dims):
     """Tests the multivector reverse for equivariance."""
-    check_consistence_with_grade_involution(grade_involute, batch_dims=batch_dims, **TOLERANCES)
+    check_consistence_with_grade_involution(
+        grade_involute, batch_dims=batch_dims, **TOLERANCES
+    )
 
 
 @pytest.mark.parametrize("batch_dims", BATCH_DIMS)
@@ -55,7 +57,9 @@ def test_grade_project_equivariance(batch_dims):
 )
 def test_linear_equivariance(input_batch_dims, coeff_batch_dims):
     """Tests the equi_linear() primitive for equivariance."""
-    fn_kwargs = dict(coeffs=torch.randn(*coeff_batch_dims, NUM_PIN_LINEAR_BASIS_ELEMENTS))
+    fn_kwargs = dict(
+        coeffs=torch.randn(*coeff_batch_dims, NUM_PIN_LINEAR_BASIS_ELEMENTS)
+    )
     check_pin_equivariance(
         equi_linear, 1, fn_kwargs=fn_kwargs, batch_dims=input_batch_dims, **TOLERANCES
     )
