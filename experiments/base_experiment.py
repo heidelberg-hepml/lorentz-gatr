@@ -10,6 +10,7 @@ from hydra.core.config_store import ConfigStore
 from hydra.utils import instantiate
 import mlflow
 
+import gatr.primitives.attention
 from experiments.misc import get_device, flatten_dict
 import experiments.logger
 from experiments.logger import LOGGER, MEMORY_HANDLER, FORMATTER
@@ -84,7 +85,7 @@ class BaseExperiment:
             self.plot()
 
         dt = time.time() - t0
-        LOGGER.info(f"Finished experiment after {dt/60:.2f}min = {dt/60**2:.2f}h")
+        LOGGER.info(f"Finished experiment {self.cfg.exp_name}/{self.cfg.run_name} after {dt/60:.2f}min = {dt/60**2:.2f}h")
 
     def init_model(self):
         # initialize model
@@ -341,6 +342,7 @@ class BaseExperiment:
         LOGGER.debug(f"Using learning rate scheduler {self.cfg.training.scheduler}")
 
     def train(self):
+        
         # performance metrics
         self.train_lr, self.train_loss, self.val_loss = [], [], []
         self.train_metrics = self._init_metrics()

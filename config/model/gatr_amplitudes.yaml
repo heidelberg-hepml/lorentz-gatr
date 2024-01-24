@@ -19,7 +19,7 @@ net:
 
  attention:
   num_heads: 8
-  multi_query: true
+  multi_query: false
   increase_hidden_channels: 2
 
 defaults:

@@ -350,12 +350,13 @@ class AmplitudeExperiment(BaseExperiment):
         LOGGER.info(f"Creating plots in {plot_path}")
 
         plot_dict = {
-            "train_loss": self.train_loss,
-            "val_loss": self.val_loss,
-            "train_lr": self.train_lr,
             "results_test": self.results_test,
             "results_train": self.results_train,
         }
+        if self.cfg.train:
+            plot_dict["train_loss"] = self.train_loss
+            plot_dict["val_loss"] = self.val_loss
+            plot_dict["train_lr"] = self.train_lr
 
         plot_mixer(self.cfg, plot_path, title, plot_dict)
 

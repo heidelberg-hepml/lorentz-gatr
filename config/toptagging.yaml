@@ -7,9 +7,11 @@ data:
 
 train: true
 training:
- nepochs : 1
- batchsize: 512
+ iterations: 10
+ batchsize: 128
  lr: 1e-3
+
+ force_xformers: true
 
 plotting:
  roc: true

@@ -6,6 +6,10 @@ import torch
 from torch import nn
 
 from gatr.interface import embed_vector, extract_scalar
+from xformers.ops.fmha import BlockDiagonalMask
+
+def build_attention_mask(inputs):
+    return BlockDiagonalMask.from_seqlens(torch.bincount(inputs.batch).tolist())
 
 class TopTaggingTransformerWrapper(nn.Module):
 
@@ -13,16 +17,10 @@ class TopTaggingTransformerWrapper(nn.Module):
         super().__init__()
         self.net = net
 
-    def forward(self, inputs, attention_mask):
-        batchsize, _, _ = inputs.shape
-
-        # global_token (collect information here)
-        global_token = torch.zeros((batchsize, 1, inputs.shape[-1]), device=inputs.device, dtype=inputs.dtype)
-        global_token[:,:,0] = 1. # encode something
-        inputs = torch.cat((global_token, inputs), dim=1)
-
-        outputs = self.net(inputs, attention_mask=attention_mask)
-        logits = outputs[:,0,:]
+    def forward(self, inputs):
+        mask = build_attention_mask(inputs)
+        outputs = self.net(inputs.x.unsqueeze(0), attention_mask=mask)
+        logits = outputs[0,...][inputs.is_global]
 
         return logits
 
@@ -32,39 +30,31 @@ class TopTaggingGATrWrapper(nn.Module):
         super().__init__()
         self.net = net
 
-    def forward(self, inputs: torch.Tensor, attention_mask):
-        batchsize, _, _ = inputs.shape
-
+    def forward(self, inputs):
+        mask = build_attention_mask(inputs)
         multivector, scalars = self.embed_into_ga(inputs)
 
-        multivector_outputs, scalar_outputs = self.net(multivector, scalars=scalars, attention_mask=attention_mask)
-        probs = self.extract_from_ga(multivector_outputs, scalar_outputs)
+        multivector_outputs, scalar_outputs = self.net(multivector, scalars=scalars, attention_mask=mask)
+        logits = self.extract_from_ga(inputs, multivector_outputs, scalar_outputs)
 
-        return probs
+        return logits
 
     def embed_into_ga(self, inputs):
-        batchsize, num_objects, _ = inputs.shape
 
         # encode momenta in multivectors
-        multivector = embed_vector(inputs)
-        multivector = multivector.unsqueeze(2)
-        scalars = torch.zeros(batchsize, num_objects, 1, device=inputs.device, dtype=inputs.dtype)
-
-        # global token
-        global_token_mv = torch.zeros((batchsize, 1, multivector.shape[2], multivector.shape[3]),
-                                          dtype=multivector.dtype, device=multivector.device)
-        global_token_s = torch.zeros((batchsize, 1, scalars.shape[2]),
-                                         dtype=scalars.dtype, device=scalars.device)
-        global_token_s[:,:,0] = 1.
-        multivector = torch.cat((global_token_mv, multivector), dim=1)
-        scalars = torch.cat((global_token_s, scalars), dim=1)
+        multivector = embed_vector(inputs.x)
+        multivector = multivector.unsqueeze(1)
+        scalars = torch.zeros(len(multivector), 1, device=inputs.x.device, dtype=inputs.x.dtype)
+        multivector, scalars = multivector.unsqueeze(0), scalars.unsqueeze(0)
 
         return multivector, scalars
 
-    def extract_from_ga(self, multivector, scalars):
+    def extract_from_ga(self, inputs, multivector, scalars):
         # Extract scalars from GA representation
-        lorentz_scalars = extract_scalar(multivector)[...,0]
-        logits = lorentz_scalars[:,0,:]
+        outputs = extract_scalar(multivector)
+        logits = outputs.squeeze().unsqueeze(-1)[inputs.is_global]
 
-        probs = nn.functional.sigmoid(logits)
-        return probs
+        #probs = nn.functional.sigmoid(logits)
+        #print(inputs.label.shape, inputs.x.shape, inputs.is_global.shape, probs.shape)
+        #print(probs.mean(), probs.std())
+        return logits
