@@ -14,21 +14,25 @@ from experiments.toptagging.plots import plot_mixer
 from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
 
+import matplotlib.pyplot as plt
+
 MODEL_TITLE_DICT = {"GATr": "GATr", "Transformer": "Tr"}
 
 class TopTaggingExperiment(BaseExperiment):
 
     def init_physics(self):
-        assert self.cfg.training.force_xformers, "xformers attention required for toptagging"
+        if not self.cfg.training.force_xformers:
+            LOGGER.warning(f"Using training.force_xformers=False, this will slow down the network by a factor of 5-10.")
 
     def init_data(self):
-        LOGGER.info(f"Loading top-tagging dataset from {self.cfg.data.data_path}")
+        data_path = os.path.join(self.cfg.data.data_dir, f"toptagging_{self.cfg.data.dataset}.npz")
+        LOGGER.info(f"Loading top-tagging dataset from {data_path}")
         t0 = time.time()
-        self.data_train = TopTaggingDataset(self.cfg.data.data_path, "train",
+        self.data_train = TopTaggingDataset(data_path, "train",
                                             data_scale=None, dtype=self.dtype)
-        self.data_test = TopTaggingDataset(self.cfg.data.data_path, "test",
+        self.data_test = TopTaggingDataset(data_path, "test",
                                            data_scale=self.data_train.data_scale, dtype=self.dtype)
-        self.data_val = TopTaggingDataset(self.cfg.data.data_path, "val",
+        self.data_val = TopTaggingDataset(data_path, "val",
                                           data_scale=self.data_train.data_scale, dtype=self.dtype)
         dt = time.time() - t0
         LOGGER.info(f"Finished creating datasets after {dt:.2f} s = {dt/60:.2f} min")
@@ -48,9 +52,20 @@ class TopTaggingExperiment(BaseExperiment):
         )
 
     def evaluate(self):
-        self.results_train = self._evaluate_single(self.train_loader, "train")
+        
+        #self.results_train = self._evaluate_single(self.train_loader, "train")
         self.results_val = self._evaluate_single(self.val_loader, "val")
         self.results_test = self._evaluate_single(self.test_loader, "test")
+        
+        '''
+        self.model.eval()
+        with torch.no_grad():
+            for batch in self.train_loader:
+                batch = batch.to(self.device)
+                y_pred = self.model(batch)
+                print(y_pred)
+                print(batch.label)
+        '''
 
     def _evaluate_single(self, loader, title):
         LOGGER.info(f"### Starting to evaluate model on {title} dataset with "\
@@ -71,7 +86,6 @@ class TopTaggingExperiment(BaseExperiment):
         assert labels_true.shape == labels_predict.shape
 
         # accuracy
-        LOGGER.info(f"{labels_true.mean()} {labels_true.std()} {labels_predict.mean()} {labels_predict.std()}")
         labels_predict_rounded = np.round(labels_predict)
         accuracy = (labels_predict_rounded == labels_true).sum() / labels_true.shape[0]
         LOGGER.info(f"Accuracy on {title} dataset: {accuracy:.4f}")
@@ -96,7 +110,8 @@ class TopTaggingExperiment(BaseExperiment):
             log_mlflow(f"eval.{title}.rej03", rej03)
             log_mlflow(f"eval.{title}.rej05", rej05)
 
-        results = {"fpr": fpr, "tpr": tpr, "auc": auc}
+        results = {"labels_true": labels_true, "labels_predict": labels_predict,
+                   "fpr": fpr, "tpr": tpr, "auc": auc}
         return results
 
     def plot(self):
@@ -106,11 +121,14 @@ class TopTaggingExperiment(BaseExperiment):
         title = model_title
         LOGGER.info(f"Creating plots in {plot_path}")
 
-        file = f"{plot_path}/roc.txt"
-        roc = np.stack((self.results_test["fpr"], self.results_test["tpr"]), axis=-1)
-        np.savetxt(file, roc)
+        if self.cfg.evaluate:
+            file = f"{plot_path}/roc.txt"
+            roc = np.stack((self.results_test["fpr"], self.results_test["tpr"]), axis=-1)
+            np.savetxt(file, roc)
 
-        plot_dict = {"results_test": self.results_test}
+        plot_dict = {}
+        if self.cfg.evaluate:
+            plot_dict = {"results_test": self.results_test}
         if self.cfg.train:
             plot_dict["train_loss"] = self.train_loss
             plot_dict["val_loss"] = self.val_loss
@@ -119,6 +137,9 @@ class TopTaggingExperiment(BaseExperiment):
 
     def _init_loss(self):
         self.loss = torch.nn.BCEWithLogitsLoss()
+
+        # for jet mass regression test
+        #self.loss = torch.nn.MSELoss()
 
     def _batch_loss(self, batch):
         batch = batch.to(self.device)

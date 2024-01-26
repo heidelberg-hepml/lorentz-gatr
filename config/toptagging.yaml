@@ -3,7 +3,8 @@ exp_name: topt_local_debug
 base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
 
 data:
- data_path : /media/jspinner/shared/Studium/project3/data/toptagging_mini.npz
+ data_dir : /media/jspinner/shared/Studium/project3/data
+ dataset: mini
 
 train: true
 training:
@@ -11,11 +12,12 @@ training:
  batchsize: 128
  lr: 1e-3
 
- force_xformers: true
+ force_xformers: false
 
 plotting:
  roc: true
  loss: true
+ score: true
 
 defaults:
  - model: gatr_toptagging

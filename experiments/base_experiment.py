@@ -375,7 +375,7 @@ class BaseExperiment:
             self._step(data, step)
 
             # validation (and early stopping)
-            if step % self.cfg.training.validate_every_n_steps == 0:
+            if (step-1) % self.cfg.training.validate_every_n_steps == 0:
 
                 val_loss = self._validate(step)
                 if val_loss < smallest_val_loss:

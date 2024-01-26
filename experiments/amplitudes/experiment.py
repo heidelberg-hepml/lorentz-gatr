@@ -349,10 +349,11 @@ class AmplitudeExperiment(BaseExperiment):
         title = [f"{model_title}: {dataset_title}" for dataset_title in dataset_titles]
         LOGGER.info(f"Creating plots in {plot_path}")
 
-        plot_dict = {
-            "results_test": self.results_test,
-            "results_train": self.results_train,
-        }
+        
+        plot_dict = {}
+        if self.cfg.evaluate:
+            plot_dict["results_test"] = self.results_test,
+            plot_dict["results_train"] = self.results_train,
         if self.cfg.train:
             plot_dict["train_loss"] = self.train_loss
             plot_dict["val_loss"] = self.val_loss

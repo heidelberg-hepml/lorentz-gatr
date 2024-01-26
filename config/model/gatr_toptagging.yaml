@@ -1,4 +1,5 @@
 _target_: experiments.toptagging.wrappers.TopTaggingGATrWrapper
+force_xformers: '${training.force_xformers}'
 
 net:
  _target_: gatr.nets.GATr
@@ -9,15 +10,15 @@ net:
 
  in_s_channels: 1
  out_s_channels: 1
- hidden_s_channels: 16
+ hidden_s_channels: 8
 
- num_blocks: 8
+ num_blocks: 4
  reinsert_mv_channels: null
  reinsert_s_channels: null
  dropout_prob: null
 
  attention:
-  num_heads: 8
+  num_heads: 4
   multi_query: false
   increase_hidden_channels: 2
 

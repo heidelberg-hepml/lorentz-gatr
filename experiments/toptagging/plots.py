@@ -2,6 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 
+import warnings
+warnings.simplefilter("ignore", RuntimeWarning)
+
 from experiments.base_plots import plot_loss
 
 plt.rcParams["font.family"] = "serif"
@@ -22,7 +25,13 @@ def plot_mixer(cfg, plot_path, title, plot_dict):
         plot_loss(file, [plot_dict["train_loss"], plot_dict["val_loss"]], plot_dict["train_lr"],
                       labels=["train loss", "val loss"], logy=True)
 
-    if cfg.plotting.roc:
+    if cfg.plotting.score and cfg.evaluate:
+        file = f"{plot_path}/score.pdf"
+        with PdfPages(file) as out:
+            plot_score(out, plot_dict["results_test"]["labels_true"],
+                        plot_dict["results_test"]["labels_predict"], title=title)
+
+    if cfg.plotting.roc and cfg.evaluate:
         file = f"{plot_path}/roc.pdf"
         with PdfPages(file) as out:
             plot_roc(out, plot_dict["results_test"]["fpr"],
@@ -67,11 +76,27 @@ def plot_roc(out, fpr, tpr, auc, title=None):
     ax.set_ylabel(r"$\epsilon_S / \sqrt{\epsilon_B}$", fontsize=FONTSIZE)
     ax.plot(rnd, rnd**.5, "k--")
     ax.plot(tpr, tpr/fpr**.5, color=color)
-    ax.text(.05, .95, s=f"AUC = {auc:.4f}", horizontalalignment="left", verticalalignment="top",
+    ax.text(.95, .05, s=f"AUC = {auc:.4f}", horizontalalignment="right", verticalalignment="bottom",
                 transform=ax.transAxes, fontsize=FONTSIZE)
-    ax.text(.95, .95, s=title, horizontalalignment="right", verticalalignment="top",
+    ax.text(.05, .95, s=title, horizontalalignment="left", verticalalignment="top",
                 transform=ax.transAxes, fontsize=FONTSIZE)
     fig.savefig(out, bbox_inches="tight", format="pdf")
     plt.close()
 
+def plot_score(out, labels_true, labels_predicted, title=None,
+                xrange=[0,1], bins=100):
+    cols = [colors[1], colors[2]]
+
+    fig, ax = plt.subplots(figsize=(5,4))
+    ax.set_ylabel("Normalized", fontsize=FONTSIZE)
+    ax.set_xlabel("Classifier score (0=QCD, 1=top)", fontsize=FONTSIZE)
+    _, bins, _ = ax.hist(labels_predicted[labels_true == 0], range=xrange, bins=bins, alpha=.5, label="QCD", density=True, color=cols[0])
+    ax.hist(labels_predicted[labels_true == 1], bins=bins, label="Top", alpha=.5, density=True, color=cols[1])
+    ax.set_xlim(xrange)
+    ax.legend(frameon=False, fontsize=FONTSIZE, loc="upper left")
+    ax.text(.95, .95, s=title, horizontalalignment="right", verticalalignment="top",
+                transform=ax.transAxes, fontsize=FONTSIZE)
+    
+    fig.savefig(out, bbox_inches="tight", format="pdf")
+    plt.close()
     

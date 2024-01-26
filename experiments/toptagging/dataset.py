@@ -17,6 +17,9 @@ class TopTaggingDataset(torch.utils.data.Dataset):
         kinematics = torch.tensor(kinematics, dtype=dtype)
         labels = torch.tensor(labels, dtype=dtype)
 
+        # jet mass regression test
+        #labels = torch.sqrt(torch.sum(kinematics[...,0], dim=-1)**2 - torch.sum(torch.sum(kinematics[...,1:], dim=-2)**2, dim=-1))
+
         # create list of torch_geometric.data.Data objects
         self.data_list = []
         for i in range(kinematics.shape[0]):
