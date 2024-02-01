@@ -163,7 +163,7 @@ def abs_squared_norm(x: torch.Tensor) -> torch.Tensor:
     outputs : torch.Tensor with shape (..., 1)
         Geometric algebra norm of x.
     """
-    m = _load_metric_grades(device=x.device)
+    m = _load_metric_grades(device=x.device, dtype=x.dtype)
     abs_squared_norms = (
         cached_einsum("... i, ... i, g i -> ... g", x, x, m).abs().sum(-1, keepdim=True)
     )
