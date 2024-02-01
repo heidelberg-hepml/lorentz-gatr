@@ -23,6 +23,7 @@ def run_trial(trial: Trial, seed):
     beam_reference = trial.suggest_categorical(
         "beam_reference", ["null", "photon", "spacelike", "xyplane"]
     )
+    lr = trial.suggest_float("lr", 3e-5, 1e-3)
 
     with initialize(config_path="config", version_base=None):
         overrides = [
@@ -30,8 +31,9 @@ def run_trial(trial: Trial, seed):
             f"run_name=trial_{trial.number}",
             # f"seed={seed}",
             # Fixed settings
-            "training.iterations=2",
+            "training.iterations=30000",
             "training.batchsize=128",
+            "training.scheduler=CosineAnnealingLR",
             # Tuned parameters
             f"model.net.num_blocks={num_blocks}",
             f"model.net.hidden_mv_channels={hidden_mv_channels}",
@@ -40,13 +42,14 @@ def run_trial(trial: Trial, seed):
             f"model.net.attention.multi_query={multi_query}",
             f"model.net.attention.increase_hidden_channels={increase_hidden_channels}",
             f"model.beam_reference={beam_reference}",
+            f"training.lr={lr}",
         ]
         cfg = compose(config_name="toptagging", overrides=overrides)
         exp = TopTaggingExperiment(cfg)
 
         # Run experiment
         exp()
-        score = exp.results["val"]["bce"]
+        score = exp.results["val"]["bce"] # use BCE-loss as score
 
         return score
 
