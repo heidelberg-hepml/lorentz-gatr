@@ -10,6 +10,7 @@ from hydra.core.config_store import ConfigStore
 from hydra.utils import instantiate
 import mlflow
 
+import gatr.primitives.attention
 from experiments.misc import get_device, flatten_dict
 import experiments.logger
 from experiments.logger import LOGGER, MEMORY_HANDLER, FORMATTER
@@ -83,8 +84,16 @@ class BaseExperiment:
         if self.cfg.plot and self.cfg.save:
             self.plot()
 
+        if self.device == torch.device("cuda"):
+            max_used = torch.cuda.max_memory_allocated()
+            max_total = torch.cuda.mem_get_info()[1]
+            LOGGER.info(
+                f"GPU RAM information: max_used = {max_used/1e9:.3} GB, max_total = {max_total/1e9:.3} GB"
+            )
         dt = time.time() - t0
-        LOGGER.info(f"Finished experiment after {dt/60:.2f}min = {dt/60**2:.2f}h")
+        LOGGER.info(
+            f"Finished experiment {self.cfg.exp_name}/{self.cfg.run_name} after {dt/60:.2f}min = {dt/60**2:.2f}h"
+        )
 
     def init_model(self):
         # initialize model
@@ -341,6 +350,7 @@ class BaseExperiment:
         LOGGER.debug(f"Using learning rate scheduler {self.cfg.training.scheduler}")
 
     def train(self):
+
         # performance metrics
         self.train_lr, self.train_loss, self.val_loss = [], [], []
         self.train_metrics = self._init_metrics()
@@ -373,7 +383,7 @@ class BaseExperiment:
             self._step(data, step)
 
             # validation (and early stopping)
-            if step % self.cfg.training.validate_every_n_steps == 0:
+            if (step - 1) % self.cfg.training.validate_every_n_steps == 0:
 
                 val_loss = self._validate(step)
                 if val_loss < smallest_val_loss:
@@ -498,7 +508,7 @@ class BaseExperiment:
                 log_mlflow(f"val.{key}", values[-1], step=step)
         return val_loss
 
-    def _save_config(self, filename="amplitudes.yaml", to_mlflow=False):
+    def _save_config(self, filename, to_mlflow=False):
         # Save config
         if not self.cfg.save:
             return
