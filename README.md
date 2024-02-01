@@ -32,6 +32,12 @@ We use hydra for configuration management, allowing to quickly override paramete
 mlflow ui --port 4242 --backend-store-uri sqlite:///runs/tracking/mlflow.db
 ```
 
+An existing run can be reloaded to perform additional tests with the trained model. For a previous run with exp_name=amplitudes and run_name=hello_world, one can run for example. 
+```
+python run.py -cn config -cp runs/amplitudes/hello_world train=false warm_start_idx=0
+```
+The warm_start_idx specifies which model in the models folder should be loaded and defaults to 0. 
+
 ## Using GATr (copied from the original GATr)
 
 To use GATr on your own problem, you will at least need two components from this repository:
