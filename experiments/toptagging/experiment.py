@@ -144,7 +144,7 @@ class TopTaggingExperiment(BaseExperiment):
         # bce loss
         metrics["bce"] = torch.nn.functional.binary_cross_entropy(
             labels_predict, labels_true
-        )
+        ).item()
         labels_true, labels_predict = labels_true.numpy(), labels_predict.numpy()
 
         # accuracy
@@ -154,7 +154,8 @@ class TopTaggingExperiment(BaseExperiment):
 
         # roc (fpr = epsB, tpr = epsS)
         fpr, tpr, th = roc_curve(labels_true, labels_predict)
-        metrics["fpr"], metrics["tpr"] = fpr, tpr
+        if mode == "eval":
+            metrics["fpr"], metrics["tpr"] = fpr, tpr
         metrics["auc"] = roc_auc_score(labels_true, labels_predict)
         if mode == "eval":
             LOGGER.info(f"AUC score on {title} dataset: {metrics['auc']:.4f}")
@@ -173,6 +174,9 @@ class TopTaggingExperiment(BaseExperiment):
 
         if self.cfg.use_mlflow:
             for key, value in metrics.items():
+                if key in ["labels_true", "labels_predict", "fpr", "tpr"]:
+                    # do not log matrices
+                    continue
                 name = f"{mode}.{title}" if mode == "eval" else "val"
                 log_mlflow(f"{name}.{key}", value, step=step)
 

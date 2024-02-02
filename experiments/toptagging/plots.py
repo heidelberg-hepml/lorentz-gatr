@@ -35,23 +35,6 @@ def plot_mixer(cfg, plot_path, title, plot_dict):
                 labels=["train loss", "val loss"],
                 logy=True,
             )
-            plot_metric(
-                out,
-                [plot_dict["train_metrics"]["auc"], plot_dict["val_metrics"]["auc"]],
-                "AUC score",
-                labels=["train", "val"],
-                logy=False,
-            )
-            plot_metric(
-                out,
-                [
-                    plot_dict["train_metrics"]["accuracy"],
-                    plot_dict["val_metrics"]["accuracy"],
-                ],
-                "Accuracy score",
-                labels=["train", "val"],
-                logy=False,
-            )
 
     if cfg.plotting.score and cfg.evaluate:
         file = f"{plot_path}/score.pdf"
