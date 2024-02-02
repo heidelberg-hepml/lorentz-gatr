@@ -61,6 +61,12 @@ class TopTaggingGATrWrapper(nn.Module):
         self.net = net
         self.beam_reference = beam_reference
         self.force_xformers = force_xformers
+        assert self.beam_reference in [
+            None,
+            "photon",
+            "spacelike",
+            "xyplane",
+        ], f"beam_reference {self.beam_reference} not implemented"
 
     def forward(self, batch):
         if self.force_xformers:

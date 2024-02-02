@@ -23,7 +23,10 @@ def run_trial(trial: Trial, seed):
     beam_reference = trial.suggest_categorical(
         "beam_reference", ["null", "photon", "spacelike", "xyplane"]
     )
-    lr = trial.suggest_float("lr", 3e-5, 1e-3)
+
+    # catch runs with invalid hyperparameters
+    if num_heads > increase_hidden_channels * hidden_mv_channels:
+        raise optuna.TrialPruned()
 
     with initialize(config_path="config", version_base=None):
         overrides = [
@@ -31,9 +34,11 @@ def run_trial(trial: Trial, seed):
             f"run_name=trial_{trial.number}",
             # f"seed={seed}",
             # Fixed settings
-            "training.iterations=30000",
+            "training.iterations=20000",
             "training.batchsize=128",
             "training.scheduler=CosineAnnealingLR",
+            "training.lr=1e-4",
+            "training.force_xformers=true",
             # Tuned parameters
             f"model.net.num_blocks={num_blocks}",
             f"model.net.hidden_mv_channels={hidden_mv_channels}",
@@ -42,14 +47,13 @@ def run_trial(trial: Trial, seed):
             f"model.net.attention.multi_query={multi_query}",
             f"model.net.attention.increase_hidden_channels={increase_hidden_channels}",
             f"model.beam_reference={beam_reference}",
-            f"training.lr={lr}",
         ]
         cfg = compose(config_name="toptagging", overrides=overrides)
         exp = TopTaggingExperiment(cfg)
 
         # Run experiment
         exp()
-        score = exp.results["val"]["bce"] # use BCE-loss as score
+        score = exp.results["val"]["accuracy"]  # use accuracy as score
 
         return score
 
@@ -69,7 +73,7 @@ def sweep(cfg):
         storage=f"sqlite:///{Path(cfg.sweep.optuna_db).resolve()}?timeout=60",
         load_if_exists=True,
         study_name=cfg.exp_name,
-        direction="minimize",
+        direction="maximize",
     )
 
     # Let's go

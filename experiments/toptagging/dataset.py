@@ -84,7 +84,9 @@ class TopTaggingDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         if self.add_pairs:
             batch = self.data_list[idx]
-            n = batch.x.shape[0]
+            n = (
+                batch.x.shape[0] - 1
+            )  # number of constituents in the event (first constituent is global token)
             is_global = torch.concatenate(
                 (batch.is_global, torch.zeros(n**2, 1, dtype=torch.bool)), dim=0
             )
@@ -93,13 +95,16 @@ class TopTaggingDataset(torch.utils.data.Dataset):
             # single tokens: (fourmomentum, 0, 0)
             # pairwise tokens: (0, fourmomentum1, fourmomentum2)
             single = torch.concatenate(
-                (batch.x.reshape(n, 1, 4), torch.zeros(n, 2, 4, dtype=self.dtype)),
+                (
+                    batch.x.reshape(n + 1, 1, 4),
+                    torch.zeros(n + 1, 2, 4, dtype=self.dtype),
+                ),
                 dim=1,
             )
             pairs = torch.stack(
                 (
-                    batch.x.reshape(n, 1, 1, 4).expand(n, n, 1, 4),
-                    batch.x.reshape(1, n, 1, 4).expand(n, n, 1, 4),
+                    batch.x[1:, :].reshape(n, 1, 1, 4).expand(n, n, 1, 4),
+                    batch.x[1:, :].reshape(1, n, 1, 4).expand(n, n, 1, 4),
                 ),
                 dim=2,
             ).reshape(n**2, 2, 4)

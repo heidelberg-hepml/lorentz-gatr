@@ -83,11 +83,13 @@ class TopTaggingExperiment(BaseExperiment):
         )
         self.test_loader = DataLoader(
             dataset=self.data_test,
-            batch_size=self.cfg.training.batchsize,
+            batch_size=self.cfg.evaluation.batchsize,
             shuffle=False,
         )
         self.val_loader = DataLoader(
-            dataset=self.data_val, batch_size=self.cfg.training.batchsize, shuffle=False
+            dataset=self.data_val,
+            batch_size=self.cfg.evaluation.batchsize,
+            shuffle=False,
         )
 
         LOGGER.info(
@@ -98,15 +100,29 @@ class TopTaggingExperiment(BaseExperiment):
 
     def evaluate(self):
         self.results = {}
-        # self.results["train"] = self._evaluate_single(self.train_loader, "train")
-        self.results["val"] = self._evaluate_single(self.val_loader, "val")
-        self.results["test"] = self._evaluate_single(self.test_loader, "test")
-
-    def _evaluate_single(self, loader, title):
-        LOGGER.info(
-            f"### Starting to evaluate model on {title} dataset with "
-            f"{len(loader.dataset.data_list)} elements, batchsize {loader.batch_size} ###"
+        self.results["train"] = self._evaluate_single(
+            self.train_loader, "train", mode="eval"
         )
+        self.results["val"] = self._evaluate_single(self.val_loader, "val", mode="eval")
+        self.results["test"] = self._evaluate_single(
+            self.test_loader, "test", mode="eval"
+        )
+
+    def _evaluate_single(self, loader, title, mode, step=None):
+        assert mode in ["val", "eval"]
+        # re-initialize dataloader to make sure it is using the evaluation batchsize (makes a difference for trainloader)
+        loader = DataLoader(
+            dataset=loader.dataset,
+            batch_size=self.cfg.evaluation.batchsize,
+            shuffle=False,
+        )
+
+        if mode == "eval":
+            LOGGER.info(
+                f"### Starting to evaluate model on {title} dataset with "
+                f"{len(loader.dataset.data_list)} elements, batchsize {loader.batch_size} ###"
+            )
+        metrics = {}
 
         # predictions
         labels_true, labels_predict = [], []
@@ -119,52 +135,48 @@ class TopTaggingExperiment(BaseExperiment):
                 labels_true.append(batch.label.cpu().float())
                 labels_predict.append(y_pred.cpu().float())
         labels_true, labels_predict = torch.cat(labels_true), torch.cat(labels_predict)
-        assert labels_true.shape == labels_predict.shape
+        if mode == "eval":
+            metrics["labels_true"], metrics["labels_predict"] = (
+                labels_true,
+                labels_predict,
+            )
 
         # bce loss
-        bce = torch.nn.functional.binary_cross_entropy_with_logits(
+        metrics["bce"] = torch.nn.functional.binary_cross_entropy(
             labels_predict, labels_true
         )
-        if self.cfg.use_mlflow:
-            log_mlflow(f"eval.{title}.bce_loss", bce)
         labels_true, labels_predict = labels_true.numpy(), labels_predict.numpy()
 
         # accuracy
-        accuracy = accuracy_score(labels_true, np.round(labels_predict))
-        LOGGER.info(f"Accuracy on {title} dataset: {accuracy:.4f}")
-        if self.cfg.use_mlflow:
-            log_mlflow(f"eval.{title}.accuracy", accuracy)
+        metrics["accuracy"] = accuracy_score(labels_true, np.round(labels_predict))
+        if mode == "eval":
+            LOGGER.info(f"Accuracy on {title} dataset: {metrics['accuracy']:.4f}")
 
         # roc (fpr = epsB, tpr = epsS)
         fpr, tpr, th = roc_curve(labels_true, labels_predict)
-        auc = roc_auc_score(labels_true, labels_predict)
-        LOGGER.info(f"AUC score on {title} dataset: {auc:.4f}")
-        if self.cfg.use_mlflow:
-            log_mlflow(f"eval.{title}.auc", auc)
+        metrics["fpr"], metrics["tpr"] = fpr, tpr
+        metrics["auc"] = roc_auc_score(labels_true, labels_predict)
+        if mode == "eval":
+            LOGGER.info(f"AUC score on {title} dataset: {metrics['auc']:.4f}")
 
         # 1/epsB at fixed epsS
         def get_rej(epsS):
             idx = np.argmin(np.abs(tpr - epsS))
             return 1 / fpr[idx]
 
-        rej03 = get_rej(0.3)
-        rej05 = get_rej(0.5)
-        LOGGER.info(
-            f"Rejection rate {title} dataset: {rej03:.0f} (epsS=0.3), {rej05:.0f} (epsS=0.5)"
-        )
-        if self.cfg.use_mlflow:
-            log_mlflow(f"eval.{title}.rej03", rej03)
-            log_mlflow(f"eval.{title}.rej05", rej05)
+        metrics["rej03"] = get_rej(0.3)
+        metrics["rej05"] = get_rej(0.5)
+        if mode == "eval":
+            LOGGER.info(
+                f"Rejection rate {title} dataset: {metrics['rej03']:.0f} (epsS=0.3), {metrics['rej05']:.0f} (epsS=0.5)"
+            )
 
-        results = {
-            "labels_true": labels_true,
-            "labels_predict": labels_predict,
-            "fpr": fpr,
-            "tpr": tpr,
-            "auc": auc,
-            "bce": bce,
-        }
-        return results
+        if self.cfg.use_mlflow:
+            for key, value in metrics.items():
+                name = f"{mode}.{title}" if mode == "eval" else "val"
+                log_mlflow(f"{name}.{key}", value, step=step)
+
+        return metrics
 
     def plot(self):
         plot_path = os.path.join(self.cfg.run_dir, f"plots_{self.cfg.run_idx}")
@@ -194,25 +206,19 @@ class TopTaggingExperiment(BaseExperiment):
     def _init_loss(self):
         self.loss = torch.nn.BCEWithLogitsLoss()
 
+    # overwrite _validate method to compute metrics over the full validation set
+    def _validate(self, step):
+        metrics = self._evaluate_single(self.val_loader, "val", mode="val")
+        return metrics["bce"]
+
     def _batch_loss(self, batch):
         batch = batch.to(self.device)
         y_pred = self.model(batch)
         loss = self.loss(y_pred, batch.label.to(self.dtype))
         assert torch.isfinite(loss).all()
 
-        # compute cheap metrics
-        try:
-            labels_true, labels_predict = (
-                batch.label.float().cpu(),
-                torch.nn.functional.sigmoid(y_pred).detach().cpu(),
-            )
-            auc = roc_auc_score(labels_true, labels_predict)
-            accuracy = accuracy_score(labels_true, np.round(labels_predict))
-            metrics = {"auc": auc, "accuracy": accuracy}
-        except ValueError:
-            # only one jet class present because batchsize too small -> Can not compute metrics
-            metrics = {}
+        metrics = {}
         return loss, metrics
 
     def _init_metrics(self):
-        return {"auc": [], "accuracy": []}
+        return {}
