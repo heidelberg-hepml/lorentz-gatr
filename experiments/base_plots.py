@@ -14,7 +14,7 @@ FONTSIZE_TICK = 12
 
 
 def plot_loss(file, losses, lr, labels=None, logy=True):
-    if len(losses[1]) == 0: # catch no-validations case
+    if len(losses[1]) == 0:  # catch no-validations case
         losses = [losses[0]]
         labels = [labels[0]]
     labels = [None for _ in range(len(losses))] if labels is None else labels

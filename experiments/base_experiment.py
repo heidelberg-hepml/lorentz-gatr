@@ -320,7 +320,7 @@ class BaseExperiment:
         LOGGER.debug(
             f"Using optimizer {self.cfg.training.optimizer} with lr={self.cfg.training.lr}"
         )
-        
+
         # load existing optimizer if specified
         if self.warm_start:
             model_path = os.path.join(
@@ -340,12 +340,16 @@ class BaseExperiment:
             self.scheduler = torch.optim.lr_scheduler.OneCycleLR(
                 self.optimizer,
                 self.cfg.training.lr * 10,
-                total_steps=int(self.cfg.training.iterations * self.cfg.training.scheduler_scale),
+                total_steps=int(
+                    self.cfg.training.iterations * self.cfg.training.scheduler_scale
+                ),
             )
         elif self.cfg.training.scheduler == "CosineAnnealingLR":
             self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
                 self.optimizer,
-                T_max=int(self.cfg.training.iterations * self.cfg.training.scheduler_scale),
+                T_max=int(
+                    self.cfg.training.iterations * self.cfg.training.scheduler_scale
+                ),
                 eta_min=self.cfg.training.lr_eta_min,
             )
         elif self.cfg.training.scheduler == "ReduceLROnPlateau":
@@ -552,10 +556,16 @@ class BaseExperiment:
             filename = f"model_run{self.cfg.run_idx}.pt"
         model_path = os.path.join(self.cfg.run_dir, "models", filename)
         LOGGER.debug(f"Saving model at {model_path}")
-        torch.save({"model": self.model.state_dict(),
-                    "optimizer": self.optimizer.state_dict(),
-                    "scheduler": self.scheduler.state_dict() if self.scheduler is not None else None},
-                   model_path)
+        torch.save(
+            {
+                "model": self.model.state_dict(),
+                "optimizer": self.optimizer.state_dict(),
+                "scheduler": self.scheduler.state_dict()
+                if self.scheduler is not None
+                else None,
+            },
+            model_path,
+        )
 
     def init_physics(self):
         raise NotImplementedError()

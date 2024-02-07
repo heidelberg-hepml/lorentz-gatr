@@ -16,7 +16,7 @@ def run_trial(trial: Trial, seed, exp_name):
 
     # Choose trial params
     num_blocks = trial.suggest_int("blocks", 4, 32)
-    hidden_mv_channels = 2 ** trial.suggest_int("mv_channels", 2, 4)
+    hidden_mv_channels = 2 ** trial.suggest_int("mv_channels", 2, 5)
     hidden_s_channels = 2 ** trial.suggest_int("s_channels", 4, 7)
     num_heads = 2 ** trial.suggest_int("heads", 2, 4)
     multi_query = trial.suggest_categorical("multi_query", ["true", "false"])
@@ -60,7 +60,7 @@ def run_trial(trial: Trial, seed, exp_name):
 
         # Run experiment
         exp()
-        score = exp.results["val"]["rej05"]  # use accuracy as score
+        score = exp.results["val"]["accuracy"]  # use accuracy as score
 
         return score
 
