@@ -134,6 +134,7 @@ class TopTaggingExperiment(BaseExperiment):
                 y_pred = torch.nn.functional.sigmoid(y_pred)
                 labels_true.append(batch.label.cpu().float())
                 labels_predict.append(y_pred.cpu().float())
+                break
         labels_true, labels_predict = torch.cat(labels_true), torch.cat(labels_predict)
         if mode == "eval":
             metrics["labels_true"], metrics["labels_predict"] = (
@@ -167,9 +168,11 @@ class TopTaggingExperiment(BaseExperiment):
 
         metrics["rej03"] = get_rej(0.3)
         metrics["rej05"] = get_rej(0.5)
+        metrics["rej08"] = get_rej(0.8)
         if mode == "eval":
             LOGGER.info(
-                f"Rejection rate {title} dataset: {metrics['rej03']:.0f} (epsS=0.3), {metrics['rej05']:.0f} (epsS=0.5)"
+                f"Rejection rate {title} dataset: {metrics['rej03']:.0f} (epsS=0.3), "
+                f"{metrics['rej05']:.0f} (epsS=0.5), {metrics['rej08']:.0f}"
             )
 
         if self.cfg.use_mlflow:
@@ -179,7 +182,6 @@ class TopTaggingExperiment(BaseExperiment):
                     continue
                 name = f"{mode}.{title}" if mode == "eval" else "val"
                 log_mlflow(f"{name}.{key}", value, step=step)
-
         return metrics
 
     def plot(self):
@@ -213,6 +215,7 @@ class TopTaggingExperiment(BaseExperiment):
     # overwrite _validate method to compute metrics over the full validation set
     def _validate(self, step):
         metrics = self._evaluate_single(self.val_loader, "val", mode="val")
+        self.val_loss.append(metrics["bce"])
         return metrics["bce"]
 
     def _batch_loss(self, batch):

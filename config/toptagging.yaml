@@ -16,7 +16,7 @@ training:
  force_xformers: false
 
 evaluation:
- batchsize: 512
+ batchsize: 128
 
 plotting:
  roc: true

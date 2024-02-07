@@ -32,6 +32,7 @@ training:
  lr_eta_min: 0
  lr_factor: 0.1
  lr_patience: 50
+ scheduler_scale: 1
 
  float16: false
  enable_flash_sdp: false

@@ -113,7 +113,7 @@ class BaseExperiment:
                 self.cfg.run_dir, "models", f"model_run{self.cfg.warm_start_idx}.pt"
             )
             try:
-                state_dict = torch.load(model_path, map_location="cpu")
+                state_dict = torch.load(model_path, map_location="cpu")["model"]
             except FileNotFoundError:
                 raise ValueError(f"Cannot load model from {model_path}")
             LOGGER.info(f"Loading model from {model_path}")
@@ -320,6 +320,18 @@ class BaseExperiment:
         LOGGER.debug(
             f"Using optimizer {self.cfg.training.optimizer} with lr={self.cfg.training.lr}"
         )
+        
+        # load existing optimizer if specified
+        if self.warm_start:
+            model_path = os.path.join(
+                self.cfg.run_dir, "models", f"model_run{self.cfg.warm_start_idx}.pt"
+            )
+            try:
+                state_dict = torch.load(model_path, map_location="cpu")["optimizer"]
+            except FileNotFoundError:
+                raise ValueError(f"Cannot load optimizer from {model_path}")
+            LOGGER.info(f"Loading optimizer from {model_path}")
+            self.optimizer.load_state_dict(state_dict)
 
     def _init_scheduler(self):
         if self.cfg.training.scheduler is None:
@@ -328,12 +340,12 @@ class BaseExperiment:
             self.scheduler = torch.optim.lr_scheduler.OneCycleLR(
                 self.optimizer,
                 self.cfg.training.lr * 10,
-                total_steps=self.cfg.training.iterations,
+                total_steps=int(self.cfg.training.iterations * self.cfg.training.scheduler_scale),
             )
         elif self.cfg.training.scheduler == "CosineAnnealingLR":
             self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
                 self.optimizer,
-                T_max=self.cfg.training.iterations,
+                T_max=int(self.cfg.training.iterations * self.cfg.training.scheduler_scale),
                 eta_min=self.cfg.training.lr_eta_min,
             )
         elif self.cfg.training.scheduler == "ReduceLROnPlateau":
@@ -348,6 +360,18 @@ class BaseExperiment:
             )
 
         LOGGER.debug(f"Using learning rate scheduler {self.cfg.training.scheduler}")
+
+        # load existing scheduler if specified
+        if self.warm_start and self.scheduler is not None:
+            model_path = os.path.join(
+                self.cfg.run_dir, "models", f"model_run{self.cfg.warm_start_idx}.pt"
+            )
+            try:
+                state_dict = torch.load(model_path, map_location="cpu")["scheduler"]
+            except FileNotFoundError:
+                raise ValueError(f"Cannot load scheduler from {model_path}")
+            LOGGER.info(f"Loading scheduler from {model_path}")
+            self.scheduler.load_state_dict(state_dict)
 
     def train(self):
 
@@ -376,15 +400,13 @@ class BaseExperiment:
 
         iterator = iter(cycle(self.train_loader))
         for step in range(self.cfg.training.iterations):
-
             # training
             self.model.train()
             data = next(iterator)
             self._step(data, step)
 
             # validation (and early stopping)
-            if (step - 1) % self.cfg.training.validate_every_n_steps == 0:
-
+            if (step + 1) % self.cfg.training.validate_every_n_steps == 0:
                 val_loss = self._validate(step)
                 if val_loss < smallest_val_loss:
                     smallest_val_loss = val_loss
@@ -435,7 +457,7 @@ class BaseExperiment:
                 f"model_run{self.cfg.run_idx}_it{smallest_val_loss_step}.pt",
             )
             try:
-                state_dict = torch.load(model_path, map_location=self.device)
+                state_dict = torch.load(model_path, map_location=self.device)["model"]
                 LOGGER.info(f"Loading model from {model_path}")
                 self.model.load_state_dict(state_dict)
             except FileNotFoundError:
@@ -530,7 +552,10 @@ class BaseExperiment:
             filename = f"model_run{self.cfg.run_idx}.pt"
         model_path = os.path.join(self.cfg.run_dir, "models", filename)
         LOGGER.debug(f"Saving model at {model_path}")
-        torch.save(self.model.state_dict(), model_path)
+        torch.save({"model": self.model.state_dict(),
+                    "optimizer": self.optimizer.state_dict(),
+                    "scheduler": self.scheduler.state_dict() if self.scheduler is not None else None},
+                   model_path)
 
     def init_physics(self):
         raise NotImplementedError()
