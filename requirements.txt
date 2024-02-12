@@ -1,11 +1,11 @@
 ## Code quality
 pytest==7.0.1
-black=22.3.0
+black==22.3.0
 
 ## Standard science stack
 h5py
 matplotlib
-numpy==1.23
+numpy
 scipy
 
 ## Standard utils
@@ -14,7 +14,8 @@ tqdm
 ## Deep learning
 einops
 git+https://github.com/dgasmith/opt_einsum.git@1a984b7b75f3e532e7129f6aa13f7ddc3da66e10 # Un-released latest master (pinned for repro); the latest released version 3.3.0 has bugs in shape-based contraction path computations (used for einsum)
-torch==2.0.1
+torch==2.2.0
+torch_geometric==2.4.0
 
 ## Experiment management
 hydra-core
@@ -23,4 +24,5 @@ optuna
 
 ## Project-specific: general
 clifford==1.4.0
-xformers==0.0.20
+numba==0.58.1 # otherwise has conflicts
+xformers==0.0.24

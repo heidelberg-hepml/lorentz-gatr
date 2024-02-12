@@ -121,13 +121,19 @@ def scaled_dot_product_attention(
         of shape [batch, head, item, d]
     """
     if FORCE_XFORMERS or isinstance(attn_mask, AttentionBias):
+        if key.shape[1] != query.shape[1]:  # required to make multi_query work
+            key = key.expand(key.shape[0], query.shape[1], *key.shape[2:])
+            value = value.expand(value.shape[0], query.shape[1], *value.shape[2:])
         query = query.transpose(
             1, 2
         )  # [batch, head, item, d] -> [batch, item, head, d]
         key = key.transpose(1, 2)
         value = value.transpose(1, 2)
         out = memory_efficient_attention(
-            query.contiguous(), key.contiguous(), value, attn_bias=attn_mask
+            query.contiguous(),
+            key.contiguous(),
+            value,
+            attn_bias=attn_mask,
         )
         out = out.transpose(1, 2)  # [batch, item, head, d] -> [batch, head, item, d]
         return out

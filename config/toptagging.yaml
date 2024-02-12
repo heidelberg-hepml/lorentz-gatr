@@ -1,0 +1,35 @@
+exp_type: toptagging
+exp_name: topt_local_debug
+base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
+
+data:
+ data_dir : /media/jspinner/shared/Studium/project3/data
+ dataset: mini
+ add_pairs: false
+
+train: true
+training:
+ iterations: 10
+ batchsize: 128
+ lr: 1e-3
+
+ force_xformers: false
+
+evaluation:
+ batchsize: 128
+
+plotting:
+ roc: true
+ loss: true
+ score: true
+
+sweep: # only used for sweeps
+ seed: null
+ trials: 10
+ optuna_db: '${base_dir}/runs/${exp_name}/optuna/optuna.db'
+
+defaults:
+ - model: gatr_toptagging
+ - default
+ - hydra
+ - _self_
