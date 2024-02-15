@@ -34,7 +34,13 @@ DATASET_TITLE_DICT = {
     "zgggg": r"$q\bar q\to Zgggg$",
     "zggggg": r"$q\bar q \to Zggggg$",
 }
-MODEL_TITLE_DICT = {"GATr": "GATr", "Transformer": "Tr", "MLP": "MLP", "GAP": "GAP", "DSMLP": "DSMLP"}
+MODEL_TITLE_DICT = {
+    "GATr": "GATr",
+    "Transformer": "Tr",
+    "MLP": "MLP",
+    "GAP": "GAP",
+    "DSMLP": "DSMLP",
+}
 BASELINE_MODELS = ["MLP", "Transformer"]
 VB_MODELS = ["DSMLP"]
 
@@ -51,7 +57,9 @@ class AmplitudeExperiment(BaseExperiment):
             else:
                 self.type_token.append(list(range(len(TYPE_TOKEN_DICT[dataset]))))
 
-        token_size = max([max([max(token) for token in self.type_token]) + 1, self.n_datasets])
+        token_size = max(
+            [max([max(token) for token in self.type_token]) + 1, self.n_datasets]
+        )
         OmegaConf.set_struct(self.cfg, True)
         modelname = self.cfg.model.net._target_.rsplit(".", 1)[-1]
         if modelname in ["GAP", "MLP", "DSMLP"]:
@@ -77,9 +85,18 @@ class AmplitudeExperiment(BaseExperiment):
                     TYPE_TOKEN_DICT[self.cfg.data.dataset[0]]
                 )
             elif modelname == "DSMLP":
-                self.cfg.model.net.in_shape = 4 * len(TYPE_TOKEN_DICT[self.cfg.data.dataset[0]]) + (len(TYPE_TOKEN_DICT[self.cfg.data.dataset[0]])-1)*(len(TYPE_TOKEN_DICT[self.cfg.data.dataset[0]])) // 2
-                self.cfg.model.net.num_particles_boson = TYPE_TOKEN_DICT[self.cfg.data.dataset[0]][2:].count(1)
-                self.cfg.model.net.num_particles_glu = TYPE_TOKEN_DICT[self.cfg.data.dataset[0]][2:].count(0) + TYPE_TOKEN_DICT[self.cfg.data.dataset[0]][2:].count(2)
+                self.cfg.model.net.in_shape = (
+                    4 * len(TYPE_TOKEN_DICT[self.cfg.data.dataset[0]])
+                    + (len(TYPE_TOKEN_DICT[self.cfg.data.dataset[0]]) - 1)
+                    * (len(TYPE_TOKEN_DICT[self.cfg.data.dataset[0]]))
+                    // 2
+                )
+                self.cfg.model.net.num_particles_boson = TYPE_TOKEN_DICT[
+                    self.cfg.data.dataset[0]
+                ][2:].count(1)
+                self.cfg.model.net.num_particles_glu = TYPE_TOKEN_DICT[
+                    self.cfg.data.dataset[0]
+                ][2:].count(0) + TYPE_TOKEN_DICT[self.cfg.data.dataset[0]][2:].count(2)
             else:
                 raise ValueError(f"model {modelname} not implemented")
 
