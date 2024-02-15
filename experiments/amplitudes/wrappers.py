@@ -9,6 +9,7 @@ from gatr.interface import embed_vector, extract_scalar
 from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity
 from experiments.amplitudes.preprocessing import preprocess_particles
 
+
 def encode_tokens(type_token, global_token, token_size, isgatr, batchsize, device):
     """Compute embedded type_token and global_token to be used within Transformers
 
@@ -32,10 +33,8 @@ def encode_tokens(type_token, global_token, token_size, isgatr, batchsize, devic
     """
 
     type_token_raw = torch.tensor(type_token, device=device)
- 
-    type_token = nn.functional.one_hot(
-        type_token_raw, num_classes=token_size
-    )
+
+    type_token = nn.functional.one_hot(type_token_raw, num_classes=token_size)
     type_token = type_token.unsqueeze(0).expand(batchsize, *type_token.shape).float()
 
     global_token = torch.tensor(global_token, device=device)
@@ -64,8 +63,8 @@ class AmplitudeMLPWrapper(nn.Module):
         out = self.net(inputs)
         return out
 
-class AmplitudeDSMLPWrapper(nn.Module):
 
+class AmplitudeDSMLPWrapper(nn.Module):
     def __init__(self, net):
         super().__init__()
         self.net = net
@@ -75,6 +74,7 @@ class AmplitudeDSMLPWrapper(nn.Module):
         batchsize, num_components = inputs.shape
         out = self.net(inputs)
         return out
+
 
 class AmplitudeTransformerWrapper(nn.Module):
     def __init__(self, net, token_size):
@@ -138,6 +138,7 @@ class AmplitudeGAPWrapper(nn.Module):
 
         return outputs
 
+
 class AmplitudeGATrWrapper(nn.Module):
     def __init__(self, net, token_size, reinsert_type_token=False):
         super().__init__()
@@ -161,7 +162,7 @@ class AmplitudeGATrWrapper(nn.Module):
         # encode momenta in multivectors
         multivector = embed_vector(inputs)
         multivector = multivector.unsqueeze(2)
-        
+
         type_token, global_token = encode_tokens(
             type_token,
             global_token,

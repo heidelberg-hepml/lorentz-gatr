@@ -8,6 +8,7 @@ from experiments.base_experiment import BaseExperiment
 from experiments.amplitudes.dataset import AmplitudeDataset
 from experiments.amplitudes.preprocessing import (
     preprocess_particles,
+    preprocess_particles_w_invariants,
     preprocess_amplitude,
     undo_preprocess_amplitude,
 )
@@ -18,19 +19,24 @@ from experiments.mlflow import log_mlflow
 TYPE_TOKEN_DICT = {
     "aag": [0, 0, 1, 1, 0],
     "aagg": [0, 0, 1, 1, 0, 0],
+    "zg": [0, 0, 1, 2],
     "zgg": [0, 0, 1, 2, 2],
     "zggg": [0, 0, 1, 2, 2, 2],
     "zgggg": [0, 0, 1, 2, 2, 2, 2],
+    "zggggg": [0, 0, 1, 2, 2, 2, 2, 2],
 }
 DATASET_TITLE_DICT = {
     "aag": r"$gg\to\gamma\gamma g$",
     "aagg": r"$gg\to\gamma\gamma gg$",
+    "zg": r"$q\bar q\to Zg$",
     "zgg": r"$q\bar q\to Zgg$",
     "zggg": r"$q\bar q\to Zggg$",
     "zgggg": r"$q\bar q\to Zgggg$",
+    "zggggg": r"$q\bar q \to Zggggg$",
 }
-MODEL_TITLE_DICT = {"GATr": "GATr", "Transformer": "Tr", "MLP": "MLP", "GAP": "GAP"}
+MODEL_TITLE_DICT = {"GATr": "GATr", "Transformer": "Tr", "MLP": "MLP", "GAP": "GAP", "DSMLP": "DSMLP"}
 BASELINE_MODELS = ["MLP", "Transformer"]
+VB_MODELS = ["DSMLP"]
 
 
 class AmplitudeExperiment(BaseExperiment):
@@ -45,10 +51,10 @@ class AmplitudeExperiment(BaseExperiment):
             else:
                 self.type_token.append(list(range(len(TYPE_TOKEN_DICT[dataset]))))
 
-        n_type_tokens = max([max(token) for token in self.type_token]) + 1
+        token_size = max([max([max(token) for token in self.type_token]) + 1, self.n_datasets])
         OmegaConf.set_struct(self.cfg, True)
         modelname = self.cfg.model.net._target_.rsplit(".", 1)[-1]
-        if modelname in ["GAP", "MLP"]:
+        if modelname in ["GAP", "MLP", "DSMLP"]:
             assert len(self.cfg.data.dataset) == 1, (
                 f"Architecture {modelname} can not handle several datasets "
                 f"as specified in {self.cfg.data.dataset}"
@@ -57,9 +63,11 @@ class AmplitudeExperiment(BaseExperiment):
         with open_dict(self.cfg):
             # specify shape for type_token and MLPs
             if modelname == "GATr":
-                self.cfg.model.net.in_s_channels = n_type_tokens
+                self.cfg.model.net.in_s_channels = token_size
+                self.cfg.model.token_size = token_size
             elif modelname == "Transformer":
-                self.cfg.model.net.in_channels = 4 + n_type_tokens
+                self.cfg.model.net.in_channels = 4 + token_size
+                self.cfg.model.token_size = token_size
             elif modelname == "GAP":
                 self.cfg.model.net.in_mv_channels = len(
                     TYPE_TOKEN_DICT[self.cfg.data.dataset[0]]
@@ -68,6 +76,10 @@ class AmplitudeExperiment(BaseExperiment):
                 self.cfg.model.net.in_shape = 4 * len(
                     TYPE_TOKEN_DICT[self.cfg.data.dataset[0]]
                 )
+            elif modelname == "DSMLP":
+                self.cfg.model.net.in_shape = 4 * len(TYPE_TOKEN_DICT[self.cfg.data.dataset[0]]) + (len(TYPE_TOKEN_DICT[self.cfg.data.dataset[0]])-1)*(len(TYPE_TOKEN_DICT[self.cfg.data.dataset[0]])) // 2
+                self.cfg.model.net.num_particles_boson = TYPE_TOKEN_DICT[self.cfg.data.dataset[0]][2:].count(1)
+                self.cfg.model.net.num_particles_glu = TYPE_TOKEN_DICT[self.cfg.data.dataset[0]][2:].count(0) + TYPE_TOKEN_DICT[self.cfg.data.dataset[0]][2:].count(2)
             else:
                 raise ValueError(f"model {modelname} not implemented")
 
@@ -77,7 +89,7 @@ class AmplitudeExperiment(BaseExperiment):
 
             # extra outputs for heteroscedastic loss
             if self.cfg.heteroscedastic:
-                if modelname == "MLP":
+                if modelname in ["MLP", "DSMLP"]:
                     self.cfg.model.net.out_shape = 2
                 elif modelname == "Transformer":
                     self.cfg.model.net.out_channels = 2
@@ -125,6 +137,8 @@ class AmplitudeExperiment(BaseExperiment):
                 particles_prepd, _, _ = preprocess_particles(particles)
             else:
                 particles_prepd = particles / particles.std()
+            if type(self.model.net).__name__ in VB_MODELS:
+                particles_prepd = preprocess_particles_w_invariants(particles)
 
             # collect everything
             self.particles.append(particles)
@@ -360,6 +374,8 @@ class AmplitudeExperiment(BaseExperiment):
             def heteroscedastic_loss(y_true, pred):
                 # extract log(sigma^2) instead of just sigma to improve numerical stability
                 y_pred, logsigma2 = pred[..., [0]], pred[..., [1]]
+
+                logsigma2 = torch.clamp(logsigma2, min=-16)
 
                 # drop constant term log(2 pi)/2 because it does not affect optimization
                 expression = (y_pred - y_true) ** 2 / (
