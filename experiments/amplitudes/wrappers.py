@@ -9,8 +9,7 @@ from gatr.interface import embed_vector, extract_scalar
 from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity
 from experiments.amplitudes.preprocessing import preprocess_particles
 
-
-def encode_tokens(type_token, global_token, isgatr, batchsize, device):
+def encode_tokens(type_token, global_token, token_size, isgatr, batchsize, device):
     """Compute embedded type_token and global_token to be used within Transformers
 
     Parameters
@@ -33,15 +32,17 @@ def encode_tokens(type_token, global_token, isgatr, batchsize, device):
     """
 
     type_token_raw = torch.tensor(type_token, device=device)
+ 
     type_token = nn.functional.one_hot(
-        type_token_raw, num_classes=type_token_raw.max() + 1
+        type_token_raw, num_classes=token_size
     )
     type_token = type_token.unsqueeze(0).expand(batchsize, *type_token.shape).float()
 
     global_token = torch.tensor(global_token, device=device)
     global_token = nn.functional.one_hot(
-        global_token, num_classes=type_token_raw.max() + 1 + (0 if isgatr else 4)
+        global_token, num_classes=token_size + (0 if isgatr else 4)
     )
+
     global_token = (
         global_token.unsqueeze(0)
         .expand(batchsize, *global_token.shape)
@@ -63,11 +64,23 @@ class AmplitudeMLPWrapper(nn.Module):
         out = self.net(inputs)
         return out
 
+class AmplitudeDSMLPWrapper(nn.Module):
 
-class AmplitudeTransformerWrapper(nn.Module):
     def __init__(self, net):
         super().__init__()
         self.net = net
+
+    def forward(self, inputs, type_token, global_token):
+        # ignore type_token (architecture is not permutation invariant)
+        batchsize, num_components = inputs.shape
+        out = self.net(inputs)
+        return out
+
+class AmplitudeTransformerWrapper(nn.Module):
+    def __init__(self, net, token_size):
+        super().__init__()
+        self.net = net
+        self.token_size = token_size
 
     def forward(self, inputs, type_token, global_token):
         batchsize, _, _ = inputs.shape
@@ -75,6 +88,7 @@ class AmplitudeTransformerWrapper(nn.Module):
         type_token, global_token = encode_tokens(
             type_token,
             global_token,
+            self.token_size,
             isgatr=False,
             batchsize=batchsize,
             device=inputs.device,
@@ -124,12 +138,12 @@ class AmplitudeGAPWrapper(nn.Module):
 
         return outputs
 
-
 class AmplitudeGATrWrapper(nn.Module):
-    def __init__(self, net, reinsert_type_token=False):
+    def __init__(self, net, token_size, reinsert_type_token=False):
         super().__init__()
         self.net = net
         # reinsert_type_token is processed in the experiment class
+        self.token_size = token_size
 
     def forward(self, inputs: torch.Tensor, type_token, global_token):
         batchsize, _, _ = inputs.shape
@@ -147,10 +161,11 @@ class AmplitudeGATrWrapper(nn.Module):
         # encode momenta in multivectors
         multivector = embed_vector(inputs)
         multivector = multivector.unsqueeze(2)
-
+        
         type_token, global_token = encode_tokens(
             type_token,
             global_token,
+            self.token_size,
             isgatr=True,
             batchsize=batchsize,
             device=inputs.device,
