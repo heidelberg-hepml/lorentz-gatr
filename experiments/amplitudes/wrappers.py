@@ -64,7 +64,7 @@ class AmplitudeMLPWrapper(nn.Module):
         return out
 
 
-class AmplitudeDSMLPWrapper(nn.Module):
+class AmplitudeDSIWrapper(nn.Module):
     def __init__(self, net):
         super().__init__()
         self.net = net

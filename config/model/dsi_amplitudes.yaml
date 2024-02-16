@@ -1,7 +1,7 @@
-_target_: experiments.amplitudes.wrappers.AmplitudeDSMLPWrapper
+_target_: experiments.amplitudes.wrappers.AmplitudeDSIWrapper
 
 net:
-  _target_: experiments.baselines.ds_mlp.DSMLP
+  _target_: experiments.baselines.dsi.DSI
 
   in_shape: 20
   out_shape: 1

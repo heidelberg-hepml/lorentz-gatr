@@ -30,15 +30,11 @@ def preprocess_particles_w_invariants(particles_raw, mean=None, std=None, eps_st
                 (p_single_array, inner_p(p_grouped[i], p_grouped[j])[:, None]), axis=1
             )
 
-    p_single_array_prepd = np.ones(p_single_array.shape)
-    for i in range(p_single_array.shape[1]):
-        p_single_array_prepd[:, i] = (
-            p_single_array[:, i] - p_single_array[:, i].mean()
-        ) / p_single_array[:, i].std()
+    mean = p_single_array.mean((0))
+    std = p_single_array.std((0))
+    std = np.clip(std, a_min=eps_std, a_max=None)
 
-    p_single_array_prepd[:, 1] = p_single_array_prepd[:, 2] = p_single_array_prepd[
-        :, 5
-    ] = p_single_array_prepd[:, 6] = np.zeros(p_single_array.shape[0])
+    p_single_array_prepd = (p_single_array - mean) / std
 
     return p_single_array_prepd
 

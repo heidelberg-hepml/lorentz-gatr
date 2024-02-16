@@ -39,10 +39,10 @@ MODEL_TITLE_DICT = {
     "Transformer": "Tr",
     "MLP": "MLP",
     "GAP": "GAP",
-    "DSMLP": "DSMLP",
+    "DSI": "DSI",
 }
 BASELINE_MODELS = ["MLP", "Transformer"]
-VB_MODELS = ["DSMLP"]
+VB_MODELS = ["DSI"]
 
 
 class AmplitudeExperiment(BaseExperiment):
@@ -62,7 +62,7 @@ class AmplitudeExperiment(BaseExperiment):
         )
         OmegaConf.set_struct(self.cfg, True)
         modelname = self.cfg.model.net._target_.rsplit(".", 1)[-1]
-        if modelname in ["GAP", "MLP", "DSMLP"]:
+        if modelname in ["GAP", "MLP", "DSI"]:
             assert len(self.cfg.data.dataset) == 1, (
                 f"Architecture {modelname} can not handle several datasets "
                 f"as specified in {self.cfg.data.dataset}"
@@ -84,7 +84,7 @@ class AmplitudeExperiment(BaseExperiment):
                 self.cfg.model.net.in_shape = 4 * len(
                     TYPE_TOKEN_DICT[self.cfg.data.dataset[0]]
                 )
-            elif modelname == "DSMLP":
+            elif modelname == "DSI":
                 self.cfg.model.net.in_shape = (
                     4 * len(TYPE_TOKEN_DICT[self.cfg.data.dataset[0]])
                     + (len(TYPE_TOKEN_DICT[self.cfg.data.dataset[0]]) - 1)
@@ -106,7 +106,7 @@ class AmplitudeExperiment(BaseExperiment):
 
             # extra outputs for heteroscedastic loss
             if self.cfg.heteroscedastic:
-                if modelname in ["MLP", "DSMLP"]:
+                if modelname in ["MLP", "DSI"]:
                     self.cfg.model.net.out_shape = 2
                 elif modelname == "Transformer":
                     self.cfg.model.net.out_channels = 2
@@ -152,10 +152,10 @@ class AmplitudeExperiment(BaseExperiment):
             amplitudes_prepd, prepd_mean, prepd_std = preprocess_amplitude(amplitudes)
             if type(self.model.net).__name__ in BASELINE_MODELS:
                 particles_prepd, _, _ = preprocess_particles(particles)
+            elif type(self.model.net).__name__ in VB_MODELS:
+                particles_prepd = preprocess_particles_w_invariants(particles)
             else:
                 particles_prepd = particles / particles.std()
-            if type(self.model.net).__name__ in VB_MODELS:
-                particles_prepd = preprocess_particles_w_invariants(particles)
 
             # collect everything
             self.particles.append(particles)
