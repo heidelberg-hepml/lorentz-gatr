@@ -122,7 +122,7 @@ def squared_norm(x: torch.Tensor) -> torch.Tensor:
     return inner_product(x, x)
 
 
-def pin_invariants(x: torch.Tensor) -> torch.Tensor:
+def pin_invariants(x: torch.Tensor, epsilon: float = 0.01) -> torch.Tensor:
     """Computes five invariants from multivectors: scalar component, norms of the four other grades.
 
     NOTE: this primitive is not used widely in our architectures.
@@ -131,6 +131,9 @@ def pin_invariants(x: torch.Tensor) -> torch.Tensor:
     ----------
     x : torch.Tensor with shape (..., 16)
         Input multivector.
+    epsilon : float
+              Epsilon parameter that regularizes the norm in case it is lower or equal to zero to avoid infinite gradients.
+
 
     Returns
     -------
@@ -143,7 +146,7 @@ def pin_invariants(x: torch.Tensor) -> torch.Tensor:
 
     # Compute norms
     squared_norms = inner_product(projections, projections)[..., 0]  # (..., 5)
-    norms = torch.sqrt(torch.clamp(squared_norms, 0.0))
+    norms = torch.sqrt(torch.clamp(squared_norms, epsilon))
 
     # Outputs: scalar component of input and norms of four other grades
     return torch.cat((x[..., [0]], norms[..., 1:]), dim=-1)  # (..., 5)

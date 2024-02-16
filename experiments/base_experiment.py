@@ -392,6 +392,7 @@ class BaseExperiment:
         LOGGER.info(
             f"Starting to train for {self.cfg.training.iterations} iterations "
             f"= {self.cfg.training.iterations / len(self.train_loader):.1f} epochs "
+            f"on a dataset with {len(self.train_loader)} samples "
             f"using early stopping with patience {self.cfg.training.es_patience} "
             f"while validating every {self.cfg.training.validate_every_n_steps} iterations"
         )
@@ -404,6 +405,7 @@ class BaseExperiment:
 
         iterator = iter(cycle(self.train_loader))
         for step in range(self.cfg.training.iterations):
+
             # training
             self.model.train()
             data = next(iterator)
