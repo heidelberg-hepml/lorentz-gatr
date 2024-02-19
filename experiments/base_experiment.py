@@ -339,7 +339,8 @@ class BaseExperiment:
         elif self.cfg.training.scheduler == "OneCycleLR":
             self.scheduler = torch.optim.lr_scheduler.OneCycleLR(
                 self.optimizer,
-                self.cfg.training.lr * 10,
+                max_lr=self.cfg.training.lr * self.cfg.training.onecycle_max_lr,
+                pct_start=self.cfg.training.onecycle_pct_start,
                 total_steps=int(
                     self.cfg.training.iterations * self.cfg.training.scheduler_scale
                 ),
@@ -350,13 +351,13 @@ class BaseExperiment:
                 T_max=int(
                     self.cfg.training.iterations * self.cfg.training.scheduler_scale
                 ),
-                eta_min=self.cfg.training.lr_eta_min,
+                eta_min=self.cfg.training.cosanneal_eta_min,
             )
         elif self.cfg.training.scheduler == "ReduceLROnPlateau":
             self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 self.optimizer,
-                factor=self.cfg.training.lr_factor,
-                patience=self.cfg.training.lr_patience,
+                factor=self.cfg.training.reduceplateau_factor,
+                patience=self.cfg.training.reduceplateau_patience,
             )
         else:
             raise ValueError(

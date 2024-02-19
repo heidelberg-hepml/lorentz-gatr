@@ -29,10 +29,12 @@ training:
  eps: 1.e-8
  
  scheduler: null
- lr_eta_min: 0
- lr_factor: 0.1
- lr_patience: 50
  scheduler_scale: 1
+ cosanneal_eta_min: 0
+ reduceplateau_factor: 0.1
+ reduceplateau_patience: 50
+ onecycle_max_lr: 10
+ onecycle_pct_start: 0.3
 
  float16: false
  enable_flash_sdp: false
