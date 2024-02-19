@@ -190,7 +190,7 @@ class TopTaggingExperiment(BaseExperiment):
         title = model_title
         LOGGER.info(f"Creating plots in {plot_path}")
 
-        if self.cfg.evaluate:
+        if self.cfg.evaluate and self.cfg.evaluation.save_roc:
             file = f"{plot_path}/roc.txt"
             roc = np.stack(
                 (self.results["test"]["fpr"], self.results["test"]["tpr"]), axis=-1
