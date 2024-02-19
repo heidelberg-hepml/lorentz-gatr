@@ -28,8 +28,6 @@ class SelfAttentionConfig:
         Whether additional scalar features for the keys and queries will be provided.
     normalizer : str
         Normalizer function to use in sdp_dist attention
-    normalizer_eps : float
-        Small umerical constant for stability in the normalizer in sdp_dist attention
     multi_query: bool
         Whether to do multi-query attention
     attention_type : {"scalar", "geometric", "sdp_dist"}
@@ -55,7 +53,6 @@ class SelfAttentionConfig:
     num_heads: int = 8
     additional_qk_mv_channels: int = 0
     additional_qk_s_channels: int = 0
-    normalizer_eps: Optional[float] = 1e-3
     pos_encoding: bool = False
     pos_enc_base: int = 4096
     output_init: str = "default"
