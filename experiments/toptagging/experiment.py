@@ -213,7 +213,7 @@ class TopTaggingExperiment(BaseExperiment):
 
     # overwrite _validate method to compute metrics over the full validation set
     def _validate(self, step):
-        metrics = self._evaluate_single(self.val_loader, "val", mode="val")
+        metrics = self._evaluate_single(self.val_loader, "val", mode="val", step=step)
         self.val_loss.append(metrics["bce"])
         return metrics["bce"]
 
