@@ -9,6 +9,7 @@ warm_start_idx: null
 save: true
 use_mlflow: true
 save_source: true
+ema: false
 
 train: true
 training:
@@ -35,6 +36,8 @@ training:
  reduceplateau_patience: 50
  onecycle_max_lr: 10
  onecycle_pct_start: 0.3
+
+ ema_decay: 0.99
 
  float16: false
  enable_flash_sdp: false

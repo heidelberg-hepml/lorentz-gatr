@@ -9,6 +9,7 @@ from omegaconf import OmegaConf, open_dict, errors
 from hydra.core.config_store import ConfigStore
 from hydra.utils import instantiate
 import mlflow
+from torch_ema import ExponentialMovingAverage
 
 import gatr.primitives.attention
 from experiments.misc import get_device, flatten_dict
@@ -107,6 +108,13 @@ class BaseExperiment:
             f"Instantiated model {type(self.model.net).__name__} with {num_parameters} learnable parameters"
         )
 
+        if self.cfg.ema:
+            LOGGER.info(f"Using EMA for validation and eval")
+            self.ema = ExponentialMovingAverage(self.model.parameters(), decay=self.cfg.training.ema_decay)
+        else:
+            LOGGER.info(f"Not using EMA")
+            self.ema = None
+
         # load existing model if specified
         if self.warm_start:
             model_path = os.path.join(
@@ -119,7 +127,15 @@ class BaseExperiment:
             LOGGER.info(f"Loading model from {model_path}")
             self.model.load_state_dict(state_dict)
 
+            if self.ema is not None:
+                LOGGER.info(f"Loading EMA from {model_path}")
+                state_dict = torch.load(model_path, map_location="cpu")["ema"]
+                self.ema.load_state_dict(state_dict)
+                
+
         self.model.to(self.device, dtype=self.dtype)
+        if self.ema is not None:
+            self.ema.to(self.device)
 
     def _init(self):
         run_name = self._init_experiment()
@@ -488,6 +504,8 @@ class BaseExperiment:
             .item()
         )
         self.optimizer.step()
+        if self.ema is not None:
+            self.ema.update()
 
         if self.cfg.training.scheduler in ["OneCycleLR", "CosineAnnealingLR"]:
             self.scheduler.step()
@@ -566,6 +584,7 @@ class BaseExperiment:
                 "scheduler": self.scheduler.state_dict()
                 if self.scheduler is not None
                 else None,
+                "ema": self.ema.state_dict() if self.ema is not None else None,
             },
             model_path,
         )
