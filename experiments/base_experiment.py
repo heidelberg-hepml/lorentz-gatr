@@ -110,7 +110,9 @@ class BaseExperiment:
 
         if self.cfg.ema:
             LOGGER.info(f"Using EMA for validation and eval")
-            self.ema = ExponentialMovingAverage(self.model.parameters(), decay=self.cfg.training.ema_decay)
+            self.ema = ExponentialMovingAverage(
+                self.model.parameters(), decay=self.cfg.training.ema_decay
+            )
         else:
             LOGGER.info(f"Not using EMA")
             self.ema = None
@@ -131,7 +133,6 @@ class BaseExperiment:
                 LOGGER.info(f"Loading EMA from {model_path}")
                 state_dict = torch.load(model_path, map_location="cpu")["ema"]
                 self.ema.load_state_dict(state_dict)
-                
 
         self.model.to(self.device, dtype=self.dtype)
         if self.ema is not None:
@@ -541,7 +542,13 @@ class BaseExperiment:
         self.model.eval()
         with torch.no_grad():
             for data in self.val_loader:
-                loss, metric = self._batch_loss(data)
+                # use EMA for validation if available
+                if self.ema is not None:
+                    with self.ema.average_parameters():
+                        loss, metric = self._batch_loss(data)
+                else:
+                    loss, metric = self._batch_loss(data)
+
                 losses.append(loss.cpu().item())
                 for key, value in metric.items():
                     metrics[key].append(value)
