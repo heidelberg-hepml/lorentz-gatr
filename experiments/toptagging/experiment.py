@@ -234,7 +234,12 @@ class TopTaggingExperiment(BaseExperiment):
 
     # overwrite _validate method to compute metrics over the full validation set
     def _validate(self, step):
-        with self.ema.average_parameters():
+        if self.ema is not None:
+            with self.ema.average_parameters():
+                metrics = self._evaluate_single(
+                    self.val_loader, "val", mode="val", step=step
+                )
+        else:
             metrics = self._evaluate_single(
                 self.val_loader, "val", mode="val", step=step
             )
