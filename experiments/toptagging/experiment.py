@@ -100,13 +100,34 @@ class TopTaggingExperiment(BaseExperiment):
 
     def evaluate(self):
         self.results = {}
-        self.results["train"] = self._evaluate_single(
-            self.train_loader, "train", mode="eval"
-        )
-        self.results["val"] = self._evaluate_single(self.val_loader, "val", mode="eval")
-        self.results["test"] = self._evaluate_single(
-            self.test_loader, "test", mode="eval"
-        )
+
+        # this is a bit ugly, but it does the job
+        if self.ema is not None:
+            with self.ema.average_parameters():
+                self.results["train"] = self._evaluate_single(
+                    self.train_loader, "train", mode="eval"
+                )
+                self.results["val"] = self._evaluate_single(
+                    self.val_loader, "val", mode="eval"
+                )
+                self.results["test"] = self._evaluate_single(
+                    self.test_loader, "test", mode="eval"
+                )
+
+            self._evaluate_single(self.train_loader, "train_noema", mode="eval")
+            self._evaluate_single(self.val_loader, "val_noema", mode="eval")
+            self._evaluate_single(self.test_loader, "test_noema", mode="eval")
+
+        else:
+            self.results["train"] = self._evaluate_single(
+                self.train_loader, "train", mode="eval"
+            )
+            self.results["val"] = self._evaluate_single(
+                self.val_loader, "val", mode="eval"
+            )
+            self.results["test"] = self._evaluate_single(
+                self.test_loader, "test", mode="eval"
+            )
 
     def _evaluate_single(self, loader, title, mode, step=None):
         assert mode in ["val", "eval"]
@@ -190,7 +211,7 @@ class TopTaggingExperiment(BaseExperiment):
         title = model_title
         LOGGER.info(f"Creating plots in {plot_path}")
 
-        if self.cfg.evaluate:
+        if self.cfg.evaluate and self.cfg.evaluation.save_roc:
             file = f"{plot_path}/roc.txt"
             roc = np.stack(
                 (self.results["test"]["fpr"], self.results["test"]["tpr"]), axis=-1
@@ -213,7 +234,15 @@ class TopTaggingExperiment(BaseExperiment):
 
     # overwrite _validate method to compute metrics over the full validation set
     def _validate(self, step):
-        metrics = self._evaluate_single(self.val_loader, "val", mode="val")
+        if self.ema is not None:
+            with self.ema.average_parameters():
+                metrics = self._evaluate_single(
+                    self.val_loader, "val", mode="val", step=step
+                )
+        else:
+            metrics = self._evaluate_single(
+                self.val_loader, "val", mode="val", step=step
+            )
         self.val_loss.append(metrics["bce"])
         return metrics["bce"]
 

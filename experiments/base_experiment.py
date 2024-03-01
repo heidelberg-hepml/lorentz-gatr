@@ -9,6 +9,7 @@ from omegaconf import OmegaConf, open_dict, errors
 from hydra.core.config_store import ConfigStore
 from hydra.utils import instantiate
 import mlflow
+from torch_ema import ExponentialMovingAverage
 
 import gatr.primitives.attention
 from experiments.misc import get_device, flatten_dict
@@ -107,6 +108,15 @@ class BaseExperiment:
             f"Instantiated model {type(self.model.net).__name__} with {num_parameters} learnable parameters"
         )
 
+        if self.cfg.ema:
+            LOGGER.info(f"Using EMA for validation and eval")
+            self.ema = ExponentialMovingAverage(
+                self.model.parameters(), decay=self.cfg.training.ema_decay
+            )
+        else:
+            LOGGER.info(f"Not using EMA")
+            self.ema = None
+
         # load existing model if specified
         if self.warm_start:
             model_path = os.path.join(
@@ -119,7 +129,14 @@ class BaseExperiment:
             LOGGER.info(f"Loading model from {model_path}")
             self.model.load_state_dict(state_dict)
 
+            if self.ema is not None:
+                LOGGER.info(f"Loading EMA from {model_path}")
+                state_dict = torch.load(model_path, map_location="cpu")["ema"]
+                self.ema.load_state_dict(state_dict)
+
         self.model.to(self.device, dtype=self.dtype)
+        if self.ema is not None:
+            self.ema.to(self.device)
 
     def _init(self):
         run_name = self._init_experiment()
@@ -339,7 +356,8 @@ class BaseExperiment:
         elif self.cfg.training.scheduler == "OneCycleLR":
             self.scheduler = torch.optim.lr_scheduler.OneCycleLR(
                 self.optimizer,
-                self.cfg.training.lr * 10,
+                max_lr=self.cfg.training.lr * self.cfg.training.onecycle_max_lr,
+                pct_start=self.cfg.training.onecycle_pct_start,
                 total_steps=int(
                     self.cfg.training.iterations * self.cfg.training.scheduler_scale
                 ),
@@ -350,13 +368,13 @@ class BaseExperiment:
                 T_max=int(
                     self.cfg.training.iterations * self.cfg.training.scheduler_scale
                 ),
-                eta_min=self.cfg.training.lr_eta_min,
+                eta_min=self.cfg.training.cosanneal_eta_min,
             )
         elif self.cfg.training.scheduler == "ReduceLROnPlateau":
             self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 self.optimizer,
-                factor=self.cfg.training.lr_factor,
-                patience=self.cfg.training.lr_patience,
+                factor=self.cfg.training.reduceplateau_factor,
+                patience=self.cfg.training.reduceplateau_patience,
             )
         else:
             raise ValueError(
@@ -487,6 +505,8 @@ class BaseExperiment:
             .item()
         )
         self.optimizer.step()
+        if self.ema is not None:
+            self.ema.update()
 
         if self.cfg.training.scheduler in ["OneCycleLR", "CosineAnnealingLR"]:
             self.scheduler.step()
@@ -522,7 +542,13 @@ class BaseExperiment:
         self.model.eval()
         with torch.no_grad():
             for data in self.val_loader:
-                loss, metric = self._batch_loss(data)
+                # use EMA for validation if available
+                if self.ema is not None:
+                    with self.ema.average_parameters():
+                        loss, metric = self._batch_loss(data)
+                else:
+                    loss, metric = self._batch_loss(data)
+
                 losses.append(loss.cpu().item())
                 for key, value in metric.items():
                     metrics[key].append(value)
@@ -565,6 +591,7 @@ class BaseExperiment:
                 "scheduler": self.scheduler.state_dict()
                 if self.scheduler is not None
                 else None,
+                "ema": self.ema.state_dict() if self.ema is not None else None,
             },
             model_path,
         )

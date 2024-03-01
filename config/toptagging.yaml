@@ -17,6 +17,7 @@ training:
 
 evaluation:
  batchsize: 128
+ save_roc: false
 
 plotting:
  roc: true

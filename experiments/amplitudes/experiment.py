@@ -234,9 +234,25 @@ class AmplitudeExperiment(BaseExperiment):
 
     def evaluate(self):
         with torch.no_grad():
-            self.results_train = self._evaluate_single(self.train_loader, "train")
-            self.results_val = self._evaluate_single(self.val_loader, "val")
-            self.results_test = self._evaluate_single(self.test_loader, "test")
+
+            # this is a bit ugly, but it does the job
+            if self.ema is not None:
+                with self.ema.average_parameters():
+                    self.results_train = self._evaluate_single(
+                        self.train_loader, "train"
+                    )
+                    self.results_val = self._evaluate_single(self.val_loader, "val")
+                    self.results_test = self._evaluate_single(self.test_loader, "test")
+
+                # also evaluate without ema to see the effect
+                self._evaluate_single(self.train_loader, "train_noema")
+                self._evaluate_single(self.val_loader, "val_noema")
+                self._evaluate_single(self.test_loader, "test_noema")
+
+            else:
+                self.results_train = self._evaluate_single(self.train_loader, "train")
+                self.results_val = self._evaluate_single(self.val_loader, "val")
+                self.results_test = self._evaluate_single(self.test_loader, "test")
 
     def _evaluate_single(self, loader, title):
         # compute predictions
@@ -257,6 +273,7 @@ class AmplitudeExperiment(BaseExperiment):
                     type_token=self.type_token[idataset],
                     global_token=idataset,
                 )
+
                 y_pred = pred[..., 0]
                 if self.cfg.heteroscedastic:
                     std_prepd = torch.exp(
@@ -376,13 +393,12 @@ class AmplitudeExperiment(BaseExperiment):
 
         plot_dict = {}
         if self.cfg.evaluate:
-            plot_dict["results_test"] = (self.results_test,)
-            plot_dict["results_train"] = (self.results_train,)
+            plot_dict["results_test"] = self.results_test
+            plot_dict["results_train"] = self.results_train
         if self.cfg.train:
             plot_dict["train_loss"] = self.train_loss
             plot_dict["val_loss"] = self.val_loss
             plot_dict["train_lr"] = self.train_lr
-
         plot_mixer(self.cfg, plot_path, title, plot_dict)
 
     def _init_loss(self):
