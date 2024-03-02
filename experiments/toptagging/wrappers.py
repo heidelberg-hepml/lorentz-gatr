@@ -56,10 +56,13 @@ class TopTaggingTransformerWrapper(nn.Module):
 
 
 class TopTaggingGATrWrapper(nn.Module):
-    def __init__(self, net, beam_reference, force_xformers=True):
+    def __init__(
+        self, net, beam_reference, mean_aggregation=False, force_xformers=True
+    ):
         super().__init__()
         self.net = net
         self.beam_reference = beam_reference
+        self.mean_aggregation = mean_aggregation
         self.force_xformers = force_xformers
         assert self.beam_reference in [
             None,
@@ -109,6 +112,9 @@ class TopTaggingGATrWrapper(nn.Module):
         else:
             multivector = embed_vector(batch.x)
 
+        if self.mean_aggregation:
+            multivector = multivector[~batch.is_global]
+
         scalars = torch.zeros(
             multivector.shape[0], 1, device=batch.x.device, dtype=batch.x.dtype
         )
@@ -121,6 +127,9 @@ class TopTaggingGATrWrapper(nn.Module):
 
         # remove batch index (0) and channel index (-1)
         outputs = extract_scalar(multivector)
-        logits = outputs.squeeze([0, -1])[batch.is_global]
+        if self.mean_aggregation:
+            logits = outputs.mean(dim=[1, 2, 3])
+        else:
+            logits = outputs.squeeze([0, -1])[batch.is_global]
 
         return logits
