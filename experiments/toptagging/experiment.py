@@ -25,8 +25,8 @@ class TopTaggingExperiment(BaseExperiment):
             == "experiments.toptagging.wrappers.TopTaggingTransformerWrapper"
         ):
             assert (
-                not self.cfg.data.add_pairs
-            ), "data.add_pairs are not implemented for the default Transformer"
+                not self.cfg.data.pairs.use
+            ), "data.pairs are not implemented for the default Transformer"
             # assert not self.cfg.model.beam_reference, "model.beam_reference are not implemented for the default Transformer"
 
         if not self.cfg.training.force_xformers:
@@ -42,8 +42,10 @@ class TopTaggingExperiment(BaseExperiment):
             ):
                 if self.cfg.model.beam_reference is not None:
                     self.cfg.model.net.in_mv_channels += 1
-                if self.cfg.data.add_pairs:
+                if self.cfg.data.pairs.use:
                     self.cfg.model.net.in_mv_channels += 2
+                    if self.cfg.data.pairs.delta:
+                        self.cfg.model.net.in_mv_channels += 1
 
     def init_data(self):
         data_path = os.path.join(
@@ -54,23 +56,29 @@ class TopTaggingExperiment(BaseExperiment):
         self.data_train = TopTaggingDataset(
             data_path,
             "train",
+            keep_on_gpu=self.cfg.data.keep_on_gpu,
             data_scale=None,
-            add_pairs=self.cfg.data.add_pairs,
+            pairs=self.cfg.data.pairs,
             dtype=self.dtype,
+            device=self.device,
         )
         self.data_test = TopTaggingDataset(
             data_path,
             "test",
+            keep_on_gpu=self.cfg.data.keep_on_gpu,
             data_scale=self.data_train.data_scale,
-            add_pairs=self.cfg.data.add_pairs,
+            pairs=self.cfg.data.pairs,
             dtype=self.dtype,
+            device=self.device,
         )
         self.data_val = TopTaggingDataset(
             data_path,
             "val",
+            keep_on_gpu=self.cfg.data.keep_on_gpu,
             data_scale=self.data_train.data_scale,
-            add_pairs=self.cfg.data.add_pairs,
+            pairs=self.cfg.data.pairs,
             dtype=self.dtype,
+            device=self.device,
         )
         dt = time.time() - t0
         LOGGER.info(f"Finished creating datasets after {dt:.2f} s = {dt/60:.2f} min")
@@ -247,7 +255,6 @@ class TopTaggingExperiment(BaseExperiment):
         return metrics["bce"]
 
     def _batch_loss(self, batch):
-        batch = batch.to(self.device)
         y_pred = self.model(batch)
         loss = self.loss(y_pred, batch.label.to(self.dtype))
         assert torch.isfinite(loss).all()

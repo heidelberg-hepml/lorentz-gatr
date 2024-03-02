@@ -5,7 +5,12 @@ base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
 data:
  data_dir : /media/jspinner/shared/Studium/project3/data
  dataset: mini
- add_pairs: false
+ keep_on_gpu: false
+ pairs:
+  use: true
+  delta: true
+  directed: true
+  top_k: 100
 
 train: true
 training:
