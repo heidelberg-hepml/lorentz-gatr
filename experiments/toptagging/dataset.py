@@ -25,7 +25,14 @@ class TopTaggingDataset(torch.utils.data.Dataset):
     """
 
     def __init__(
-        self, filename, mode, pairs, keep_on_gpu, data_scale=None, dtype=torch.float, device="cpu",
+        self,
+        filename,
+        mode,
+        pairs,
+        keep_on_gpu,
+        data_scale=None,
+        dtype=torch.float,
+        device="cpu",
     ):
         """
         Parameters
@@ -102,7 +109,13 @@ class TopTaggingDataset(torch.utils.data.Dataset):
             single = torch.concatenate(
                 (
                     batch.x.reshape(n + 1, 1, 4),
-                    torch.zeros(n + 1, num_paired_channels, 4, dtype=self.dtype, device=self.device),
+                    torch.zeros(
+                        n + 1,
+                        num_paired_channels,
+                        4,
+                        dtype=self.dtype,
+                        device=self.device,
+                    ),
                 ),
                 dim=1,
             )
@@ -117,34 +130,46 @@ class TopTaggingDataset(torch.utils.data.Dataset):
             )
             if self.pairs.delta:
                 # add fourmomentum1 - fourmomentum2 as extra channel
-                delta = batch.x[1:, :].reshape(n, 1, 1, 4).expand(n, n, 1, 4) - batch.x[1:, :].reshape(1, n, 1, 4).expand(n, n, 1, 4)
+                delta = batch.x[1:, :].reshape(n, 1, 1, 4).expand(n, n, 1, 4) - batch.x[
+                    1:, :
+                ].reshape(1, n, 1, 4).expand(n, n, 1, 4)
                 pairs = torch.cat((pairs, delta.reshape(n, n, 1, 1, 4)), dim=2)
             pairs = torch.concatenate(
-                (torch.zeros(n**2, 1, 4, dtype=self.dtype, device=self.device), pairs.reshape(n**2, num_paired_channels, 4)), dim=1
+                (
+                    torch.zeros(n**2, 1, 4, dtype=self.dtype, device=self.device),
+                    pairs.reshape(n**2, num_paired_channels, 4),
+                ),
+                dim=1,
             )
             if self.pairs.directed:
                 # remove pairs with fourmomentum1 <= fourmomentum2
-                #mask = torch.tensor([idx1 < idx2 for idx1 in range(n) for idx2 in range(n)], device=self.device) # this is slow because of the loop
+                # mask = torch.tensor([idx1 < idx2 for idx1 in range(n) for idx2 in range(n)], device=self.device) # this is slow because of the loop
                 idx = torch.triu_indices(n, n, device=self.device)
                 mask = torch.ones(n, n, dtype=torch.bool, device=self.device)
                 mask[idx[0], idx[1]] = False
                 mask = mask.flatten()
-                
-                pairs = pairs[mask,...]
+
+                pairs = pairs[mask, ...]
             if self.pairs.top_k is not None:
                 # keep only the top_k pairs with highest kt-distance
-                p1, p2 = pairs[...,1,:], pairs[...,2,:]
+                p1, p2 = pairs[..., 1, :], pairs[..., 2, :]
                 kt = get_kt(p1, p2)
                 sort_idx = torch.sort(kt, descending=True)[1]
-                pairs = pairs[sort_idx,...]
+                pairs = pairs[sort_idx, ...]
                 if pairs.shape[0] >= self.pairs.top_k:
-                    pairs = pairs[:self.pairs.top_k,...]
+                    pairs = pairs[: self.pairs.top_k, ...]
 
             # combine single and pairwise tokens
             # (and update the is_global mask)
             x = torch.concatenate((single, pairs), dim=0)
             is_global = torch.concatenate(
-                (batch.is_global, torch.zeros(pairs.shape[0], 1, dtype=torch.bool, device=self.device)), dim=0
+                (
+                    batch.is_global,
+                    torch.zeros(
+                        pairs.shape[0], 1, dtype=torch.bool, device=self.device
+                    ),
+                ),
+                dim=0,
             )
 
             # return new object instead of overwriting the old one!
@@ -152,24 +177,29 @@ class TopTaggingDataset(torch.utils.data.Dataset):
         else:
             return self.data_list[idx].to(self.device)
 
+
 def _get_pt(p):
     # transverse momentum
-    return torch.sqrt(p[...,1]**2 + p[...,2]**2)
+    return torch.sqrt(p[..., 1] ** 2 + p[..., 2] ** 2)
+
 
 def _get_phi(p):
     # azimuthal angle
-    return torch.arctan2(p[...,2], p[...,1])
+    return torch.arctan2(p[..., 2], p[..., 1])
+
 
 def _get_eta(p):
     # rapidity
-    p_abs = torch.sqrt(torch.sum(p[...,1:]**2, dim=-1))
-    return torch.arctanh(p[...,3] / p_abs)
+    p_abs = torch.sqrt(torch.sum(p[..., 1:] ** 2, dim=-1))
+    return torch.arctanh(p[..., 3] / p_abs)
+
 
 def _get_deltaR(p1, p2):
     # deltaR = angular distance
     phi1, phi2 = _get_phi(p1), _get_phi(p2)
     eta1, eta2 = _get_eta(p1), _get_eta(p2)
-    return torch.sqrt( (phi1-phi2)**2 + (eta1-eta2)**2 )
+    return torch.sqrt((phi1 - phi2) ** 2 + (eta1 - eta2) ** 2)
+
 
 def get_kt(p1, p2):
     # un-normalized kt distance, corresponding to R=1
