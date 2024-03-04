@@ -1,6 +1,7 @@
 _target_: experiments.toptagging.wrappers.TopTaggingGATrWrapper
 force_xformers: '${training.force_xformers}'
 beam_reference: null
+mean_aggregation: false
 
 net:
  _target_: gatr.nets.GATr

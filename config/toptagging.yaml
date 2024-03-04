@@ -10,7 +10,7 @@ data:
   use: true
   delta: true
   directed: true
-  top_k: 100
+  top_k: 10
 
 train: true
 training:
