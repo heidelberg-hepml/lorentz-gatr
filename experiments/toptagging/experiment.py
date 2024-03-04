@@ -53,32 +53,21 @@ class TopTaggingExperiment(BaseExperiment):
         )
         LOGGER.info(f"Loading top-tagging dataset from {data_path}")
         t0 = time.time()
+        kwargs = {
+            "pairs": self.cfg.data.pairs,
+            "dtype": self.dtype,
+            "device": self.device,
+            "keep_on_gpu": self.cfg.data.keep_on_gpu,
+            "add_jet_momentum": self.cfg.data.add_jet_momentum,
+        }
         self.data_train = TopTaggingDataset(
-            data_path,
-            "train",
-            keep_on_gpu=self.cfg.data.keep_on_gpu,
-            data_scale=None,
-            pairs=self.cfg.data.pairs,
-            dtype=self.dtype,
-            device=self.device,
+            data_path, "train", data_scale=None, **kwargs
         )
         self.data_test = TopTaggingDataset(
-            data_path,
-            "test",
-            keep_on_gpu=self.cfg.data.keep_on_gpu,
-            data_scale=self.data_train.data_scale,
-            pairs=self.cfg.data.pairs,
-            dtype=self.dtype,
-            device=self.device,
+            data_path, "test", data_scale=self.data_train.data_scale, **kwargs
         )
         self.data_val = TopTaggingDataset(
-            data_path,
-            "val",
-            keep_on_gpu=self.cfg.data.keep_on_gpu,
-            data_scale=self.data_train.data_scale,
-            pairs=self.cfg.data.pairs,
-            dtype=self.dtype,
-            device=self.device,
+            data_path, "val", data_scale=self.data_train.data_scale, **kwargs
         )
         dt = time.time() - t0
         LOGGER.info(f"Finished creating datasets after {dt:.2f} s = {dt/60:.2f} min")

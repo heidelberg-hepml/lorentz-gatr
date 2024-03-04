@@ -6,6 +6,7 @@ data:
  data_dir : /media/jspinner/shared/Studium/project3/data
  dataset: mini
  keep_on_gpu: false
+ add_jet_momentum: false
  pairs:
   use: true
   delta: true

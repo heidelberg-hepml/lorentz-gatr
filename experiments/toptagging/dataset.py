@@ -30,6 +30,7 @@ class TopTaggingDataset(torch.utils.data.Dataset):
         mode,
         pairs,
         keep_on_gpu,
+        add_jet_momentum=False,
         data_scale=None,
         dtype=torch.float,
         device="cpu",
@@ -58,6 +59,7 @@ class TopTaggingDataset(torch.utils.data.Dataset):
         self.pairs = pairs
         self.dtype = dtype
         self.device = device
+        self.add_jet_momentum = add_jet_momentum
 
         data = np.load(filename)
         kinematics = data[f"kinematics_{mode}"]
@@ -83,8 +85,11 @@ class TopTaggingDataset(torch.utils.data.Dataset):
             label = labels[i, ...]
 
             # construct global token
-            global_token = torch.zeros_like(x[[0], ...], dtype=self.dtype)
-            global_token[..., 0] = 1
+            if self.add_jet_momentum:
+                global_token = x.sum(dim=0, keepdim=True)
+            else:
+                global_token = torch.zeros_like(x[[0], ...], dtype=self.dtype)
+                global_token[..., 0] = 1
             x = torch.cat((global_token, x), dim=0)
             is_global = torch.zeros(x.shape[0], 1, dtype=torch.bool)
             is_global[0, 0] = True
