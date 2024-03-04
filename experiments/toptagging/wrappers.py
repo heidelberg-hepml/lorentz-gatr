@@ -125,9 +125,13 @@ class TopTaggingGATrWrapper(nn.Module):
         # remove batch index (0) and channel index (-1)
         outputs = extract_scalar(multivector)
         if self.mean_aggregation:
-            outputs = outputs.squeeze() # remove irrelevant dimensions (batchsize=1, channels=1, mv_dimension=1)
-            batch_masks = [batch.batch == n for n in range(batch.batch.max()+1)]
-            logits = torch.cat([outputs[mask].mean(dim=0, keepdim=True) for mask in batch_masks])
+            outputs = (
+                outputs.squeeze()
+            )  # remove irrelevant dimensions (batchsize=1, channels=1, mv_dimension=1)
+            batch_masks = [batch.batch == n for n in range(batch.batch.max() + 1)]
+            logits = torch.cat(
+                [outputs[mask].mean(dim=0, keepdim=True) for mask in batch_masks]
+            )
         else:
             logits = outputs.squeeze([0, -1])[batch.is_global]
 
