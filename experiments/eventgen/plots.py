@@ -76,11 +76,11 @@ def plot_histogram(
     dup_last = lambda a: np.append(a, a[-1])
 
     fig, axs = plt.subplots(
-            3,
-            1,
-            sharex=True,
-            figsize=(6, 4),
-            gridspec_kw={"height_ratios": [3, 1, 1], "hspace": 0.00},
+        3,
+        1,
+        sharex=True,
+        figsize=(6, 4),
+        gridspec_kw={"height_ratios": [3, 1, 1], "hspace": 0.00},
     )
 
     for i, y, y_err, scale, label, color in zip(
@@ -216,25 +216,25 @@ def plot_histogram(
     axs[2].set_yticks([0.1, 1.0, 10.0])
     axs[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
     axs[2].set_yticks(
-            [
-                0.2,
-                0.3,
-                0.4,
-                0.5,
-                0.6,
-                0.7,
-                0.8,
-                0.9,
-                2.0,
-                3.0,
-                4.0,
-                5.0,
-                6.0,
-                7.0,
-                8.0,
-                9.0,
-            ],
-            minor=True,
+        [
+            0.2,
+            0.3,
+            0.4,
+            0.5,
+            0.6,
+            0.7,
+            0.8,
+            0.9,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+        ],
+        minor=True,
     )
 
     axs[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")

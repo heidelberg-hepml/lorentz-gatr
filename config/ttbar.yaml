@@ -4,24 +4,26 @@ base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
 
 data:
  n_jets: [0]
- data_path_0j: /media/jspinner/shared/Studium/project3/data/ttbar_0j_100M.npy
- data_path_1j: /media/jspinner/shared/Studium/project3/data/ttbar_1j_100M.npy
- data_path_2j: /media/jspinner/shared/Studium/project3/data/ttbar_2j_100M.npy
- data_path_3j: /media/jspinner/shared/Studium/project3/data/ttbar_3j_100M.npy
- data_path_4j: /media/jspinner/shared/Studium/project3/data/ttbar_4j_100M.npy
+ data_path_0j: /media/jspinner/shared/Studium/project3/data/ttbar_0j_200M.npy
+ data_path_1j: /media/jspinner/shared/Studium/project3/data/ttbar_1j_200M.npy
+ data_path_2j: /media/jspinner/shared/Studium/project3/data/ttbar_2j_200M.npy
+ data_path_3j: /media/jspinner/shared/Studium/project3/data/ttbar_3j_200M.npy
+ data_path_4j: /media/jspinner/shared/Studium/project3/data/ttbar_4j_200M.npy
  subsample: 100000
  train_test_val: [.4, .5, .1]
 
 training:
- batchsize: 1024
+ batchsize: 8192
 
 evaluation:
  nsamples: 10000
- batchsize: 1024
+ batchsize: 8192
 
 plot: true
 plotting:
- momenta: true
+ fourmomenta: true
+ jetmomenta: true
+ preprocessed: true
  virtual: true
  delta: true
  deta_dphi: true
