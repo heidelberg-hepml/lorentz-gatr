@@ -38,7 +38,8 @@ def gather(input):
     if isinstance(input, torch.Tensor):
         global_input = [torch.empty_like(input) for _ in range(dist.get_world_size())]
         dist.all_gather(global_input, input.contiguous())
-        return torch.cat(global_input)
+        #return torch.cat(global_input)
+        return global_input
 
     if isinstance(input, tuple):
         input = list(input)
@@ -126,7 +127,8 @@ class Accuracy(Metric):
 class Loss(Metric):
     @all_gather
     def compute(self):
-        return torch.mean(torch.cat(self.collection), dim=0)
+        #return torch.mean(torch.cat(self.collection), dim=0)
+        return torch.mean(self.collection[0][0], dim=0)
 
 
 def build_roc(labels, score, t_eff=[0.3, 0.5]):

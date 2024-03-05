@@ -30,17 +30,18 @@ def main(config):
     print(f"Using device: {device}")
 
     optimizer_config = config["optimizer"]
-    optimizer = engineer.load_module(optimizer_config.pop("module"))(
-        model.parameters(), **optimizer_config
-    )
+    #optimizer = engineer.load_module(optimizer_config.pop("module"))(
+    #    model.parameters(), **optimizer_config
+    #)
+    optimizer = torch.optim.Adam(model.parameters(), foreach=False)
     steps = config["trainer"]["max_steps"]
     scheduler = config["trainer"]["scheduler"]
-    scheduler = CosineAnnealingLR(
-        optimizer,
-        steps,
-        warmup_steps=int(1 / 64 * steps),
-        decay_steps=int(1 / 4 * steps),
-    )
+    #scheduler = CosineAnnealingLR(
+    #    optimizer,
+    #    steps,
+    #    warmup_steps=int(1 / 64 * steps),
+    #    decay_steps=int(1 / 4 * steps),
+    #)
     trainer_module = engineer.load_module(config["trainer"].pop("module"))
 
     trainer_config = config["trainer"]
@@ -49,7 +50,7 @@ def main(config):
         **trainer_config,
     )
     trainer.fit(model, optimizer, train_loader, val_loader, test_loader)
-    trainer.test(model, test_loader)
+    trainer.test_loop(model, optimizer, test_loader)
 
 
 if __name__ == "__main__":

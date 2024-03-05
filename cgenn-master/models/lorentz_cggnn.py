@@ -53,8 +53,8 @@ class CGLayer(nn.Module):
         out_features_h,
         edge_attr_x=3,
         edge_attr_h=0,
-        node_attr_x=2,
-        node_attr_h=2,
+        node_attr_x=1,
+        node_attr_h=1,
         aggregation="mean",
         use_invariants_to_update=True,
         residual=False,
@@ -275,16 +275,16 @@ class CGLayer(nn.Module):
 
 
 class LorentzCGGNN(nn.Module):
-    loss_fn = nn.CrossEntropyLoss(reduction="none")
+    loss_fn = nn.MSELoss()
 
     def __init__(
         self,
-        in_features_h: int = 2,
+        in_features_h: int = 1,
         hidden_features_h: int = 72,
         in_features_x: int = 1,
         hidden_features_x: int = 8,
         decoder_features=64,
-        n_class=2,
+        n_class=1,
         n_layers=4,
         dropout=0.2,
         use_invariants_to_update=True,
@@ -327,7 +327,7 @@ class LorentzCGGNN(nn.Module):
                     residual=residual,
                     aggregation=aggregation,
                     layer_type=layer_type,
-                    node_attr_h=2,
+                    node_attr_h=1,
                     node_attr_x=1,
                     edge_attr_x=3,
                 )
@@ -347,14 +347,14 @@ class LorentzCGGNN(nn.Module):
         self.train_metrics = MetricCollection(
             {
                 "loss": Loss(),
-                "accuracy": Accuracy(),
+                #"accuracy": Accuracy(),
             },
         )
         self.test_metrics = MetricCollection(
             {
                 "loss": Loss(),
-                "accuracy": Accuracy(),
-                "lorentz": LorentzMetric(),
+                #"accuracy": Accuracy(),
+                #"lorentz": LorentzMetric(),
             },
         )
 
@@ -415,7 +415,7 @@ class LorentzCGGNN(nn.Module):
         nodes = data["nodes"].view(batch_size * n_nodes, -1).float()
         nodes = psi(nodes)
         edges = [a for a in data["edges"]]
-        label = data["is_signal"].long()
+        label = data["is_signal"].float()
 
         i, j = edges
         relative_momentum = atom_momentum[i] - atom_momentum[j]
@@ -468,11 +468,14 @@ class LorentzCGGNN(nn.Module):
             n_nodes=n_nodes,
         )
 
-        predict = pred.max(1).indices
-        correct = (predict == label).float()
-        loss = self.loss_fn(pred, label)
-        preds = pred.softmax(dim=-1)[..., 1]
+        #predict = pred.max(1).indices
+        #correct = (predict == label).float()
+        #loss = self.loss_fn(pred, label)
+        #preds = pred.softmax(dim=-1)[..., 1]
 
+        loss = self.loss_fn(pred, label)
+
+        """
         return (
             loss.mean(),
             {
@@ -481,3 +484,6 @@ class LorentzCGGNN(nn.Module):
                 "lorentz": (preds, label),
             },
         )
+        """
+
+        return (loss, {"loss": loss})

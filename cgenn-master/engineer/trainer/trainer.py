@@ -120,7 +120,7 @@ class Trainer:
         max_time: str = None,
         limit_val_batches: int = float("inf"),
         val_check_interval: int = 1024,
-        print_interval: int = 32,
+        print_interval: int = 1000,
         fast_dev_run: bool = False,
         wandb=None,
         callbacks=list(),
@@ -191,7 +191,8 @@ class Trainer:
 
         loss, outputs = model(batch, self.global_step)
 
-        optimizer.zero_grad(set_to_none=True)
+        #optimizer.zero_grad(set_to_none=True)
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
@@ -204,7 +205,7 @@ class Trainer:
             model.train_metrics.update(**outputs)
 
         if self.global_step % self.print_interval == 0:
-            print(f"Step: {self.global_step} (Training) Loss: {loss:.4f}")
+            print(f"Step: {self.global_step} (Training) Loss: {loss}")
 
     @torch.no_grad()
     def test_loop(
@@ -356,13 +357,13 @@ class Trainer:
                     t0 = time.time()
                     last_global_step = self.global_step
 
-                    if self.should_test:
-                        if test_loader is not None:
-                            with torch.no_grad():
-                                self.test_loop(
-                                    model, optimizer, test_loader, validation=False
-                                )
-                                self.should_test = False
+                    #if self.should_test:
+                    #    if test_loader is not None:
+                    #        with torch.no_grad():
+                    #            self.test_loop(
+                    #                model, optimizer, test_loader, validation=False
+                    #            )
+                    #            self.should_test = False
 
                 self.global_step += 1
 
