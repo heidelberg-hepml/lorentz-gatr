@@ -28,9 +28,7 @@ class TopTaggingDataset(torch.utils.data.Dataset):
         self,
         filename,
         mode,
-        pairs,
-        keep_on_gpu,
-        add_jet_momentum=False,
+        cfg,
         data_scale=None,
         dtype=torch.float,
         device="cpu",
@@ -43,11 +41,9 @@ class TopTaggingDataset(torch.utils.data.Dataset):
         mode : {"train", "test", "val"}
             Purpose of the dataset
             Train, test and validation datasets are already seperated in the specified file
-        pairs : dataclass
-            Dataclass object containing options for adding pairwise tokens
-            The pairwise tokens are constructed at runtime to save memory
-        keep_on_gpu: bool
-            Whether to keep all data on gpu throughout training
+        cfg : dataclass
+            Dataclass object containing options for the format
+            in which the data is preprocessed at runtime
         data_scale : float
             std() of all entries in the train dataset
             Effectively a change of units to make the network entries O(1)
@@ -56,10 +52,9 @@ class TopTaggingDataset(torch.utils.data.Dataset):
         device: torch.device
             Device on which the dataset will be stored
         """
-        self.pairs = pairs
+        self.cfg = cfg
         self.dtype = dtype
         self.device = device
-        self.add_jet_momentum = add_jet_momentum
 
         data = np.load(filename)
         kinematics = data[f"kinematics_{mode}"]
@@ -85,7 +80,7 @@ class TopTaggingDataset(torch.utils.data.Dataset):
             label = labels[i, ...]
 
             # construct global token
-            if self.add_jet_momentum:
+            if self.cfg.data.add_jet_momentum:
                 global_token = x.sum(dim=0, keepdim=True)
             else:
                 global_token = torch.zeros_like(x[[0], ...], dtype=self.dtype)
@@ -95,95 +90,142 @@ class TopTaggingDataset(torch.utils.data.Dataset):
             is_global[0, 0] = True
 
             data = Data(x=x, label=label, is_global=is_global)
-            if keep_on_gpu:
-                data = data.to(self.device)
             self.data_list.append(data)
 
     def __len__(self):
         return len(self.data_list)
 
     def __getitem__(self, idx):
-        if self.pairs.use:
-            batch = self.data_list[idx].to(self.device)
-            n = (
-                batch.x.shape[0] - 1
-            )  # number of constituents in the event (first constituent is global token)
+        batch = self.data_list[idx].to(self.device)
 
-            # create single tokens as (fourmomentum, 0, 0)
-            num_paired_channels = 3 if self.pairs.delta else 2
-            single = torch.concatenate(
-                (
-                    batch.x.reshape(n + 1, 1, 4),
-                    torch.zeros(
-                        n + 1,
-                        num_paired_channels,
-                        4,
-                        dtype=self.dtype,
-                        device=self.device,
-                    ),
-                ),
-                dim=1,
-            )
-
-            # create pairwise tokens as (0, fourmomentum1, fourmomentum2)
-            pairs = torch.stack(
-                (
-                    batch.x[1:, :].reshape(n, 1, 1, 4).expand(n, n, 1, 4),
-                    batch.x[1:, :].reshape(1, n, 1, 4).expand(n, n, 1, 4),
-                ),
-                dim=2,
-            )
-            if self.pairs.delta:
-                # add fourmomentum1 - fourmomentum2 as extra channel
-                delta = batch.x[1:, :].reshape(n, 1, 1, 4).expand(n, n, 1, 4) - batch.x[
-                    1:, :
-                ].reshape(1, n, 1, 4).expand(n, n, 1, 4)
-                pairs = torch.cat((pairs, delta.reshape(n, n, 1, 1, 4)), dim=2)
-            pairs = torch.concatenate(
-                (
-                    torch.zeros(n**2, 1, 4, dtype=self.dtype, device=self.device),
-                    pairs.reshape(n**2, num_paired_channels, 4),
-                ),
-                dim=1,
-            )
-            if self.pairs.directed:
-                # remove pairs with fourmomentum1 <= fourmomentum2
-                # mask = torch.tensor([idx1 < idx2 for idx1 in range(n) for idx2 in range(n)], device=self.device) # this is slow because of the loop
-                idx = torch.triu_indices(n, n, device=self.device)
-                mask = torch.ones(n, n, dtype=torch.bool, device=self.device)
-                mask[idx[0], idx[1]] = False
-                mask = mask.flatten()
-
-                pairs = pairs[mask, ...]
-            if self.pairs.top_k is not None:
-                # keep only the top_k pairs with highest kt-distance
-                p1, p2 = pairs[..., 1, :], pairs[..., 2, :]
-                kt = get_kt(p1, p2)
-                sort_idx = torch.sort(kt, descending=True)[1]
-                pairs = pairs[sort_idx, ...]
-                if pairs.shape[0] >= self.pairs.top_k:
-                    pairs = pairs[: self.pairs.top_k, ...]
-
-            # combine single and pairwise tokens
-            # (and update the is_global mask)
-            x = torch.concatenate((single, pairs), dim=0)
-            is_global = torch.concatenate(
-                (
-                    batch.is_global,
-                    torch.zeros(
-                        pairs.shape[0], 1, dtype=torch.bool, device=self.device
-                    ),
-                ),
-                dim=0,
-            )
-
-            # return new object instead of overwriting the old one!
-            return Data(x=x, label=batch.label, is_global=is_global)
+        # create embeddings
+        single = batch.x.unsqueeze(1)
+        if self.cfg.data.add_pt:
+            single_scalars = get_pt(single)
         else:
-            return self.data_list[idx].to(self.device)
+            single_scalars = torch.zeros(
+                single.shape[0], 0, device=self.device, dtype=self.dtype
+            )
+        if self.cfg.data.pairs.use:
+            pairs, pairs_scalars = self._create_pairwise_tokens(single)
+
+            # combine arrays
+            x = torch.zeros(
+                single.shape[0] + pairs.shape[0],
+                single.shape[1] + pairs.shape[1],
+                4,
+                device=self.device,
+                dtype=self.dtype,
+            )
+            x[: single.shape[0], : single.shape[1], :] = single
+            x[single.shape[0] :, single.shape[1] :, :] = pairs
+
+            scalars = torch.zeros(
+                single_scalars.shape[0] + pairs_scalars.shape[0],
+                single_scalars.shape[1] + pairs_scalars.shape[1],
+                device=self.device,
+                dtype=self.dtype,
+            )
+            scalars[
+                : single_scalars.shape[0], : single_scalars.shape[1]
+            ] = single_scalars
+            scalars[
+                single_scalars.shape[0] :, single_scalars.shape[1] :
+            ] = pairs_scalars
+
+            pairs_are_not_global = torch.zeros(
+                pairs.shape[0], 1, dtype=torch.bool, device=self.device
+            )
+            is_global = torch.cat((batch.is_global, pairs_are_not_global), dim=0)
+        else:
+            x = single
+            scalars = single_scalars
+            is_global = batch.is_global
+
+        # make sure there is at least one scalar channel
+        if scalars.shape[1] == 0:
+            scalars = torch.zeros(
+                scalars.shape[0], 1, device=self.device, dtype=self.dtype
+            )
+
+        return Data(x=x, scalars=scalars, label=batch.label, is_global=is_global)
+
+    def _create_pairwise_tokens(self, single):
+        """
+        Create embedding of pairwise vector and (optional) scalar tokens
+
+        Parameters
+        ----------
+        single: torch.tensor with shape (items, 4)
+            4-momenta as starting point for pairwise tokens
+
+        Returns
+        -------
+        pairs: torch.tensor with shape (n_pairs, n_channels, 4)
+            embedded pairwise vector tokens
+            amount of pairs and channels depends on the settings specified in self.cfg.data.pairs
+        pairs_scalars: torch.tensor with shape (n_pairs, n_channels)
+            embedded pairwise scalar tokens
+            amount of pairs and channels depends on the settings specified in self.cfg.data.pairs
+
+        """
+
+        # number of tokens (global token + one token per particle)
+        n = single.shape[0] - 1
+
+        num_paired_channels = 3 if self.cfg.data.pairs.add_differences else 2
+        pairs = torch.cat(
+            (
+                single[1:, :].reshape(n, 1, 1, 4).expand(n, n, 1, 4),
+                single[1:, :].reshape(1, n, 1, 4).expand(n, n, 1, 4),
+            ),
+            dim=2,
+        )
+
+        if self.cfg.data.pairs.add_differences:
+            # add fourmomentum1 - fourmomentum2 as extra channel
+            differences = single[1:, :].reshape(n, 1, 1, 4).expand(n, n, 1, 4) - single[
+                1:, :
+            ].reshape(1, n, 1, 4).expand(n, n, 1, 4)
+            # differences = differences.unsqueeze
+            pairs = torch.cat((pairs, differences), dim=2)
+        pairs = pairs.reshape(n**2, num_paired_channels, 4)
+
+        if self.cfg.data.pairs.directed:
+            # remove pairs with fourmomentum1 <= fourmomentum2
+            # mask = torch.tensor([idx1 < idx2 for idx1 in range(n) for idx2 in range(n)], device=self.device) # this is slow because of the loop
+            idx = torch.triu_indices(n, n, device=self.device)
+            mask = torch.ones(n, n, dtype=torch.bool, device=self.device)
+            mask[idx[0], idx[1]] = False
+            mask = mask.flatten()
+
+            pairs = pairs[mask, ...]
+
+        if self.cfg.data.pairs.top_k is not None:
+            # keep only the top_k pairs with highest kt-distance
+            p1, p2 = pairs[..., 0, :], pairs[..., 1, :]
+            kt = get_kt(p1, p2)
+            sort_idx = torch.sort(
+                kt, descending=False if self.cfg.data.pairs.lowest_kt else True
+            )[1]
+            pairs = pairs[sort_idx, ...]
+            if pairs.shape[0] >= self.cfg.data.pairs.top_k:
+                pairs = pairs[: self.cfg.data.pairs.top_k, ...]
+
+        if self.cfg.data.pairs.add_scalars:
+            p1, p2 = pairs[..., 0, :], pairs[..., 1, :]
+            deltaR = get_deltaR(p1, p2)
+            kt = get_kt(p1, p2)
+            pairs_scalars = torch.stack((kt, deltaR), dim=-1)
+        else:
+            pairs_scalars = torch.zeros(
+                pairs.shape[0], 0, device=self.device, dtype=self.dtype
+            )
+
+        return pairs, pairs_scalars
 
 
-def _get_pt(p):
+def get_pt(p):
     # transverse momentum
     return torch.sqrt(p[..., 1] ** 2 + p[..., 2] ** 2)
 
@@ -199,7 +241,7 @@ def _get_eta(p):
     return torch.arctanh(p[..., 3] / p_abs)
 
 
-def _get_deltaR(p1, p2):
+def get_deltaR(p1, p2):
     # deltaR = angular distance
     phi1, phi2 = _get_phi(p1), _get_phi(p2)
     eta1, eta2 = _get_eta(p1), _get_eta(p2)
@@ -208,6 +250,6 @@ def _get_deltaR(p1, p2):
 
 def get_kt(p1, p2):
     # un-normalized kt distance, corresponding to R=1
-    pt1, pt2 = _get_pt(p1), _get_pt(p2)
-    deltaR = _get_deltaR(p1, p2)
+    pt1, pt2 = get_pt(p1), get_pt(p2)
+    deltaR = get_deltaR(p1, p2)
     return deltaR * torch.min(pt1, pt2)

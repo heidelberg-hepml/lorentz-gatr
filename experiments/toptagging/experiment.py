@@ -34,18 +34,48 @@ class TopTaggingExperiment(BaseExperiment):
                 f"Using training.force_xformers=False, this will slow down the network by a factor of 5-10."
             )
 
+        # dynamically extend dict
         with open_dict(self.cfg):
-            # extra mv channels for GATr
             if (
                 self.cfg.model._target_
                 == "experiments.toptagging.wrappers.TopTaggingGATrWrapper"
             ):
-                if self.cfg.model.beam_reference is not None:
-                    self.cfg.model.net.in_mv_channels += 1
+                # make sure we know where we start from
+                self.cfg.model.net.in_s_channels = 0
+                self.cfg.model.net.in_mv_channels = 1
+
+                # extra s channels for pt
+                self.cfg.model.add_pt = self.cfg.data.add_pt
+                if self.cfg.data.add_pt:
+                    self.cfg.model.net.in_s_channels += 1
+
+                # extra mv channels for beam_reference
+                self.cfg.model.beam_reference = self.cfg.data.beam_reference
+                if self.cfg.data.beam_reference is not None:
+                    self.cfg.model.net.in_mv_channels += (
+                        2 if self.cfg.data.beam_reference == "cgenn" else 1
+                    )
+
+                # extra mv and s channels for pairs
                 if self.cfg.data.pairs.use:
                     self.cfg.model.net.in_mv_channels += 2
-                    if self.cfg.data.pairs.delta:
+                    if self.cfg.data.pairs.add_differences:
                         self.cfg.model.net.in_mv_channels += 1
+                    if self.cfg.data.pairs.add_scalars:
+                        self.cfg.model.net.in_s_channels += 2
+
+                # reinsert channels
+                if self.cfg.data.reinsert_channels:
+                    self.cfg.model.net.reinsert_mv_channels = list(
+                        range(self.cfg.model.net.in_mv_channels)
+                    )
+                    self.cfg.model.net.reinsert_s_channels = list(
+                        range(self.cfg.model.net.in_s_channels)
+                    )
+
+                # make sure there is at least 1 scalar channel
+                if self.cfg.model.net.in_s_channels == 0:
+                    self.cfg.model.net.in_s_channels = 1
 
     def init_data(self):
         data_path = os.path.join(
@@ -54,11 +84,9 @@ class TopTaggingExperiment(BaseExperiment):
         LOGGER.info(f"Loading top-tagging dataset from {data_path}")
         t0 = time.time()
         kwargs = {
-            "pairs": self.cfg.data.pairs,
+            "cfg": self.cfg,
             "dtype": self.dtype,
             "device": self.device,
-            "keep_on_gpu": self.cfg.data.keep_on_gpu,
-            "add_jet_momentum": self.cfg.data.add_jet_momentum,
         }
         self.data_train = TopTaggingDataset(
             data_path, "train", data_scale=None, **kwargs
