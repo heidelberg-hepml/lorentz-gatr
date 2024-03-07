@@ -18,7 +18,10 @@ import matplotlib.pyplot as plt
 MODEL_TITLE_DICT = {"GATr": "GATr", "Transformer": "Tr", "MLP": "MLP"}
 
 
-class TopTaggingExperiment(BaseExperiment):
+class TaggingExperiment(BaseExperiment):
+    '''
+    Generalization of all tagging experiments
+    '''
     def init_physics(self):
         if (
             self.cfg.model._target_
@@ -78,23 +81,23 @@ class TopTaggingExperiment(BaseExperiment):
                     self.cfg.model.net.in_s_channels = 1
 
     def init_data(self):
-        data_path = os.path.join(
-            self.cfg.data.data_dir, f"toptagging_{self.cfg.data.dataset}.npz"
-        )
-        LOGGER.info(f"Loading top-tagging dataset from {data_path}")
+        raise NotImplementedError
+
+    def _init_data(self, Dataset, data_path):
+        LOGGER.info(f"Creating {Dataset.__name__} from {data_path}")
         t0 = time.time()
         kwargs = {
             "cfg": self.cfg,
             "dtype": self.dtype,
             "device": self.device,
         }
-        self.data_train = TopTaggingDataset(
+        self.data_train = Dataset(
             data_path, "train", data_scale=None, **kwargs
         )
-        self.data_test = TopTaggingDataset(
+        self.data_test = Dataset(
             data_path, "test", data_scale=self.data_train.data_scale, **kwargs
         )
-        self.data_val = TopTaggingDataset(
+        self.data_val = Dataset(
             data_path, "val", data_scale=self.data_train.data_scale, **kwargs
         )
         dt = time.time() - t0
@@ -281,3 +284,11 @@ class TopTaggingExperiment(BaseExperiment):
 
     def _init_metrics(self):
         return {}
+
+class TopTaggingExperiment(TaggingExperiment):
+
+    def init_data(self):
+        data_path = os.path.join(
+            self.cfg.data.data_dir, f"toptagging_{self.cfg.data.dataset}.npz"
+        )
+        self._init_data(TopTaggingDataset, data_path)
