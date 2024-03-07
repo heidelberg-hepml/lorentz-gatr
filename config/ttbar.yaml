@@ -18,6 +18,7 @@ training:
 evaluation:
  nsamples: 10000
  batchsize: 8192
+ sample_only: false
 
 plot: true
 plotting:

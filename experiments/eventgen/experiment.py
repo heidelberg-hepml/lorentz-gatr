@@ -117,21 +117,23 @@ class EventGenerationExperiment(BaseExperiment):
             f"batch_size={self.cfg.training.batchsize} (training), {self.cfg.evaluation.batchsize} (evaluation)"
         )
 
+    @torch.no_grad()
     def evaluate(self):
-        with torch.no_grad():
-            self._sample_events()
+        self._sample_events()
+        if self.cfg.evaluation.sample_only:
+            return
 
-            for loader, title in zip(
-                [
-                    self.train_loader,
-                    self.test_loader,
-                    self.val_loader,
-                    self.sample_loader,
-                ],
-                ["train", "test", "val", "samples"],
-            ):
-                # TODO: EMA-support
-                self._evaluate_single(loader, title)
+        for loader, title in zip(
+            [
+                self.train_loader,
+                self.test_loader,
+                self.val_loader,
+                self.sample_loader,
+            ],
+            ["train", "test", "val", "samples"],
+        ):
+            # TODO: EMA-support
+            self._evaluate_single(loader, title)
 
     def _evaluate_single(self, loader, title):
         # use the same random numbers for all datasets to get comparable results
