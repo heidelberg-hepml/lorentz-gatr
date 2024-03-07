@@ -1,4 +1,4 @@
-_target_: experiments.eventgen.wrappers.ttbarGATrWrapper
+_target_: experiments.eventgen.wrappers.GATrCFMWrapper
 embed_t_dim: 8
 embed_t_scale: 30.
 

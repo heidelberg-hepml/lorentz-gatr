@@ -10,12 +10,8 @@ data:
  subsample: 100000
  train_test_val: [.4, .5, .1]
 
-training:
- batchsize: 1024
-
 evaluation:
  nsamples: 10000
- batchsize: 1024
 
 plot: true
 plotting:

@@ -3,7 +3,6 @@ import torch
 
 import os, time
 from omegaconf import OmegaConf, open_dict
-from torchdiffeq import odeint
 
 from experiments.base_experiment import BaseExperiment
 from experiments.eventgen.dataset import EventDataset
@@ -176,13 +175,6 @@ class EventGenerationExperiment(BaseExperiment):
 
         for ijet, n_jets in enumerate(self.cfg.data.n_jets):
 
-            def velocity(t, x_t):
-                t = t * torch.ones(
-                    x_t.shape[0], 1, 1, dtype=x_t.dtype, device=x_t.device
-                )
-                v_t = self.model(x_t, t, ijet=ijet)
-                return v_t
-
             sample = []
             shape = (self.cfg.evaluation.batchsize, self.n_hard_particles + n_jets, 4)
             n_batches = (
@@ -193,10 +185,9 @@ class EventGenerationExperiment(BaseExperiment):
             )
             t0 = time.time()
             for i in range(n_batches):
-                eps = self.model.sample_base(shape).to(
-                    dtype=self.dtype, device=self.device
+                x_t = self.model.sample(
+                    ijet, shape, device=self.device, dtype=self.dtype
                 )
-                x_t = odeint(velocity, eps, torch.tensor([1.0, 0.0]))[-1]
                 sample.append(x_t)
             t1 = time.time()
             LOGGER.info(
@@ -265,15 +256,9 @@ class EventGenerationExperiment(BaseExperiment):
         mse = []
         for ijet, x0 in enumerate(data):
             x0 = x0.to(self.device)
-            t = torch.rand(x0.shape[0], 1, 1, dtype=x0.dtype, device=x0.device)
-            eps = self.model.sample_base(x0.shape).to(device=x0.device, dtype=x0.dtype)
-            x_t = (1 - t) * x0 + t * eps
-            v_t = -x0 + eps
-
-            v_theta = self.model(x_t, t, ijet=ijet)
-
-            loss += self.loss(v_theta, v_t) / len(self.cfg.data.n_jets)
-            mse.append(self.loss(v_theta, v_t).cpu().item())
+            loss_single = self.model.batch_loss(x0, ijet, loss_fn=self.loss)
+            loss += loss_single / len(self.cfg.data.n_jets)
+            mse.append(loss_single.cpu().item())
         assert torch.isfinite(loss).all()
 
         metrics = {

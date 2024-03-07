@@ -29,7 +29,7 @@ plotting:
  deta_dphi: true
 
 defaults:
-- model: gatr_ttbar
+- model: gatr_eventgen
 - default
 - hydra
 - _self_

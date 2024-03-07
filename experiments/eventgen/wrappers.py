@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from torch import nn
 
+from torchdiffeq import odeint
 from gatr.interface import embed_vector, extract_vector
 from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity
 
@@ -47,7 +48,7 @@ class GaussianFourierProjection(nn.Module):
         return embedding
 
 
-class ttbarTransformerWrapper(nn.Module):
+class CFMWrapper(nn.Module):
     def __init__(
         self,
         net,
@@ -71,6 +72,49 @@ class ttbarTransformerWrapper(nn.Module):
         eps = torch.randn(shape, generator=gen)
         eps[..., 0] = torch.abs(eps[..., 0])
         return eps
+
+    def batch_loss(self, x0, ijet, loss_fn):
+        t = torch.rand(x0.shape[0], 1, 1, dtype=x0.dtype, device=x0.device)
+        eps = self.sample_base(x0.shape).to(device=x0.device, dtype=x0.dtype)
+        x_t = (1 - t) * x0 + t * eps
+        v_t = -x0 + eps
+
+        v_pred = self.forward(x_t, t, ijet=ijet)
+        loss = loss_fn(v_pred, v_t)
+        return loss
+
+    def sample(self, ijet, shape, device, dtype):
+        def velocity(t, x_t):
+            t = t * torch.ones(shape[0], 1, 1, dtype=dtype, device=device)
+            v_t = self.forward(x_t, t, ijet=ijet)
+            return v_t
+
+        eps = self.sample_base(shape).to(device=device, dtype=dtype)
+        x_t = odeint(velocity, eps, torch.tensor([1.0, 0.0]))[-1]
+        return x_t
+
+    def forward(self, x, t, ijet):
+        raise NotImplementedError
+
+
+class TrCFMWrapper(CFMWrapper):
+    def __init__(
+        self,
+        net,
+        is_onshell,
+        embed_t_dim,
+        embed_t_scale,
+        type_token_channels,
+        process_token_channels,
+    ):
+        super().__init__(
+            net,
+            is_onshell,
+            embed_t_dim,
+            embed_t_scale,
+            type_token_channels,
+            process_token_channels,
+        )
 
     def forward(self, x, t, ijet):
         type_token = get_type_token(x, self.type_token_channels)
@@ -84,7 +128,7 @@ class ttbarTransformerWrapper(nn.Module):
         return v
 
 
-class ttbarGATrWrapper(nn.Module):
+class GATrCFMWrapper(CFMWrapper):
     def __init__(
         self,
         net,
@@ -94,20 +138,14 @@ class ttbarGATrWrapper(nn.Module):
         type_token_channels,
         process_token_channels,
     ):
-        super().__init__()
-        self.net = net
-        self.is_onshell = is_onshell
-        self.type_token_channels = type_token_channels
-        self.process_token_channels = process_token_channels
-        self.t_embedding = nn.Sequential(
-            GaussianFourierProjection(embed_dim=embed_t_dim, scale=embed_t_scale),
-            nn.Linear(embed_t_dim, embed_t_dim),
+        super().__init__(
+            net,
+            is_onshell,
+            embed_t_dim,
+            embed_t_scale,
+            type_token_channels,
+            process_token_channels,
         )
-
-    def sample_base(self, shape, gen=None):
-        eps = torch.randn(shape, generator=gen)
-        eps[..., 0] = torch.abs(eps[..., 0])
-        return eps
 
     def forward(self, x, t, ijet):
         mv, s = self.embed_into_ga(x, t, ijet)
