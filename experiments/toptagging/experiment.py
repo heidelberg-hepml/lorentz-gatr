@@ -45,7 +45,7 @@ class TaggingExperiment(BaseExperiment):
                 == "experiments.toptagging.wrappers.TopTaggingGATrWrapper"
             ):
                 # make sure we know where we start from
-                self.cfg.model.net.in_s_channels = 0
+                self.cfg.model.net.in_s_channels = 1
                 self.cfg.model.net.in_mv_channels = 1
 
                 # extra s channels for pt
@@ -75,10 +75,6 @@ class TaggingExperiment(BaseExperiment):
                     self.cfg.model.net.reinsert_s_channels = list(
                         range(self.cfg.model.net.in_s_channels)
                     )
-
-                # make sure there is at least 1 scalar channel
-                if self.cfg.model.net.in_s_channels == 0:
-                    self.cfg.model.net.in_s_channels = 1
 
     def init_data(self):
         raise NotImplementedError
