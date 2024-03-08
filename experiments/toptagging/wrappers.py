@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from torch import nn
 
-from gatr.interface import embed_vector, extract_scalar
+from gatr.interface import extract_scalar
 from xformers.ops.fmha import BlockDiagonalMask
 
 from experiments.logger import LOGGER
@@ -35,54 +35,6 @@ def attention_mask(batch, force_xformers=True):
         # materialize mask to torch.tensor (only for testing purposes)
         mask = mask.materialize(shape=(len(batch.batch), len(batch.batch)))
     return mask
-
-
-def embed_beam_reference(p_ref, beam_reference):
-    """
-    Construct attention mask that makes sure that objects only attend to each other
-    within the same batch element, and not across batch elements
-
-    Parameters
-    ----------
-    p_ref: torch.tensor with shape (..., items, 4)
-        Reference tensor to infer device, dtype and shape for the beam_reference
-    beam_reference: str
-        Different options for adding a beam_reference
-
-    Returns
-    -------
-    beam: torch.tensor with shape (..., items, mv_channels, 16)
-        beam embedded as mv_channels multivectors
-    """
-    if beam_reference in ["timelike", "spacelike"]:
-        # add another 4-momentum
-        beam = [1, 0, 0, 1] if beam_reference == "timelike" else [0, 0, 0, 1]
-        beam = torch.tensor(beam, device=p_ref.device, dtype=p_ref.dtype)
-        beam = beam.unsqueeze(0).expand(p_ref.shape[0], 1, 4)
-        beam = embed_vector(beam)
-
-    elif beam_reference == "cgenn":
-        beam_mass = 1.0
-        beam = [[(1 + beam_mass) ** 0.5, 0, 0, 1], [(1 + beam_mass) ** 0.5, 0, 0, -1]]
-        beam = torch.tensor(beam, device=p_ref.device, dtype=p_ref.dtype)
-        beam = beam.unsqueeze(0).expand(p_ref.shape[0], 2, 4)
-        beam = embed_vector(beam)
-
-    elif beam_reference == "xyplane":
-        # add the x-y-plane, embedded as a bivector
-        # convention for bivector components: [tx, ty, tz, xy, xz, yz]
-        beam = torch.zeros(
-            p_ref.shape[0], 1, 16, device=p_ref.device, dtype=p_ref.dtype
-        )
-        beam[..., 8] = 1
-
-    elif beam_reference is None:
-        beam = None
-
-    else:
-        raise NotImplementedError
-
-    return beam
 
 
 class TopTaggingTransformerWrapper(nn.Module):
@@ -116,24 +68,15 @@ class TopTaggingGATrWrapper(nn.Module):
     def __init__(
         self,
         net,
-        beam_reference=None,
         mean_aggregation=False,
         add_pt=False,
         force_xformers=True,
     ):
         super().__init__()
         self.net = net
-        self.beam_reference = beam_reference
         self.mean_aggregation = mean_aggregation
         self.add_pt = add_pt
         self.force_xformers = force_xformers
-        assert self.beam_reference in [
-            None,
-            "timelike",
-            "spacelike",
-            "xyplane",
-            "cgenn",
-        ], f"beam_reference {self.beam_reference} not implemented"
 
     def forward(self, batch):
         mask = attention_mask(batch, self.force_xformers)
@@ -147,14 +90,9 @@ class TopTaggingGATrWrapper(nn.Module):
         return logits
 
     def embed_into_ga(self, batch):
-        multivector = embed_vector(batch.x)
-
-        beam = embed_beam_reference(multivector, self.beam_reference)
-        if beam is not None:
-            multivector = torch.cat((multivector, beam), dim=-2)
-
+        # embedding happens in the dataset for convenience
         # add artificial batch index (needed for xformers attention)
-        multivector, scalars = multivector.unsqueeze(0), batch.scalars.unsqueeze(0)
+        multivector, scalars = batch.x.unsqueeze(0), batch.scalars.unsqueeze(0)
         return multivector, scalars
 
     def extract_from_ga(self, batch, multivector, scalars):

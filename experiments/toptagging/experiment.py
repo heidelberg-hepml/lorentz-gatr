@@ -19,9 +19,10 @@ MODEL_TITLE_DICT = {"GATr": "GATr", "Transformer": "Tr", "MLP": "MLP"}
 
 
 class TaggingExperiment(BaseExperiment):
-    '''
+    """
     Generalization of all tagging experiments
-    '''
+    """
+
     def init_physics(self):
         if (
             self.cfg.model._target_
@@ -53,7 +54,6 @@ class TaggingExperiment(BaseExperiment):
                     self.cfg.model.net.in_s_channels += 1
 
                 # extra mv channels for beam_reference
-                self.cfg.model.beam_reference = self.cfg.data.beam_reference
                 if self.cfg.data.beam_reference is not None:
                     self.cfg.model.net.in_mv_channels += (
                         2 if self.cfg.data.beam_reference == "cgenn" else 1
@@ -91,9 +91,7 @@ class TaggingExperiment(BaseExperiment):
             "dtype": self.dtype,
             "device": self.device,
         }
-        self.data_train = Dataset(
-            data_path, "train", data_scale=None, **kwargs
-        )
+        self.data_train = Dataset(data_path, "train", data_scale=None, **kwargs)
         self.data_test = Dataset(
             data_path, "test", data_scale=self.data_train.data_scale, **kwargs
         )
@@ -285,8 +283,8 @@ class TaggingExperiment(BaseExperiment):
     def _init_metrics(self):
         return {}
 
-class TopTaggingExperiment(TaggingExperiment):
 
+class TopTaggingExperiment(TaggingExperiment):
     def init_data(self):
         data_path = os.path.join(
             self.cfg.data.data_dir, f"toptagging_{self.cfg.data.dataset}.npz"
