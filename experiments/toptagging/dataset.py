@@ -3,7 +3,7 @@ import numpy as np
 from torch_geometric.data import Data
 
 from experiments.logger import LOGGER
-
+from gatr.interface import embed_vector
 
 class TopTaggingDataset(torch.utils.data.Dataset):
 
@@ -25,7 +25,13 @@ class TopTaggingDataset(torch.utils.data.Dataset):
     """
 
     def __init__(
-        self, filename, mode, data_scale=None, add_pairs=False, dtype=torch.float
+        self,
+        filename,
+        mode,
+        cfg,
+        data_scale=None,
+        dtype=torch.float,
+        device="cpu",
     ):
         """
         Parameters
@@ -35,15 +41,20 @@ class TopTaggingDataset(torch.utils.data.Dataset):
         mode : {"train", "test", "val"}
             Purpose of the dataset
             Train, test and validation datasets are already seperated in the specified file
+        cfg : dataclass
+            Dataclass object containing options for the format
+            in which the data is preprocessed at runtime
         data_scale : float
             std() of all entries in the train dataset
             Effectively a change of units to make the network entries O(1)
-        add_pairs : bool
-            Option to extend the data by pairwise tokens
-            The pairwise tokens are constructed at runtime to save memory
+        dtype: str
+            Not supported consistently
+        device: torch.device
+            Device on which the dataset will be stored
         """
-        self.add_pairs = add_pairs
+        self.cfg = cfg
         self.dtype = dtype
+        self.device = device
 
         data = np.load(filename)
         kinematics = data[f"kinematics_{mode}"]
@@ -69,8 +80,11 @@ class TopTaggingDataset(torch.utils.data.Dataset):
             label = labels[i, ...]
 
             # construct global token
-            global_token = torch.zeros_like(x[[0], ...], dtype=self.dtype)
-            global_token[..., 0] = 1
+            if self.cfg.data.add_jet_momentum:
+                global_token = x.sum(dim=0, keepdim=True)
+            else:
+                global_token = torch.zeros_like(x[[0], ...], dtype=self.dtype)
+                global_token[..., 0] = 1
             x = torch.cat((global_token, x), dim=0)
             is_global = torch.zeros(x.shape[0], 1, dtype=torch.bool)
             is_global[0, 0] = True
@@ -82,38 +96,222 @@ class TopTaggingDataset(torch.utils.data.Dataset):
         return len(self.data_list)
 
     def __getitem__(self, idx):
-        if self.add_pairs:
-            batch = self.data_list[idx]
-            n = (
-                batch.x.shape[0] - 1
-            )  # number of constituents in the event (first constituent is global token)
-            is_global = torch.concatenate(
-                (batch.is_global, torch.zeros(n**2, 1, dtype=torch.bool)), dim=0
-            )
+        batch = self.data_list[idx].to(self.device)
 
-            # combine single and pairwise tokens in channels in the following way:
-            # single tokens: (fourmomentum, 0, 0)
-            # pairwise tokens: (0, fourmomentum1, fourmomentum2)
-            single = torch.concatenate(
-                (
-                    batch.x.reshape(n + 1, 1, 4),
-                    torch.zeros(n + 1, 2, 4, dtype=self.dtype),
-                ),
-                dim=1,
-            )
-            pairs = torch.stack(
-                (
-                    batch.x[1:, :].reshape(n, 1, 1, 4).expand(n, n, 1, 4),
-                    batch.x[1:, :].reshape(1, n, 1, 4).expand(n, n, 1, 4),
-                ),
-                dim=2,
-            ).reshape(n**2, 2, 4)
-            pairs = torch.concatenate(
-                (torch.zeros(n**2, 1, 4, dtype=self.dtype), pairs), dim=1
-            )
-            x = torch.concatenate((single, pairs), dim=0)
-
-            # return new object instead of overwriting the old one!
-            return Data(x=x, label=batch.label, is_global=is_global)
+        # create embeddings
+        single = batch.x.unsqueeze(1)
+        if self.cfg.data.add_pt:
+            single_scalars = get_pt(single)
         else:
-            return self.data_list[idx]
+            single_scalars = torch.zeros(
+                single.shape[0], 0, device=self.device, dtype=self.dtype
+            )
+        if self.cfg.data.pairs.use:
+            pairs, pairs_scalars = create_pairwise_tokens(single, self.cfg)
+
+            # combine arrays
+            x = torch.zeros(
+                single.shape[0] + pairs.shape[0],
+                single.shape[1] + pairs.shape[1],
+                4,
+                device=self.device,
+                dtype=self.dtype,
+            )
+            x[: single.shape[0], : single.shape[1], :] = single
+            x[single.shape[0] :, single.shape[1] :, :] = pairs
+
+            scalars = torch.zeros(
+                single_scalars.shape[0] + pairs_scalars.shape[0],
+                single_scalars.shape[1] + pairs_scalars.shape[1],
+                device=self.device,
+                dtype=self.dtype,
+            )
+            scalars[
+                : single_scalars.shape[0], : single_scalars.shape[1]
+            ] = single_scalars
+            scalars[
+                single_scalars.shape[0] :, single_scalars.shape[1] :
+            ] = pairs_scalars
+
+            pairs_are_not_global = torch.zeros(
+                pairs.shape[0], 1, dtype=torch.bool, device=self.device
+            )
+            is_global = torch.cat((batch.is_global, pairs_are_not_global), dim=0)
+        else:
+            x = single
+            scalars = single_scalars
+            is_global = batch.is_global
+
+        # beam reference
+        x = embed_vector(x)
+        beam = embed_beam_reference(x, self.cfg.data.beam_reference)
+        if beam is not None:
+            x = torch.cat((x, beam), dim=-2)
+
+        # add information about which token is global
+        scalars_is_global = torch.zeros(
+            scalars.shape[0], 1, device=self.device, dtype=self.dtype
+        )
+        scalars_is_global[..., 0] = 1.0
+        scalars = torch.cat([scalars_is_global, scalars], dim=-1)
+
+        return Data(
+            x=x, scalars=scalars, label=batch.label, is_global=is_global
+        )
+
+
+def create_pairwise_tokens(self, single, cfg):
+    """
+    Create embedding of pairwise vector and (optional) scalar tokens
+
+    Parameters
+    ----------
+    single: torch.tensor with shape (items, 4)
+        4-momenta as starting point for pairwise tokens
+    cfg : dataclass
+        Dataclass object containing options for the format
+        in which the data is preprocessed at runtime
+
+    Returns
+    -------
+    pairs: torch.tensor with shape (n_pairs, n_channels, 4)
+        embedded pairwise vector tokens
+        amount of pairs and channels depends on the settings specified in self.cfg.data.pairs
+    pairs_scalars: torch.tensor with shape (n_pairs, n_channels)
+        embedded pairwise scalar tokens
+        amount of pairs and channels depends on the settings specified in self.cfg.data.pairs
+
+    """
+
+    # number of tokens (global token + one token per particle)
+    n = single.shape[0] - 1
+
+    num_paired_channels = 3 if self.cfg.data.pairs.add_differences else 2
+    pairs = torch.cat(
+        (
+            single[1:, :].reshape(n, 1, 1, 4).expand(n, n, 1, 4),
+            single[1:, :].reshape(1, n, 1, 4).expand(n, n, 1, 4),
+        ),
+        dim=2,
+    )
+
+    if cfg.data.pairs.add_differences:
+        # add fourmomentum1 - fourmomentum2 as extra channel
+        differences = single[1:, :].reshape(n, 1, 1, 4).expand(n, n, 1, 4) - single[
+            1:, :
+        ].reshape(1, n, 1, 4).expand(n, n, 1, 4)
+        # differences = differences.unsqueeze
+        pairs = torch.cat((pairs, differences), dim=2)
+    pairs = pairs.reshape(n**2, num_paired_channels, 4)
+
+    if cfg.data.pairs.directed:
+        # remove pairs with fourmomentum1 <= fourmomentum2
+        # mask = torch.tensor([idx1 < idx2 for idx1 in range(n) for idx2 in range(n)], device=self.device) # this is slow because of the loop
+        idx = torch.triu_indices(n, n, device=single.device)
+        mask = torch.ones(n, n, dtype=torch.bool, single=self.device)
+        mask[idx[0], idx[1]] = False
+        mask = mask.flatten()
+
+        pairs = pairs[mask, ...]
+
+    if cfg.data.pairs.top_k is not None:
+        # keep only the top_k pairs with highest kt-distance
+        p1, p2 = pairs[..., 0, :], pairs[..., 1, :]
+        kt = get_kt(p1, p2)
+        sort_idx = torch.sort(
+            kt, descending=False if cfg.data.pairs.lowest_kt else True
+        )[1]
+        pairs = pairs[sort_idx, ...]
+        if pairs.shape[0] >= cfg.data.pairs.top_k:
+            pairs = pairs[: cfg.data.pairs.top_k, ...]
+
+    if cfg.data.pairs.add_scalars:
+        p1, p2 = pairs[..., 0, :], pairs[..., 1, :]
+        deltaR = get_deltaR(p1, p2)
+        kt = get_kt(p1, p2)
+        pairs_scalars = torch.stack((kt, deltaR), dim=-1)
+    else:
+        pairs_scalars = torch.zeros(
+            pairs.shape[0], 0, device=single.device, dtype=single.dtype
+        )
+
+    return pairs, pairs_scalars
+
+
+def embed_beam_reference(p_ref, beam_reference):
+    """
+    Construct attention mask that makes sure that objects only attend to each other
+    within the same batch element, and not across batch elements
+
+    Parameters
+    ----------
+    p_ref: torch.tensor with shape (..., items, 4)
+        Reference tensor to infer device, dtype and shape for the beam_reference
+    beam_reference: str
+        Different options for adding a beam_reference
+
+    Returns
+    -------
+    beam: torch.tensor with shape (..., items, mv_channels, 16)
+        beam embedded as mv_channels multivectors
+    """
+
+    if beam_reference in ["timelike", "spacelike"]:
+        # add another 4-momentum
+        beam = [1, 0, 0, 1] if beam_reference == "timelike" else [0, 0, 0, 1]
+        beam = torch.tensor(beam, device=p_ref.device, dtype=p_ref.dtype)
+        beam = beam.unsqueeze(0).expand(p_ref.shape[0], 1, 4)
+        beam = embed_vector(beam)
+
+    elif beam_reference == "cgenn":
+        beam_mass = 1.0
+        beam = [[(1 + beam_mass) ** 0.5, 0, 0, 1], [(1 + beam_mass) ** 0.5, 0, 0, -1]]
+        beam = torch.tensor(beam, device=p_ref.device, dtype=p_ref.dtype)
+        beam = beam.unsqueeze(0).expand(p_ref.shape[0], 2, 4)
+        beam = embed_vector(beam)
+
+    elif beam_reference == "xyplane":
+        # add the x-y-plane, embedded as a bivector
+        # convention for bivector components: [tx, ty, tz, xy, xz, yz]
+        beam = torch.zeros(
+            p_ref.shape[0], 1, 16, device=p_ref.device, dtype=p_ref.dtype
+        )
+        beam[..., 8] = 1
+
+    elif beam_reference is None:
+        beam = None
+
+    else:
+        raise NotImplementedError
+
+    return beam
+
+
+def get_pt(p):
+    # transverse momentum
+    return torch.sqrt(p[..., 1] ** 2 + p[..., 2] ** 2)
+
+
+def _get_phi(p):
+    # azimuthal angle
+    return torch.arctan2(p[..., 2], p[..., 1])
+
+
+def _get_eta(p):
+    # rapidity
+    p_abs = torch.sqrt(torch.sum(p[..., 1:] ** 2, dim=-1))
+    return torch.arctanh(p[..., 3] / p_abs)
+
+
+def get_deltaR(p1, p2):
+    # deltaR = angular distance
+    phi1, phi2 = _get_phi(p1), _get_phi(p2)
+    eta1, eta2 = _get_eta(p1), _get_eta(p2)
+    return torch.sqrt((phi1 - phi2) ** 2 + (eta1 - eta2) ** 2)
+
+
+def get_kt(p1, p2):
+    # un-normalized kt distance, corresponding to R=1
+    pt1, pt2 = get_pt(p1), get_pt(p2)
+    deltaR = get_deltaR(p1, p2)
+    return deltaR * torch.min(pt1, pt2)

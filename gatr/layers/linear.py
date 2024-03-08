@@ -100,13 +100,13 @@ class EquiLinear(nn.Module):
         # Scalars -> MV scalars
         self.s2mvs: Optional[nn.Linear]
         if in_s_channels:
-            self.s2mvs = nn.Linear(in_s_channels, out_mv_channels, bias=bias)
+            self.s2mvs = nn.Linear(in_s_channels, 2*out_mv_channels, bias=bias)
         else:
             self.s2mvs = None
 
         # MV scalars -> scalars
         if out_s_channels:
-            self.mvs2s = nn.Linear(in_mv_channels, out_s_channels, bias=bias)
+            self.mvs2s = nn.Linear(2*in_mv_channels, out_s_channels, bias=bias)
         else:
             self.mvs2s = None
 
@@ -159,10 +159,10 @@ class EquiLinear(nn.Module):
             outputs_mv = outputs_mv + bias
 
         if self.s2mvs is not None and scalars is not None:
-            outputs_mv[..., 0] += self.s2mvs(scalars)
+            outputs_mv[..., [0, -1]] += self.s2mvs(scalars).view(*outputs_mv.shape[:-2], outputs_mv.shape[-2], 2)
 
         if self.mvs2s is not None:
-            outputs_s = self.mvs2s(multivectors[..., 0])
+            outputs_s = self.mvs2s(multivectors[..., [0, -1]].flatten(start_dim=-2))
             if self.s2s is not None and scalars is not None:
                 outputs_s = outputs_s + self.s2s(scalars)
         else:
@@ -316,10 +316,15 @@ class EquiLinear(nn.Module):
         # contributes to the scalar output. Thus, we can reduce the variance of the correponding
         # weights to give a variance of 0.5, not 1.
         if self.s2mvs is not None:
+            # contribution from scalar -> mv scalar
             bound = mv_component_factors[0] * mv_factor / np.sqrt(fan_in) / np.sqrt(2)
             nn.init.uniform_(self.weight[..., [0]], a=-bound, b=bound)
+            # contribution from scalar -> mv pseudoscalar
+            bound = mv_component_factors[-1] * mv_factor / np.sqrt(fan_in) / np.sqrt(2)
+            nn.init.uniform_(self.weight[..., [-1]], a=-bound, b=bound)
 
         # The same holds for the scalar-to-MV map, where we also just want a variance of 0.5.
+        # Note: This is not properly extended to scalar and pseudoscalar outputs yet
         if self.s2mvs is not None:
             fan_in, _ = nn.init._calculate_fan_in_and_fan_out(
                 self.s2mvs.weight
@@ -341,12 +346,14 @@ class EquiLinear(nn.Module):
                 nn.init.uniform_(
                     self.s2mvs.bias, mvs_bias_shift - bound, mvs_bias_shift + bound
                 )
+            
 
     def _init_scalars(self, s_factor):
         """Weight initialization for maps to multivector outputs."""
 
         # If both exist, we need to account for overcounting again, and assign each a target a
         # variance of 0.5.
+        # Note: This is not properly extended to scalar and pseudoscalar outputs yet
         models = []
         if self.s2s:
             models.append(self.s2s)

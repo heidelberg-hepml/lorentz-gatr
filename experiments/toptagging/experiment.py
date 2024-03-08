@@ -18,15 +18,19 @@ import matplotlib.pyplot as plt
 MODEL_TITLE_DICT = {"GATr": "GATr", "Transformer": "Tr", "MLP": "MLP"}
 
 
-class TopTaggingExperiment(BaseExperiment):
+class TaggingExperiment(BaseExperiment):
+    """
+    Generalization of all tagging experiments
+    """
+
     def init_physics(self):
         if (
             self.cfg.model._target_
             == "experiments.toptagging.wrappers.TopTaggingTransformerWrapper"
         ):
             assert (
-                not self.cfg.data.add_pairs
-            ), "data.add_pairs are not implemented for the default Transformer"
+                not self.cfg.data.pairs.use
+            ), "data.pairs are not implemented for the default Transformer"
             # assert not self.cfg.model.beam_reference, "model.beam_reference are not implemented for the default Transformer"
 
         if not self.cfg.training.force_xformers:
@@ -34,43 +38,61 @@ class TopTaggingExperiment(BaseExperiment):
                 f"Using training.force_xformers=False, this will slow down the network by a factor of 5-10."
             )
 
+        # dynamically extend dict
         with open_dict(self.cfg):
-            # extra mv channels for GATr
             if (
                 self.cfg.model._target_
                 == "experiments.toptagging.wrappers.TopTaggingGATrWrapper"
             ):
-                if self.cfg.model.beam_reference is not None:
-                    self.cfg.model.net.in_mv_channels += 1
-                if self.cfg.data.add_pairs:
+                # make sure we know where we start from
+                self.cfg.model.net.in_s_channels = 1
+                self.cfg.model.net.in_mv_channels = 1
+
+                # extra s channels for pt
+                self.cfg.model.add_pt = self.cfg.data.add_pt
+                if self.cfg.data.add_pt:
+                    self.cfg.model.net.in_s_channels += 1
+
+                # extra mv channels for beam_reference
+                if self.cfg.data.beam_reference is not None:
+                    self.cfg.model.net.in_mv_channels += (
+                        2 if self.cfg.data.beam_reference == "cgenn" else 1
+                    )
+
+                # extra mv and s channels for pairs
+                if self.cfg.data.pairs.use:
                     self.cfg.model.net.in_mv_channels += 2
+                    if self.cfg.data.pairs.add_differences:
+                        self.cfg.model.net.in_mv_channels += 1
+                    if self.cfg.data.pairs.add_scalars:
+                        self.cfg.model.net.in_s_channels += 2
+
+                # reinsert channels
+                if self.cfg.data.reinsert_channels:
+                    self.cfg.model.net.reinsert_mv_channels = list(
+                        range(self.cfg.model.net.in_mv_channels)
+                    )
+                    self.cfg.model.net.reinsert_s_channels = list(
+                        range(self.cfg.model.net.in_s_channels)
+                    )
 
     def init_data(self):
-        data_path = os.path.join(
-            self.cfg.data.data_dir, f"toptagging_{self.cfg.data.dataset}.npz"
-        )
-        LOGGER.info(f"Loading top-tagging dataset from {data_path}")
+        raise NotImplementedError
+
+    def _init_data(self, Dataset, data_path):
+        LOGGER.info(f"Creating {Dataset.__name__} from {data_path}")
         t0 = time.time()
-        self.data_train = TopTaggingDataset(
-            data_path,
-            "train",
-            data_scale=None,
-            add_pairs=self.cfg.data.add_pairs,
-            dtype=self.dtype,
+        kwargs = {
+            "cfg": self.cfg,
+            "dtype": self.dtype,
+            "device": self.device,
+        }
+        self.data_train = Dataset(data_path, "train", data_scale=None, **kwargs)
+        self.data_test = Dataset(
+            data_path, "test", data_scale=self.data_train.data_scale, **kwargs
         )
-        self.data_test = TopTaggingDataset(
-            data_path,
-            "test",
-            data_scale=self.data_train.data_scale,
-            add_pairs=self.cfg.data.add_pairs,
-            dtype=self.dtype,
-        )
-        self.data_val = TopTaggingDataset(
-            data_path,
-            "val",
-            data_scale=self.data_train.data_scale,
-            add_pairs=self.cfg.data.add_pairs,
-            dtype=self.dtype,
+        self.data_val = Dataset(
+            data_path, "val", data_scale=self.data_train.data_scale, **kwargs
         )
         dt = time.time() - t0
         LOGGER.info(f"Finished creating datasets after {dt:.2f} s = {dt/60:.2f} min")
@@ -247,7 +269,6 @@ class TopTaggingExperiment(BaseExperiment):
         return metrics["bce"]
 
     def _batch_loss(self, batch):
-        batch = batch.to(self.device)
         y_pred = self.model(batch)
         loss = self.loss(y_pred, batch.label.to(self.dtype))
         assert torch.isfinite(loss).all()
@@ -257,3 +278,11 @@ class TopTaggingExperiment(BaseExperiment):
 
     def _init_metrics(self):
         return {}
+
+
+class TopTaggingExperiment(TaggingExperiment):
+    def init_data(self):
+        data_path = os.path.join(
+            self.cfg.data.data_dir, f"toptagging_{self.cfg.data.dataset}.npz"
+        )
+        self._init_data(TopTaggingDataset, data_path)
