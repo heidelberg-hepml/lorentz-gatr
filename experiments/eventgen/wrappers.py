@@ -6,6 +6,8 @@ import torch
 from torch import nn
 
 from torchdiffeq import odeint
+from torch.distributions import Normal
+
 from gatr.interface import embed_vector, extract_vector
 from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity
 
@@ -57,6 +59,7 @@ class CFMWrapper(nn.Module):
         embed_t_scale,
         type_token_channels,
         process_token_channels,
+        base_density,
     ):
         super().__init__()
         self.net = net
@@ -67,11 +70,20 @@ class CFMWrapper(nn.Module):
             GaussianFourierProjection(embed_dim=embed_t_dim, scale=embed_t_scale),
             nn.Linear(embed_t_dim, embed_t_dim),
         )
+        self.base_density = base_density
+        assert self.base_density in ["gaussian", "half-gaussian"]
 
     def sample_base(self, shape, gen=None):
+        assert shape[-1] == 4
         eps = torch.randn(shape, generator=gen)
-        eps[..., 0] = torch.abs(eps[..., 0])
+        if self.base_density == "half-gaussian":
+            eps[..., 0] = torch.abs(eps[..., 0])
+            eps[..., 0] = torch.sqrt(eps[..., 0]**2 + torch.sum(eps[..., 1:]**2, dim=-1))
         return eps
+
+    def log_prob_base(self, eps):
+        log_prob = Normal(loc=0., scale=1.).log_prob(eps)
+        raise NotImplementedError
 
     def batch_loss(self, x0, ijet, loss_fn):
         t = torch.rand(x0.shape[0], 1, 1, dtype=x0.dtype, device=x0.device)
@@ -106,6 +118,7 @@ class TrCFMWrapper(CFMWrapper):
         embed_t_scale,
         type_token_channels,
         process_token_channels,
+        base_density,
     ):
         super().__init__(
             net,
@@ -114,6 +127,7 @@ class TrCFMWrapper(CFMWrapper):
             embed_t_scale,
             type_token_channels,
             process_token_channels,
+            base_density,
         )
 
     def forward(self, x, t, ijet):
@@ -137,6 +151,8 @@ class GATrCFMWrapper(CFMWrapper):
         embed_t_scale,
         type_token_channels,
         process_token_channels,
+        base_density,
+        beam_reference,
     ):
         super().__init__(
             net,
@@ -145,6 +161,8 @@ class GATrCFMWrapper(CFMWrapper):
             embed_t_scale,
             type_token_channels,
             process_token_channels,
+            base_density,
+            beam_reference,
         )
 
     def forward(self, x, t, ijet):
