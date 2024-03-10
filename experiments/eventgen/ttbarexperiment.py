@@ -8,7 +8,9 @@ class ttbarExperiment(EventGenerationExperiment):
         self.plot_title = r"t\bar t"
         self.n_hard_particles = 6
         self.n_jets_max = 4
-        self.is_onshell = []
+        self.onshell_list = []
+        self.onshell_mass = []
+        self.pt_min = [21.49] * 10
         self.obs_names_index = ["b1", "q1", "q2", "b2", "q3", "q4"]
         for ijet in range(self.n_jets_max):
             self.obs_names_index.append(f"j{ijet+1}")

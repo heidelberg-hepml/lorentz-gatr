@@ -8,7 +8,9 @@ class zmumuExperiment(EventGenerationExperiment):
         self.plot_title = r"Z"
         self.n_hard_particles = 2
         self.n_jets_max = 5
-        self.is_onshell = [0, 1]
+        self.onshell_list = [0, 1]
+        self.onshell_mass = [0.1, 0.1]
+        self.pt_min = [0.0, 0.0, 20.0, 20.0, 20.0]
         self.obs_names_index = ["l1", "l2"]
         for ijet in range(self.n_jets_max):
             self.obs_names_index.append(f"j{ijet+1}")

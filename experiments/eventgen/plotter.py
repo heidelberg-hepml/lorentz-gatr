@@ -9,7 +9,31 @@ from experiments.eventgen.physics import (
     get_virtual_particle,
     fourmomenta_to_jetmomenta,
 )
+from experiments.base_plots import plot_loss
 from experiments.eventgen.plots import plot_histogram, plot_histogram_2d
+
+
+def plot_losses(exp, filename, model_label):
+    with PdfPages(filename) as file:
+        plot_loss(
+            file,
+            [exp.train_loss, exp.val_loss],
+            exp.train_lr,
+            labels=["train loss", "val loss"],
+            logy=True,
+        )
+
+        for ijet, n_jets in enumerate(exp.cfg.data.n_jets):
+            plot_loss(
+                file,
+                [
+                    exp.train_metrics[f"{n_jets}j.mse"],
+                    exp.val_metrics[f"{n_jets}j.mse"],
+                ],
+                lr=exp.train_lr,
+                labels=[f"train mse {n_jets}j", f"val mse {n_jets}j"],
+                logy=True,
+            )
 
 
 def plot_fourmomenta(exp, filename, model_label):
@@ -30,7 +54,7 @@ def plot_fourmomenta(exp, filename, model_label):
             for channel in range(num_components):
 
                 def extract(event):
-                    event = event.copy()
+                    event = event.clone()
                     event = event.reshape(event.shape[0], -1)[:, channel]
                     return event
 
@@ -72,7 +96,7 @@ def plot_jetmomenta(exp, filename, model_label):
             for channel in range(num_components):
 
                 def extract(event):
-                    event = event.copy()
+                    event = event.clone()
                     event = fourmomenta_to_jetmomenta(event)
                     event = event.reshape(event.shape[0], -1)[:, channel]
                     return event

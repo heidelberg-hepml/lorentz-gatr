@@ -71,11 +71,11 @@ class BaseExperiment:
         self.init_model()
         self.init_data()
         self._init_dataloader()
+        self._init_loss()
 
         if self.cfg.train:
             self._init_optimizer()
             self._init_scheduler()
-            self._init_loss()
             self.train()
             self._save_model()
 

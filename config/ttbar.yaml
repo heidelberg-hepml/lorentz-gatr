@@ -13,15 +13,17 @@ data:
  train_test_val: [.4, .5, .1]
 
 training:
- batchsize: 8192
+ batchsize: 1024
 
 evaluation:
- nsamples: 10000
- batchsize: 8192
- sample_only: false
+ nsamples: 1000
+ batchsize: 1024
+ eval_loss: [train, test, gen]
+ eval_log_prob: []
 
 plot: true
 plotting:
+ loss: true
  fourmomenta: true
  jetmomenta: true
  preprocessed: true

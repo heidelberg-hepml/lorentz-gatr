@@ -11,7 +11,7 @@ data:
  train_test_val: [.4, .5, .1]
 
 evaluation:
- nsamples: 10000
+ nsamples: 1000
 
 plot: true
 plotting:

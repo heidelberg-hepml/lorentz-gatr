@@ -5,6 +5,7 @@ from torch_geometric.data import Data
 from experiments.logger import LOGGER
 from gatr.interface import embed_vector
 
+
 class TopTaggingDataset(torch.utils.data.Dataset):
 
     """
@@ -155,12 +156,10 @@ class TopTaggingDataset(torch.utils.data.Dataset):
         scalars_is_global[..., 0] = 1.0
         scalars = torch.cat([scalars_is_global, scalars], dim=-1)
 
-        return Data(
-            x=x, scalars=scalars, label=batch.label, is_global=is_global
-        )
+        return Data(x=x, scalars=scalars, label=batch.label, is_global=is_global)
 
 
-def create_pairwise_tokens(self, single, cfg):
+def create_pairwise_tokens(single, cfg):
     """
     Create embedding of pairwise vector and (optional) scalar tokens
 
@@ -176,17 +175,17 @@ def create_pairwise_tokens(self, single, cfg):
     -------
     pairs: torch.tensor with shape (n_pairs, n_channels, 4)
         embedded pairwise vector tokens
-        amount of pairs and channels depends on the settings specified in self.cfg.data.pairs
+        amount of pairs and channels depends on the settings specified in cfg.data.pairs
     pairs_scalars: torch.tensor with shape (n_pairs, n_channels)
         embedded pairwise scalar tokens
-        amount of pairs and channels depends on the settings specified in self.cfg.data.pairs
+        amount of pairs and channels depends on the settings specified in cfg.data.pairs
 
     """
 
     # number of tokens (global token + one token per particle)
     n = single.shape[0] - 1
 
-    num_paired_channels = 3 if self.cfg.data.pairs.add_differences else 2
+    num_paired_channels = 3 if cfg.data.pairs.add_differences else 2
     pairs = torch.cat(
         (
             single[1:, :].reshape(n, 1, 1, 4).expand(n, n, 1, 4),
@@ -206,9 +205,9 @@ def create_pairwise_tokens(self, single, cfg):
 
     if cfg.data.pairs.directed:
         # remove pairs with fourmomentum1 <= fourmomentum2
-        # mask = torch.tensor([idx1 < idx2 for idx1 in range(n) for idx2 in range(n)], device=self.device) # this is slow because of the loop
+        # mask = torch.tensor([idx1 < idx2 for idx1 in range(n) for idx2 in range(n)], device=pairs.device) # this is slow because of the loop
         idx = torch.triu_indices(n, n, device=single.device)
-        mask = torch.ones(n, n, dtype=torch.bool, single=self.device)
+        mask = torch.ones(n, n, dtype=torch.bool, device=single.device)
         mask[idx[0], idx[1]] = False
         mask = mask.flatten()
 

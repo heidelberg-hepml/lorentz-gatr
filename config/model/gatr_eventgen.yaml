@@ -1,6 +1,7 @@
 _target_: experiments.eventgen.wrappers.GATrCFMWrapper
 embed_t_dim: 8
 embed_t_scale: 30.
+beam_reference: xyplane
 
 net:
  _target_: gatr.nets.GATr
@@ -11,7 +12,7 @@ net:
 
  in_s_channels: null
  out_s_channels: 1
- hidden_s_channels: 32
+ hidden_s_channels: 8
 
  num_blocks: 1
  reinsert_mv_channels: null

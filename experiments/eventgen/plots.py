@@ -204,7 +204,9 @@ def plot_histogram(
         fontsize=FONTSIZE,
     )
 
-    axs[1].set_ylabel(r"$\frac{\mathrm{JetGPT}}{\mathrm{Test}}$", fontsize=FONTSIZE)
+    axs[1].set_ylabel(
+        r"$\frac{\mathrm{{%s}}}{\mathrm{Test}}$" % model_label, fontsize=FONTSIZE
+    )
     axs[1].set_yticks(error_ticks)
     axs[1].set_ylim(error_range)
     axs[1].axhline(y=error_ticks[0], c="black", ls="dotted", lw=0.5)
