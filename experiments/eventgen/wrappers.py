@@ -8,8 +8,8 @@ from torch import nn
 from gatr.interface import embed_vector, extract_vector
 from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity
 from experiments.toptagging.dataset import embed_beam_reference
-from experiments.eventgen.diffusion import CFM
-from experiments.eventgen.physics import (
+from experiments.eventgen.cfm import CFM
+from experiments.eventgen.transforms import (
     fourmomenta_to_jetmomenta,
     jetmomenta_to_fourmomenta,
     jetmomenta_to_precisesiast,
@@ -17,8 +17,9 @@ from experiments.eventgen.physics import (
     velocities_fourmomenta_to_jetmomenta,
     velocities_jetmomenta_to_precisesiast,
     stable_arctanh,
+    EPS1,
+    EPS2,
 )
-from experiments.eventgen.physics import EPS1, EPS2
 
 
 def get_type_token(x_ref, type_token_channels):
@@ -144,9 +145,7 @@ class GATrCFMWrapper(CFM):
 
     def get_velocity(self, precisesiast, t, ijet):
         # precisesiast -> fourmomenta
-        jetmomenta = precisesiast_to_jetmomenta(
-            precisesiast, self.pt_min, for_gatr=True, prep_params=self.prep_params[ijet]
-        )
+        jetmomenta = precisesiast_to_jetmomenta(precisesiast, self.pt_min)
         fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
 
         # GATr in fourmomenta space

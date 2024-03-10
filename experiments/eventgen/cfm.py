@@ -43,7 +43,7 @@ class CFM(nn.Module):
 
         v_pred = self.get_velocity(x_t, t, ijet=ijet)
         loss = loss_fn(v_pred, v_t)
-        '''
+        """
         lossi = (v_pred - v_t) ** 2
         print(lossi.max(dim=0)[0])
         import matplotlib.pyplot as plt
@@ -51,7 +51,7 @@ class CFM(nn.Module):
             plt.hist(v_pred[...,i].flatten().detach(), bins=100, alpha=.5)
             plt.hist(v_t[...,i].flatten().detach(), bins=100, alpha=.5)
             plt.show()
-        '''
+        """
         return loss
 
     def sample(self, ijet, shape, device, dtype):
@@ -65,8 +65,8 @@ class CFM(nn.Module):
             velocity,
             eps,
             torch.tensor([1.0, 0.0]),
-            # method="rk4",
-            # options={"step_size": 1e-2},
+            method="rk4",
+            options={"step_size": 1e-2},
         )[-1]
         return x_t
 

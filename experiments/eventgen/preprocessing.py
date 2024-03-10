@@ -1,6 +1,6 @@
 import torch
 
-from experiments.eventgen.physics import (
+from experiments.eventgen.transforms import (
     fourmomenta_to_jetmomenta,
     jetmomenta_to_fourmomenta,
     jetmomenta_to_precisesiast,
@@ -19,40 +19,30 @@ def ensure_onshell(fourmomenta, onshell_list, onshell_mass):
     return fourmomenta
 
 
-def preprocess_gatr(fourmomenta, pt_min, prep_params=None):
+def preprocess(fourmomenta, pt_min, is_gatr, prep_params):
     if prep_params is None:
-        prep_params = {"std": fourmomenta.std()}
-    fourmomenta = fourmomenta / prep_params["std"]
+        prep_params = {"units": fourmomenta.std()}
+    fourmomenta = fourmomenta / prep_params["units"]
     jetmomenta = fourmomenta_to_jetmomenta(fourmomenta)
-    precisesiast = jetmomenta_to_precisesiast(
-        jetmomenta, pt_min, for_gatr=True, prep_params=prep_params
-    )
+    precisesiast = jetmomenta_to_precisesiast(jetmomenta, pt_min)
+    if not is_gatr:
+        # standardize components
+        if (
+            prep_params.get("std", None) is None
+            or prep_params.get("mean", None) is None
+        ):
+            prep_params = {
+                "std": precisesiast.std(dim=[0, 1], keepdim=True),
+                "mean": precisesiast.mean(dim=[0, 1], keepdim=True),
+            }
+        precisesiast = (precisesiast - prep_params["mean"]) / prep_params["std"]
     return precisesiast, prep_params
 
 
-def undo_preprocess_gatr(precisesiast, pt_min, prep_params):
-    jetmomenta = precisesiast_to_jetmomenta(
-        precisesiast, pt_min, for_gatr=True, prep_params=prep_params
-    )
+def undo_preprocess(precisesiast, pt_min, is_gatr, prep_params):
+    if not is_gatr:
+        precisesiast = precisesiast * prep_params["std"] + prep_params["mean"]
+    jetmomenta = precisesiast_to_jetmomenta(precisesiast, pt_min)
     fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
-    fourmomenta = fourmomenta * prep_params["std"]
-    return fourmomenta
-
-
-def preprocess_tr(fourmomenta, pt_min, prep_params=None):
-    jetmomenta = fourmomenta_to_jetmomenta(fourmomenta)
-    precisesiast = jetmomenta_to_precisesiast(jetmomenta, pt_min, for_gatr=False)
-    if prep_params is None:
-        prep_params = {
-            "std": precisesiast.std(dim=[0, 1], keepdim=True),
-            "mean": precisesiast.mean(dim=[0, 1], keepdim=True),
-        }
-    precisesiast = (precisesiast - prep_params["mean"]) / prep_params["std"]
-    return precisesiast, prep_params
-
-
-def undo_preprocess_tr(precisesiast, pt_min, prep_params):
-    precisesiast = precisesiast * prep_params["std"] + prep_params["mean"]
-    jetmomenta = precisesiast_to_jetmomenta(precisesiast, pt_min, for_gatr=False)
-    fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
+    fourmomenta = fourmomenta * prep_params["units"]
     return fourmomenta

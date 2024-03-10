@@ -7,14 +7,13 @@ EPS1 = 1e-2
 
 # log(x) -> log(x+EPS2)
 # in situations where we need numerical stability (non-invertible)
-# (should have EPS2>1e-5 to avoid large v_x_phi from v_x_phi \propto 1/(phi**2 - pi**2)
-EPS2 = 1e-3
+# (should have EPS2>1e-5 to avoid large v_x_phi from v_x_phi \propto 1/(phi**2 - pi**2,
+#  but also need EPS2<1e-3 to not remove features in the eta distributions)
+EPS2 = 1e-4
 
 # sqrt(x) -> sqrt(x+EPS3)
 # numerical stability for masses
 EPS3 = 1e-6
-
-EPS4 = 1e-2
 
 # exp(x) -> exp(x.clamp(max=CUTOFF))
 CUTOFF = 7
@@ -52,13 +51,10 @@ def jetmomenta_to_fourmomenta(jetmomenta):
     return fourmomenta
 
 
-def jetmomenta_to_precisesiast(jetmomenta, pt_min, for_gatr, prep_params=None):
+def jetmomenta_to_precisesiast(jetmomenta, pt_min):
     pt, phi, eta, mass = torch.permute(jetmomenta, (2, 0, 1))
 
     pt_min_local = pt_min[:, : pt.shape[-1]].clone().to(pt.device)
-    if for_gatr:
-        assert prep_params is not None
-        pt_min_local /= prep_params["std"].to(pt.device)
     x_pt = torch.log(pt - pt_min_local + EPS1)
     x_phi = stable_arctanh(phi / math.pi, eps=1e-10)
     x_mass = torch.log(mass + EPS1)
@@ -70,13 +66,10 @@ def jetmomenta_to_precisesiast(jetmomenta, pt_min, for_gatr, prep_params=None):
     return precisesiast
 
 
-def precisesiast_to_jetmomenta(precisesiast, pt_min, for_gatr, prep_params=None):
+def precisesiast_to_jetmomenta(precisesiast, pt_min):
     x_pt, x_phi, eta, x_mass = torch.permute(precisesiast, (2, 0, 1))
 
     pt_min_local = pt_min[:, : x_pt.shape[-1]].clone().to(x_pt.device)
-    if for_gatr:
-        assert prep_params is not None
-        pt_min_local /= prep_params["std"].to(x_pt.device)
     pt = x_pt.clamp(max=CUTOFF).exp() + pt_min_local - EPS1
     phi = torch.tanh(x_phi.clamp(min=-CUTOFF, max=CUTOFF)) * math.pi
     mass = x_mass.clamp(max=CUTOFF).exp() - EPS1
@@ -102,7 +95,7 @@ def velocities_fourmomenta_to_jetmomenta(v_fourmomenta, fourmomenta, jetmomenta)
         / pt**2
         / torch.sqrt(px**2 + py**2 + pz**2)
     )
-    v_mass = (E * v_E - px * v_px - py * v_py - pz * v_pz) / mass #.clamp(min=EPS3)
+    v_mass = (E * v_E - px * v_px - py * v_py - pz * v_pz) / mass  # .clamp(min=EPS3)
 
     v_jetmomenta = torch.stack((v_pt, v_phi, v_eta, v_mass), dim=-1)
     assert torch.isfinite(

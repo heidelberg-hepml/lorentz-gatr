@@ -7,10 +7,8 @@ from omegaconf import OmegaConf, open_dict
 from experiments.base_experiment import BaseExperiment
 from experiments.eventgen.dataset import EventDataset
 from experiments.eventgen.preprocessing import (
-    preprocess_gatr,
-    undo_preprocess_gatr,
-    preprocess_tr,
-    undo_preprocess_tr,
+    preprocess,
+    undo_preprocess,
     ensure_onshell,
 )
 import experiments.eventgen.plotter as plotter
@@ -23,34 +21,35 @@ class EventGenerationExperiment(BaseExperiment):
         self.define_process_specifics()
 
         # dynamically set wrapper properties
-        self.modelname = self.cfg.model.net._target_.rsplit(".", 1)[-1]
+        modelname = self.cfg.model.net._target_.rsplit(".", 1)[-1]
+        self.is_gatr = True if modelname == "GATr" else False
         with open_dict(self.cfg):
             self.cfg.model.type_token_channels = self.n_hard_particles + max(
                 self.cfg.data.n_jets
             )
             self.cfg.model.process_token_channels = len(self.cfg.data.n_jets)
-            if self.modelname == "Transformer":
+            if not self.is_gatr:
                 self.cfg.model.net.in_channels = (
                     4
                     + self.cfg.model.type_token_channels
                     + self.cfg.model.process_token_channels
                     + self.cfg.model.embed_t_dim
                 )
-            elif self.modelname == "GATr":
+            else:
                 self.cfg.model.net.in_s_channels = (
                     self.cfg.model.type_token_channels
                     + self.cfg.model.process_token_channels
                     + self.cfg.model.embed_t_dim
                 )
 
-            if self.modelname == "GATr" and self.cfg.model.beam_reference is not None:
+            if self.is_gatr and self.cfg.model.beam_reference is not None:
                 self.cfg.model.net.in_mv_channels += (
                     2 if self.cfg.model.beam_reference == "cgenn" else 1
                 )
 
             self.cfg.model.onshell_list = self.onshell_list
             self.cfg.model.onshell_mass = self.onshell_mass
-            if self.modelname == "GATr":
+            if self.is_gatr:
                 self.cfg.model.pt_min = self.pt_min
             self.pt_min = torch.tensor(self.pt_min).unsqueeze(0)
 
@@ -58,7 +57,7 @@ class EventGenerationExperiment(BaseExperiment):
         LOGGER.info(f"Working with {self.cfg.data.n_jets} extra jets")
 
         # load all datasets and organize them in lists
-        self.events_raw, self.events_prepd, self.prep_params = [], [], []
+        self.events_raw = []
         for n_jets in self.cfg.data.n_jets:
             # load data
             data_path = eval(f"self.cfg.data.data_path_{n_jets}j")
@@ -76,21 +75,27 @@ class EventGenerationExperiment(BaseExperiment):
             data_raw = data_raw.reshape(data_raw.shape[0], data_raw.shape[1] // 4, 4)
             data_raw = torch.tensor(data_raw, dtype=self.dtype)
 
-            # preprocess data
-            data_raw = ensure_onshell(data_raw, self.onshell_list, self.onshell_mass)
-            if self.modelname == "GATr":
-                data_prepd, prep_params = preprocess_gatr(data_raw, self.pt_min)
-            elif self.modelname == "Transformer":
-                data_prepd, prep_params = preprocess_tr(data_raw, self.pt_min)
-
             # collect everything
             self.events_raw.append(data_raw)
+
+        # change global units
+        units = torch.cat(self.events_raw, dim=-2).std()
+        self.pt_min /= units
+        self.model.pt_min /= units
+
+        # preprocessing
+        self.events_prepd, self.prep_params = [], []
+        for _ in self.cfg.data.n_jets:
+            prep_params = {"units": units}
+
+            # preprocess data
+            data_raw = ensure_onshell(data_raw, self.onshell_list, self.onshell_mass)
+            data_prepd, prep_params = preprocess(
+                data_raw, self.pt_min, self.is_gatr, prep_params
+            )
+
             self.events_prepd.append(data_prepd)
             self.prep_params.append(prep_params)
-
-        # pass prep_params to model
-        if self.modelname == "GATr":
-            self.model.prep_params = self.prep_params
 
     def _init_dataloader(self):
         assert sum(self.cfg.data.train_test_val) <= 1
@@ -215,14 +220,9 @@ class EventGenerationExperiment(BaseExperiment):
             ].cpu()
             self.data_prepd[ijet]["gen"] = samples
 
-            if self.modelname == "GATr":
-                samples_raw = undo_preprocess_gatr(
-                    samples, self.pt_min, self.prep_params[ijet]
-                )
-            elif self.modelname == "Transformer":
-                samples_raw = undo_preprocess_tr(
-                    samples, self.pt_min, self.prep_params[ijet]
-                )
+            samples_raw = undo_preprocess(
+                samples, self.pt_min, self.is_gatr, self.prep_params[ijet]
+            )
             self.data_raw[ijet]["gen"] = samples_raw
 
         self.sample_loader = torch.utils.data.DataLoader(
@@ -242,7 +242,7 @@ class EventGenerationExperiment(BaseExperiment):
         ]
         kwargs = {
             "exp": self,
-            "model_label": "GATr" if self.modelname == "GATr" else "Transformer",
+            "model_label": "GATr" if self.is_gatr else "Transformer",
         }
 
         if self.cfg.plotting.loss and self.cfg.train:
