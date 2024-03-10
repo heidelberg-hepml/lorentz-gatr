@@ -255,9 +255,14 @@ def embed_beam_reference(p_ref, beam_reference):
         beam embedded as mv_channels multivectors
     """
 
-    if beam_reference in ["timelike", "spacelike"]:
+    if beam_reference in ["lightlike", "spacelike", "timelike"]:
         # add another 4-momentum
-        beam = [1, 0, 0, 1] if beam_reference == "timelike" else [0, 0, 0, 1]
+        if beam_reference == "lightlike":
+            beam = [1, 0, 0, 1]
+        elif beam_reference == "spacelike":
+            beam = [2**0.5, 0, 0, 1]
+        elif beam_reference == "timelike":
+            beam = [0, 0, 0, 1]
         beam = torch.tensor(beam, device=p_ref.device, dtype=p_ref.dtype)
         beam = beam.unsqueeze(0).expand(p_ref.shape[0], 1, 4)
         beam = embed_vector(beam)
