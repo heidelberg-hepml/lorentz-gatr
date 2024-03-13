@@ -5,6 +5,7 @@ from torch_geometric.data import Data
 from experiments.logger import LOGGER
 from gatr.interface import embed_vector
 
+
 class TopTaggingDataset(torch.utils.data.Dataset):
 
     """
@@ -67,7 +68,8 @@ class TopTaggingDataset(torch.utils.data.Dataset):
             assert data_scale is not None
         self.data_scale = data_scale
 
-        kinematics = kinematics / self.data_scale
+        if self.cfg.data.rescale_data:
+            kinematics = kinematics / self.data_scale
         kinematics = torch.tensor(kinematics, dtype=dtype)
         labels = torch.tensor(labels, dtype=torch.bool)
 
@@ -144,7 +146,9 @@ class TopTaggingDataset(torch.utils.data.Dataset):
 
         # beam reference
         x = embed_vector(x)
-        beam = embed_beam_reference(x, self.cfg.data.beam_reference)
+        beam = embed_beam_reference(
+            x, self.cfg.data.beam_reference, self.cfg.data.add_time_reference
+        )
         if beam is not None:
             x = torch.cat((x, beam), dim=-2)
 
@@ -152,15 +156,13 @@ class TopTaggingDataset(torch.utils.data.Dataset):
         scalars_is_global = torch.zeros(
             scalars.shape[0], 1, device=self.device, dtype=self.dtype
         )
-        scalars_is_global[..., 0] = 1.0
+        scalars_is_global[0, :] = 1.0
         scalars = torch.cat([scalars_is_global, scalars], dim=-1)
 
-        return Data(
-            x=x, scalars=scalars, label=batch.label, is_global=is_global
-        )
+        return Data(x=x, scalars=scalars, label=batch.label, is_global=is_global)
 
 
-def create_pairwise_tokens(self, single, cfg):
+def create_pairwise_tokens(single, cfg):
     """
     Create embedding of pairwise vector and (optional) scalar tokens
 
@@ -176,17 +178,17 @@ def create_pairwise_tokens(self, single, cfg):
     -------
     pairs: torch.tensor with shape (n_pairs, n_channels, 4)
         embedded pairwise vector tokens
-        amount of pairs and channels depends on the settings specified in self.cfg.data.pairs
+        amount of pairs and channels depends on the settings specified in cfg.data.pairs
     pairs_scalars: torch.tensor with shape (n_pairs, n_channels)
         embedded pairwise scalar tokens
-        amount of pairs and channels depends on the settings specified in self.cfg.data.pairs
+        amount of pairs and channels depends on the settings specified in cfg.data.pairs
 
     """
 
     # number of tokens (global token + one token per particle)
     n = single.shape[0] - 1
 
-    num_paired_channels = 3 if self.cfg.data.pairs.add_differences else 2
+    num_paired_channels = 3 if cfg.data.pairs.add_differences else 2
     pairs = torch.cat(
         (
             single[1:, :].reshape(n, 1, 1, 4).expand(n, n, 1, 4),
@@ -206,9 +208,9 @@ def create_pairwise_tokens(self, single, cfg):
 
     if cfg.data.pairs.directed:
         # remove pairs with fourmomentum1 <= fourmomentum2
-        # mask = torch.tensor([idx1 < idx2 for idx1 in range(n) for idx2 in range(n)], device=self.device) # this is slow because of the loop
+        # mask = torch.tensor([idx1 < idx2 for idx1 in range(n) for idx2 in range(n)], device=pairs.device) # this is slow because of the loop
         idx = torch.triu_indices(n, n, device=single.device)
-        mask = torch.ones(n, n, dtype=torch.bool, single=self.device)
+        mask = torch.ones(n, n, dtype=torch.bool, device=single.device)
         mask[idx[0], idx[1]] = False
         mask = mask.flatten()
 
@@ -238,7 +240,7 @@ def create_pairwise_tokens(self, single, cfg):
     return pairs, pairs_scalars
 
 
-def embed_beam_reference(p_ref, beam_reference):
+def embed_beam_reference(p_ref, beam_reference, add_time_reference):
     """
     Construct attention mask that makes sure that objects only attend to each other
     within the same batch element, and not across batch elements
@@ -249,6 +251,8 @@ def embed_beam_reference(p_ref, beam_reference):
         Reference tensor to infer device, dtype and shape for the beam_reference
     beam_reference: str
         Different options for adding a beam_reference
+    add_time_reference: bool
+        Whether to add the time direction as a reference to the network
 
     Returns
     -------
@@ -256,9 +260,14 @@ def embed_beam_reference(p_ref, beam_reference):
         beam embedded as mv_channels multivectors
     """
 
-    if beam_reference in ["timelike", "spacelike"]:
+    if beam_reference in ["lightlike", "spacelike", "timelike"]:
         # add another 4-momentum
-        beam = [1, 0, 0, 1] if beam_reference == "timelike" else [0, 0, 0, 1]
+        if beam_reference == "lightlike":
+            beam = [1, 0, 0, 1]
+        elif beam_reference == "spacelike":
+            beam = [2**0.5, 0, 0, 1]
+        elif beam_reference == "timelike":
+            beam = [0, 0, 0, 1]
         beam = torch.tensor(beam, device=p_ref.device, dtype=p_ref.dtype)
         beam = beam.unsqueeze(0).expand(p_ref.shape[0], 1, 4)
         beam = embed_vector(beam)
@@ -284,7 +293,19 @@ def embed_beam_reference(p_ref, beam_reference):
     else:
         raise NotImplementedError
 
-    return beam
+    if add_time_reference:
+        time = [1, 0, 0, 1]
+        time = torch.tensor(time, device=p_ref.device, dtype=p_ref.dtype)
+        time = time.unsqueeze(0).expand(p_ref.shape[0], 1, 4)
+        time = embed_vector(time)
+        if beam is None:
+            reference = time
+        else:
+            reference = torch.cat([beam, time], dim=-2)
+    else:
+        reference = beam
+
+    return reference
 
 
 def get_pt(p):
