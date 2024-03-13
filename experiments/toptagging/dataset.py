@@ -145,7 +145,9 @@ class TopTaggingDataset(torch.utils.data.Dataset):
 
         # beam reference
         x = embed_vector(x)
-        beam = embed_beam_reference(x, self.cfg.data.beam_reference, self.cfg.data.add_time_reference)
+        beam = embed_beam_reference(
+            x, self.cfg.data.beam_reference, self.cfg.data.add_time_reference
+        )
         if beam is not None:
             x = torch.cat((x, beam), dim=-2)
 
@@ -153,7 +155,7 @@ class TopTaggingDataset(torch.utils.data.Dataset):
         scalars_is_global = torch.zeros(
             scalars.shape[0], 1, device=self.device, dtype=self.dtype
         )
-        scalars_is_global[..., 0] = 1.0
+        scalars_is_global[0, :] = 1.0
         scalars = torch.cat([scalars_is_global, scalars], dim=-1)
 
         return Data(x=x, scalars=scalars, label=batch.label, is_global=is_global)
