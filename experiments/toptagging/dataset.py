@@ -145,7 +145,7 @@ class TopTaggingDataset(torch.utils.data.Dataset):
 
         # beam reference
         x = embed_vector(x)
-        beam = embed_beam_reference(x, self.cfg.data.beam_reference)
+        beam = embed_beam_reference(x, self.cfg.data.beam_reference, self.cfg.data.add_time_reference)
         if beam is not None:
             x = torch.cat((x, beam), dim=-2)
 
@@ -237,7 +237,7 @@ def create_pairwise_tokens(single, cfg):
     return pairs, pairs_scalars
 
 
-def embed_beam_reference(p_ref, beam_reference):
+def embed_beam_reference(p_ref, beam_reference, add_time_reference):
     """
     Construct attention mask that makes sure that objects only attend to each other
     within the same batch element, and not across batch elements
@@ -248,6 +248,8 @@ def embed_beam_reference(p_ref, beam_reference):
         Reference tensor to infer device, dtype and shape for the beam_reference
     beam_reference: str
         Different options for adding a beam_reference
+    add_time_reference: bool
+        Whether to add the time direction as a reference to the network
 
     Returns
     -------
@@ -288,7 +290,19 @@ def embed_beam_reference(p_ref, beam_reference):
     else:
         raise NotImplementedError
 
-    return beam
+    if add_time_reference:
+        time = [1, 0, 0, 1]
+        time = torch.tensor(time, device=p_ref.device, dtype=p_ref.dtype)
+        time = time.unsqueeze(0).expand(p_ref.shape[0], 1, 4)
+        time = embed_vector(time)
+        if beam is None:
+            reference = time
+        else:
+            reference = torch.cat([reference, time], dim=-2)
+    else:
+        reference = beam
+
+    return reference
 
 
 def get_pt(p):
