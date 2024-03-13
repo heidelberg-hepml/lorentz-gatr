@@ -46,6 +46,8 @@ class EventGenerationExperiment(BaseExperiment):
                 self.cfg.model.net.in_mv_channels += (
                     2 if self.cfg.model.beam_reference == "cgenn" else 1
                 )
+            if self.is_gatr and self.cfg.model.add_time_reference is not None:
+                self.cfg.model.net.in_mv_channels += 1
 
             self.cfg.model.onshell_list = self.onshell_list
             self.cfg.model.onshell_mass = self.onshell_mass
@@ -80,8 +82,10 @@ class EventGenerationExperiment(BaseExperiment):
 
         # change global units
         units = torch.cat(self.events_raw, dim=-2).std()
+        LOGGER.info(f"Changing to units of std(dataset)={units:.2f} GeV")
         self.pt_min /= units
-        self.model.pt_min /= units
+        if self.is_gatr:
+            self.model.pt_min /= units
 
         # preprocessing
         self.events_prepd, self.prep_params = [], []

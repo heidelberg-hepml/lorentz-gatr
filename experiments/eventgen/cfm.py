@@ -6,6 +6,7 @@ import torch
 from torch import nn
 
 from torchdiffeq import odeint
+from experiments.eventgen.transforms import ensure_angle
 
 
 class GaussianFourierProjection(nn.Module):
@@ -42,16 +43,11 @@ class CFM(nn.Module):
         v_t = -x0 + eps
 
         v_pred = self.get_velocity(x_t, t, ijet=ijet)
-        loss = loss_fn(v_pred, v_t)
-        """
-        lossi = (v_pred - v_t) ** 2
-        print(lossi.max(dim=0)[0])
-        import matplotlib.pyplot as plt
-        for i in range(4):
-            plt.hist(v_pred[...,i].flatten().detach(), bins=100, alpha=.5)
-            plt.hist(v_t[...,i].flatten().detach(), bins=100, alpha=.5)
-            plt.show()
-        """
+
+        # clamp mse entries for numerical stability
+        mse = torch.clamp((v_pred - v_t) ** 2, max=1000.0)
+        loss = mse.mean()
+        # print(loss, loss_fn(v_pred, v_t))
         return loss
 
     def sample(self, ijet, shape, device, dtype):
@@ -68,6 +64,7 @@ class CFM(nn.Module):
             method="rk4",
             options={"step_size": 1e-2},
         )[-1]
+        x_t[..., 1] = ensure_angle(x_t[..., 1])
         return x_t
 
     def log_prob(self, x, ijet):

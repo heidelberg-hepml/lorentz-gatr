@@ -17,6 +17,7 @@ from experiments.eventgen.transforms import (
     velocities_fourmomenta_to_jetmomenta,
     velocities_jetmomenta_to_precisesiast,
     stable_arctanh,
+    ensure_angle,
     EPS1,
     EPS2,
 )
@@ -70,7 +71,6 @@ class TrCFMWrapper(CFM):
         assert shape[-1] == 4
         eps = torch.randn(shape, generator=gen)
         eps[..., 1] = math.pi * (2 * torch.rand(*shape[:-1], generator=gen) - 1)
-        eps[..., 1] = stable_arctanh(eps[..., 1] / math.pi)
         eps[..., 3] -= 3.0  # masses are typically smaller
         eps[..., self.onshell_list, 3] = torch.log(
             torch.tensor(self.onshell_mass)
@@ -91,6 +91,7 @@ class TrCFMWrapper(CFM):
         process_token = get_process_token(x, ijet, self.process_token_channels)
         t_embedding = self.t_embedding(t).expand(x.shape[0], x.shape[1], -1)
 
+        x[..., 1] = ensure_angle(x[..., 1])
         x = torch.cat([x, type_token, process_token, t_embedding], dim=-1)
 
         v = self.net(x)
@@ -110,6 +111,7 @@ class GATrCFMWrapper(CFM):
         type_token_channels,
         process_token_channels,
         beam_reference,
+        add_time_reference,
     ):
         super().__init__(
             embed_t_dim,
@@ -122,12 +124,12 @@ class GATrCFMWrapper(CFM):
         self.process_token_channels = process_token_channels
         self.pt_min = torch.tensor(pt_min).unsqueeze(0)
         self.beam_reference = beam_reference
+        self.add_time_reference = add_time_reference
 
     def sample_base(self, shape, gen=None):
         assert shape[-1] == 4
         eps = torch.randn(shape, generator=gen)
         eps[..., 1] = math.pi * (2 * torch.rand(*shape[:-1], generator=gen) - 1)
-        eps[..., 1] = stable_arctanh(eps[..., 1] / math.pi)
         eps[..., 3] -= 3.0  # masses are typically smaller
         eps[..., self.onshell_list, 3] = torch.log(
             torch.tensor(self.onshell_mass)
@@ -144,6 +146,9 @@ class GATrCFMWrapper(CFM):
         raise NotImplementedError
 
     def get_velocity(self, precisesiast, t, ijet):
+        # this is not necessary, because the transform handles it
+        precisesiast[..., 1] = ensure_angle(precisesiast[..., 1])
+
         # precisesiast -> fourmomenta
         jetmomenta = precisesiast_to_jetmomenta(precisesiast, self.pt_min)
         fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
@@ -162,8 +167,7 @@ class GATrCFMWrapper(CFM):
         )
 
         # set mass-velocities to zero for on-shell particles
-        # v_precisesiast[..., self.onshell_list, 3] = 0.0
-        v_precisesiast[..., 3] = 0.0  # for debugging
+        v_precisesiast[..., self.onshell_list, 3] = 0.0
         return v_precisesiast
 
     def embed_into_ga(self, x, t, ijet):
@@ -175,7 +179,7 @@ class GATrCFMWrapper(CFM):
 
         # mv embedding
         mv = embed_vector(x).unsqueeze(-2)
-        beam = embed_beam_reference(mv, self.beam_reference)
+        beam = embed_beam_reference(mv, self.beam_reference, self.add_time_reference)
         if beam is not None:
             beam = beam.unsqueeze(1).expand(*mv.shape[:-2], beam.shape[-2], 16)
             mv = torch.cat([mv, beam], dim=-2)
