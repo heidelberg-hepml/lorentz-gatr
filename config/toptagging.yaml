@@ -17,6 +17,7 @@ data:
  add_pt: false
  add_jet_momentum: false
  reinsert_channels: false
+ rescale_data: true
 
 train: true
 training:

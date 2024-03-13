@@ -68,7 +68,8 @@ class TopTaggingDataset(torch.utils.data.Dataset):
             assert data_scale is not None
         self.data_scale = data_scale
 
-        kinematics = kinematics / self.data_scale
+        if self.cfg.data.rescale_data:
+            kinematics = kinematics / self.data_scale
         kinematics = torch.tensor(kinematics, dtype=dtype)
         labels = torch.tensor(labels, dtype=torch.bool)
 
@@ -300,7 +301,7 @@ def embed_beam_reference(p_ref, beam_reference, add_time_reference):
         if beam is None:
             reference = time
         else:
-            reference = torch.cat([reference, time], dim=-2)
+            reference = torch.cat([beam, time], dim=-2)
     else:
         reference = beam
 
