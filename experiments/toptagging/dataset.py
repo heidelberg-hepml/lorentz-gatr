@@ -264,9 +264,9 @@ def embed_beam_reference(p_ref, beam_reference, add_time_reference):
         # add another 4-momentum
         if beam_reference == "lightlike":
             beam = [1, 0, 0, 1]
-        elif beam_reference == "spacelike":
-            beam = [2**0.5, 0, 0, 1]
         elif beam_reference == "timelike":
+            beam = [2**0.5, 0, 0, 1]
+        elif beam_reference == "spacelike":
             beam = [0, 0, 0, 1]
         beam = torch.tensor(beam, device=p_ref.device, dtype=p_ref.dtype)
         beam = beam.unsqueeze(0).expand(p_ref.shape[0], 1, 4)
@@ -294,7 +294,7 @@ def embed_beam_reference(p_ref, beam_reference, add_time_reference):
         raise NotImplementedError
 
     if add_time_reference:
-        time = [1, 0, 0, 1]
+        time = [1, 0, 0, 0]
         time = torch.tensor(time, device=p_ref.device, dtype=p_ref.dtype)
         time = time.unsqueeze(0).expand(p_ref.shape[0], 1, 4)
         time = embed_vector(time)
