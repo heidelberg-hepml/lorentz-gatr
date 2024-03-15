@@ -8,7 +8,7 @@ from torch import nn
 from gatr.interface import embed_vector, extract_vector
 from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity
 from experiments.toptagging.dataset import embed_beam_reference
-from experiments.eventgen.cfm import CFM
+from experiments.eventgen.cfm import EventCFM
 from experiments.eventgen.transforms import (
     fourmomenta_to_jetmomenta,
     jetmomenta_to_fourmomenta,
@@ -46,12 +46,10 @@ def get_process_token(x_ref, ijet, process_token_channels):
     return process_token
 
 
-class TrCFMWrapper(CFM):
+class TransformerCFM(EventCFM):
     def __init__(
         self,
         net,
-        onshell_list,
-        onshell_mass,
         embed_t_dim,
         embed_t_scale,
         type_token_channels,
@@ -62,10 +60,32 @@ class TrCFMWrapper(CFM):
             embed_t_scale,
         )
         self.net = net
-        self.onshell_list = onshell_list
-        self.onshell_mass = onshell_mass
         self.type_token_channels = type_token_channels
         self.process_token_channels = process_token_channels
+
+    def preprocess(self, fourmomenta):
+        fourmomenta = fourmomenta / self.units
+        jetmomenta = fourmomenta_to_jetmomenta(fourmomenta)
+        precisesiast = jetmomenta_to_precisesiast(jetmomenta, self.pt_min)
+
+        # standardize components
+        if (
+            self.prep_params.get("std", None) is None
+            or self.prep_params.get("mean", None) is None
+        ):
+            self.prep_params["std"] = precisesiast.std(dim=[0, 1], keepdim=True)
+            self.prep_params["mean"] = precisesiast.mean(dim=[0, 1], keepdim=True)
+        precisesiast = (precisesiast - self.prep_params["mean"]) / self.prep_params[
+            "std"
+        ]
+        return precisesiast
+
+    def undo_preprocess(self, precisesiast):
+        precisesiast = precisesiast * prep_params["std"] + prep_params["mean"]
+        jetmomenta = precisesiast_to_jetmomenta(precisesiast, pt_min)
+        fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
+        fourmomenta = fourmomenta * self.units
+        return fourmomenta
 
     def sample_base(self, shape, gen=None):
         assert shape[-1] == 4
@@ -83,6 +103,13 @@ class TrCFMWrapper(CFM):
         ).all(), f"{torch.isnan(eps).sum(dim=[0,1])} {torch.isinf(eps).sum(dim=[0,1])}"
         return eps
 
+    def sample(self, *args):
+        x_t = super().sample(*args)
+
+        # enforce periodic phi
+        x_t[..., 1] = ensure_angle(x_t[..., 1])
+        return x_t
+
     def log_prob_base(self, eps):
         raise NotImplementedError
 
@@ -91,21 +118,20 @@ class TrCFMWrapper(CFM):
         process_token = get_process_token(x, ijet, self.process_token_channels)
         t_embedding = self.t_embedding(t).expand(x.shape[0], x.shape[1], -1)
 
-        x[..., 1] = ensure_angle(x[..., 1])
         x = torch.cat([x, type_token, process_token, t_embedding], dim=-1)
 
         v = self.net(x)
-        v[..., self.onshell_list, 3] = 0.0  # dont generate masses for now
         return v
 
 
-class GATrCFMWrapper(CFM):
+class GATrCFM(EventCFM):
+    """
+    Add GATr-specific parameters
+    """
+
     def __init__(
         self,
         net,
-        onshell_list,
-        onshell_mass,
-        pt_min,
         embed_t_dim,
         embed_t_scale,
         type_token_channels,
@@ -118,14 +144,31 @@ class GATrCFMWrapper(CFM):
             embed_t_scale,
         )
         self.net = net
-        self.onshell_list = onshell_list
-        self.onshell_mass = onshell_mass
         self.type_token_channels = type_token_channels
         self.process_token_channels = process_token_channels
-        self.pt_min = torch.tensor(pt_min).unsqueeze(0)
         self.beam_reference = beam_reference
         self.add_time_reference = add_time_reference
 
+
+class GATrCFM4Momenta(GATrCFM):
+    def sample_base(self, shape, gen=None):
+        eps = torch.randn(shape, generator=gen)
+        mass = eps[..., 0].abs()
+
+        # not sure if this makes sense
+        # mass[..., self.onshell_list] = torch.tensor(self.onshell_mass).unsqueeze(0).expand(shape[0], len(self.onshell_list)) + EPS1
+
+        eps[..., 0] = torch.sqrt(mass**2 + torch.sum(eps[..., 1:] ** 2, dim=-1))
+        return eps
+
+    def get_velocity(self, fourmomenta, t, ijet):
+        mv, s = self.embed_into_ga(fourmomenta, t, ijet)
+        mv_outputs, s_outputs = self.net(mv, s)
+        v_fourmomenta = self.extract_from_ga(mv_outputs, s_outputs)
+        return v_fourmomenta
+
+
+class GATrCFMNaive(GATrCFM):
     def sample_base(self, shape, gen=None):
         assert shape[-1] == 4
         eps = torch.randn(shape, generator=gen)
@@ -189,3 +232,8 @@ class GATrCFMWrapper(CFM):
     def extract_from_ga(self, mv, s):
         v = extract_vector(mv).squeeze(dim=-2)
         return v
+
+
+class GATrCFMStable(GATrCFM):
+    def __init__(self, *args):
+        super().__init__(*args)

@@ -7,8 +7,6 @@ from omegaconf import OmegaConf, open_dict
 from experiments.base_experiment import BaseExperiment
 from experiments.eventgen.dataset import EventDataset
 from experiments.eventgen.preprocessing import (
-    preprocess,
-    undo_preprocess,
     ensure_onshell,
 )
 import experiments.eventgen.plotter as plotter
@@ -49,12 +47,6 @@ class EventGenerationExperiment(BaseExperiment):
             if self.is_gatr and self.cfg.model.add_time_reference is not None:
                 self.cfg.model.net.in_mv_channels += 1
 
-            self.cfg.model.onshell_list = self.onshell_list
-            self.cfg.model.onshell_mass = self.onshell_mass
-            if self.is_gatr:
-                self.cfg.model.pt_min = self.pt_min
-            self.pt_min = torch.tensor(self.pt_min).unsqueeze(0)
-
     def init_data(self):
         LOGGER.info(f"Working with {self.cfg.data.n_jets} extra jets")
 
@@ -83,20 +75,16 @@ class EventGenerationExperiment(BaseExperiment):
         # change global units
         units = torch.cat(self.events_raw, dim=-2).std()
         LOGGER.info(f"Changing to units of std(dataset)={units:.2f} GeV")
-        self.pt_min /= units
-        if self.is_gatr:
-            self.model.pt_min /= units
+        self.model.init_physics(
+            units, self.pt_min, self.onshell_list, self.onshell_mass
+        )
 
         # preprocessing
         self.events_prepd, self.prep_params = [], []
         for _ in self.cfg.data.n_jets:
-            prep_params = {"units": units}
-
             # preprocess data
             data_raw = ensure_onshell(data_raw, self.onshell_list, self.onshell_mass)
-            data_prepd, prep_params = preprocess(
-                data_raw, self.pt_min, self.is_gatr, prep_params
-            )
+            data_prepd = self.model.preprocess(data_raw)
 
             self.events_prepd.append(data_prepd)
             self.prep_params.append(prep_params)
@@ -224,9 +212,7 @@ class EventGenerationExperiment(BaseExperiment):
             ].cpu()
             self.data_prepd[ijet]["gen"] = samples
 
-            samples_raw = undo_preprocess(
-                samples, self.pt_min, self.is_gatr, self.prep_params[ijet]
-            )
+            samples_raw = self.model.undo_preprocess(samples)
             self.data_raw[ijet]["gen"] = samples_raw
 
         self.sample_loader = torch.utils.data.DataLoader(

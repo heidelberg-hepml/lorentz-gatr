@@ -25,6 +25,12 @@ class GaussianFourierProjection(nn.Module):
 
 
 class CFM(nn.Module):
+    """
+    Base class for all CFM models
+    - sample_base and get_velocity should be implemented by subclasses
+    - batch_loss, sample and log_prob might be overwritten or extended by subclasses
+    """
+
     def __init__(
         self,
         embed_t_dim,
@@ -45,9 +51,10 @@ class CFM(nn.Module):
         v_pred = self.get_velocity(x_t, t, ijet=ijet)
 
         # clamp mse entries for numerical stability
-        mse = torch.clamp((v_pred - v_t) ** 2, max=1000.0)
-        loss = mse.mean()
+        # mse = torch.clamp((v_pred - v_t) ** 2, max=1000.0) # make this optional
+        # loss = mse.mean()
         # print(loss, loss_fn(v_pred, v_t))
+        loss = loss_fn(v_pred, v_t)
         return loss
 
     def sample(self, ijet, shape, device, dtype):
@@ -64,11 +71,35 @@ class CFM(nn.Module):
             method="rk4",
             options={"step_size": 1e-2},
         )[-1]
-        x_t[..., 1] = ensure_angle(x_t[..., 1])
         return x_t
+
+    def sample_base(self, shape, gen=None):
+        raise NotImplementedError
+
+    def get_velocity(self, x, t, ijet):
+        raise NotImplementedError
 
     def log_prob(self, x, ijet):
         raise NotImplementedError
 
-    def get_velocity(self, x, t, ijet):
+
+class EventCFM(CFM):
+    """
+    Add event-generation-specific methods to CFM classes:
+    Save information at the wrapper level, have wrapper-specific preprocessing and undo_preprocessing
+    """
+
+    def __init__(self, *args):
+        super().__init__(*args)
+
+    def init_physics(self, units, pt_min, onshell_list, onshell_mass):
+        self.units = units
+        self.pt_min = torch.tensor(pt_min).unsqueeze(0)
+        self.onshell_list = onshell_list
+        self.onshell_mass = onshell_mass
+
+    def preprocess(self, fourmomenta):
+        raise NotImplementedError
+
+    def undo_preprocess(self, x):
         raise NotImplementedError
