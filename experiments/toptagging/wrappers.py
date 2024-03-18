@@ -82,6 +82,58 @@ class TopTaggingGATrWrapper(nn.Module):
         mask = attention_mask(batch, self.force_xformers)
 
         multivector, scalars = self.embed_into_ga(batch)
+
+        multivector_outputs, scalar_outputs = self.net(
+            multivector, scalars=scalars, attention_mask=mask
+        )
+        logits = self.extract_from_ga(batch, multivector_outputs, scalar_outputs)
+
+        return logits
+
+    def embed_into_ga(self, batch):
+        # embedding happens in the dataset for convenience
+        # add artificial batch index (needed for xformers attention)
+        multivector, scalars = batch.x.unsqueeze(0), batch.scalars.unsqueeze(0)
+        return multivector, scalars
+
+    def extract_from_ga(self, batch, multivector, scalars):
+
+        outputs = extract_scalar(multivector).squeeze()
+        if self.mean_aggregation:
+            outputs = outputs.squeeze()
+            batchsize = max(batch.batch) + 1
+            logits = torch.zeros(batchsize, device=outputs.device, dtype=outputs.dtype)
+            logits.index_add_(0, batch.batch, outputs)  # sum
+            logits = logits / torch.bincount(batch.batch)  # mean
+        else:
+            logits = outputs.unsqueeze(-1)[batch.is_global]
+
+        return logits
+
+
+class QGTaggingGATrWrapper(nn.Module):
+    """
+    GATr for quark gluon tagging
+    including all kinds of options to play with
+    """
+
+    def __init__(
+        self,
+        net,
+        mean_aggregation=False,
+        add_pt=False,
+        force_xformers=True,
+    ):
+        super().__init__()
+        self.net = net
+        self.mean_aggregation = mean_aggregation
+        self.add_pt = add_pt
+        self.force_xformers = force_xformers
+
+    def forward(self, batch):
+        mask = attention_mask(batch, self.force_xformers)
+
+        multivector, scalars = self.embed_into_ga(batch)
         multivector_outputs, scalar_outputs = self.net(
             multivector, scalars=scalars, attention_mask=mask
         )

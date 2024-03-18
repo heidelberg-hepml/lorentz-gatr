@@ -9,6 +9,7 @@ from sklearn.metrics import roc_curve, roc_auc_score, accuracy_score
 
 from experiments.base_experiment import BaseExperiment
 from experiments.toptagging.dataset import TopTaggingDataset
+from experiments.toptagging.dataset import QGTaggingDataset
 from experiments.toptagging.plots import plot_mixer
 from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
@@ -48,10 +49,13 @@ class TaggingExperiment(BaseExperiment):
                 self.cfg.model.net.in_s_channels = 1
                 self.cfg.model.net.in_mv_channels = 1
 
-                # extra s channels for pt
-                self.cfg.model.add_pt = self.cfg.data.add_pt
-                if self.cfg.data.add_pt:
-                    self.cfg.model.net.in_s_channels += 1
+            elif (
+                self.cfg.model._target_
+                == "experiments.toptagging.wrappers.QGTaggingGATrWrapper"
+            ):
+                # make sure we know where we start from
+                self.cfg.model.net.in_s_channels = 7
+                self.cfg.model.net.in_mv_channels = 1
 
                 # extra mv channels for beam_reference and time_reference
                 if self.cfg.data.beam_reference is not None:
@@ -288,3 +292,11 @@ class TopTaggingExperiment(TaggingExperiment):
             self.cfg.data.data_dir, f"toptagging_{self.cfg.data.dataset}.npz"
         )
         self._init_data(TopTaggingDataset, data_path)
+
+class QGTaggingExperiment(TaggingExperiment):
+    def init_data(self):
+        data_path = os.path.join(
+            self.cfg.data.data_dir, f"{self.cfg.data.dataset}.npz"
+        )
+        self._init_data(QGTaggingDataset, data_path)
+
