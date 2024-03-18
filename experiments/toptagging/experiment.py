@@ -57,30 +57,36 @@ class TaggingExperiment(BaseExperiment):
                 self.cfg.model.net.in_s_channels = 7
                 self.cfg.model.net.in_mv_channels = 1
 
-                # extra mv channels for beam_reference and time_reference
-                if self.cfg.data.beam_reference is not None:
-                    self.cfg.model.net.in_mv_channels += (
-                        2 if self.cfg.data.beam_reference == "cgenn" else 1
-                    )
-                if self.cfg.data.add_time_reference:
+
+            # extra s channels for pt
+            self.cfg.model.add_pt = self.cfg.data.add_pt
+            if self.cfg.data.add_pt:
+                self.cfg.model.net.in_s_channels += 1
+
+            # extra mv channels for beam_reference and time_reference
+            if self.cfg.data.beam_reference is not None:
+                self.cfg.model.net.in_mv_channels += (
+                   2 if self.cfg.data.beam_reference == "cgenn" else 1
+                )
+            if self.cfg.data.add_time_reference:
+                self.cfg.model.net.in_mv_channels += 1
+
+            # extra mv and s channels for pairs
+            if self.cfg.data.pairs.use:
+                self.cfg.model.net.in_mv_channels += 2
+                if self.cfg.data.pairs.add_differences:
                     self.cfg.model.net.in_mv_channels += 1
+                if self.cfg.data.pairs.add_scalars:
+                    self.cfg.model.net.in_s_channels += 2
 
-                # extra mv and s channels for pairs
-                if self.cfg.data.pairs.use:
-                    self.cfg.model.net.in_mv_channels += 2
-                    if self.cfg.data.pairs.add_differences:
-                        self.cfg.model.net.in_mv_channels += 1
-                    if self.cfg.data.pairs.add_scalars:
-                        self.cfg.model.net.in_s_channels += 2
-
-                # reinsert channels
-                if self.cfg.data.reinsert_channels:
-                    self.cfg.model.net.reinsert_mv_channels = list(
-                        range(self.cfg.model.net.in_mv_channels)
-                    )
-                    self.cfg.model.net.reinsert_s_channels = list(
-                        range(self.cfg.model.net.in_s_channels)
-                    )
+            # reinsert channels
+            if self.cfg.data.reinsert_channels:
+                self.cfg.model.net.reinsert_mv_channels = list(
+                    range(self.cfg.model.net.in_mv_channels)
+                )
+                self.cfg.model.net.reinsert_s_channels = list(
+                    range(self.cfg.model.net.in_s_channels)
+                )
 
     def init_data(self):
         raise NotImplementedError
@@ -293,10 +299,8 @@ class TopTaggingExperiment(TaggingExperiment):
         )
         self._init_data(TopTaggingDataset, data_path)
 
+
 class QGTaggingExperiment(TaggingExperiment):
     def init_data(self):
-        data_path = os.path.join(
-            self.cfg.data.data_dir, f"{self.cfg.data.dataset}.npz"
-        )
+        data_path = os.path.join(self.cfg.data.data_dir, f"{self.cfg.data.dataset}.npz")
         self._init_data(QGTaggingDataset, data_path)
-

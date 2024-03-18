@@ -97,7 +97,6 @@ class TopTaggingGATrWrapper(nn.Module):
         return multivector, scalars
 
     def extract_from_ga(self, batch, multivector, scalars):
-
         outputs = extract_scalar(multivector).squeeze()
         if self.mean_aggregation:
             outputs = outputs.squeeze()
@@ -148,7 +147,6 @@ class QGTaggingGATrWrapper(nn.Module):
         return multivector, scalars
 
     def extract_from_ga(self, batch, multivector, scalars):
-
         outputs = extract_scalar(multivector).squeeze()
         if self.mean_aggregation:
             outputs = outputs.squeeze()

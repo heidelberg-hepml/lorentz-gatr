@@ -396,7 +396,6 @@ class BaseExperiment:
             self.scheduler.load_state_dict(state_dict)
 
     def train(self):
-
         # performance metrics
         self.train_lr, self.train_loss, self.val_loss = [], [], []
         self.train_metrics = self._init_metrics()
@@ -415,6 +414,7 @@ class BaseExperiment:
             f"while validating every {self.cfg.training.validate_every_n_steps} iterations"
         )
         self.training_start_time = time.time()
+
         # recycle trainloader, thanks Pim :)
         def cycle(iterable):
             while True:
@@ -423,7 +423,6 @@ class BaseExperiment:
 
         iterator = iter(cycle(self.train_loader))
         for step in range(self.cfg.training.iterations):
-
             # training
             self.model.train()
             data = next(iterator)
@@ -490,7 +489,6 @@ class BaseExperiment:
                 )
 
     def _step(self, data, step):
-
         # actual update step
         loss, metrics = self._batch_loss(data)
         self.optimizer.zero_grad()

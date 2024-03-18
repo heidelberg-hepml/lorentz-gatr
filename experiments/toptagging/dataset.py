@@ -81,7 +81,6 @@ class TopTaggingDataset(torch.utils.data.Dataset):
             x = kinematics[i, ...][mask]
             label = labels[i, ...]
 
-
             # construct global token
             if self.cfg.data.add_jet_momentum:
                 global_token = x.sum(dim=0, keepdim=True)
@@ -92,10 +91,8 @@ class TopTaggingDataset(torch.utils.data.Dataset):
             is_global = torch.zeros(x.shape[0], 1, dtype=torch.bool)
             is_global[0, 0] = True
 
-
             data = Data(x=x, label=label, is_global=is_global)
             self.data_list.append(data)
-
 
     def __len__(self):
         return len(self.data_list)
@@ -163,6 +160,7 @@ class TopTaggingDataset(torch.utils.data.Dataset):
         scalars = torch.cat([scalars_is_global, scalars], dim=-1)
 
         return Data(x=x, scalars=scalars, label=batch.label, is_global=is_global)
+
 
 class QGTaggingDataset(torch.utils.data.Dataset):
 
@@ -258,7 +256,6 @@ class QGTaggingDataset(torch.utils.data.Dataset):
             data = Data(x=x, pid=pid, label=label, is_global=is_global)
             self.data_list.append(data)
 
-
     def __len__(self):
         return len(self.data_list)
 
@@ -323,8 +320,6 @@ class QGTaggingDataset(torch.utils.data.Dataset):
         scalars = torch.cat([scalars_is_global, scalars], dim=-1)
 
         return Data(x=x, scalars=scalars, label=batch.label, is_global=is_global)
-
-
 
 
 def create_pairwise_tokens(single, cfg):
