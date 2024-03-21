@@ -10,6 +10,7 @@ class zmumuExperiment(EventGenerationExperiment):
         self.n_jets_max = 5
         self.onshell_list = [0, 1]
         self.onshell_mass = [0.1, 0.1]
+        self.delta_r_min = 0.39
         self.pt_min = [0.0, 0.0, 20.0, 20.0, 20.0]
         self.obs_names_index = ["l1", "l2"]
         for ijet in range(self.n_jets_max):

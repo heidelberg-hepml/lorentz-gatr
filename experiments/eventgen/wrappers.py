@@ -5,7 +5,7 @@ import math
 import torch
 from torch import nn
 
-from gatr.interface import embed_vector, extract_vector
+from gatr.interface import embed_vector, extract_vector, extract_scalar
 from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity
 from experiments.toptagging.dataset import embed_beam_reference
 from experiments.eventgen.cfm import EventCFM
@@ -14,12 +14,14 @@ from experiments.eventgen.transforms import (
     jetmomenta_to_fourmomenta,
     jetmomenta_to_precisesiast,
     precisesiast_to_jetmomenta,
-    velocities_fourmomenta_to_jetmomenta,
+    velocities_jetmomenta_to_fourmomenta,
+    velocities_precisesiast_to_jetmomenta,
     velocities_jetmomenta_to_precisesiast,
+    velocities_fourmomenta_to_jetmomenta,
     stable_arctanh,
     ensure_angle,
+    delta_r,
     EPS1,
-    EPS2,
 )
 
 
@@ -46,6 +48,68 @@ def get_process_token(x_ref, ijet, process_token_channels):
     return process_token
 
 
+# Note: Should eventually have seperate class for base distributions
+# (with sample() and log_prob() methods)
+def base_4momenta(shape, onshell_list, onshell_mass, generator=None):
+    """Base distribution for 4-momenta: 3-momentum from standard gaussian, mass from half-gaussian"""
+    eps = torch.randn(shape, generator=generator)
+    mass = eps[..., 0].abs()
+    mass[..., onshell_list] = torch.log(
+        torch.tensor(onshell_mass).unsqueeze(0).expand(shape[0], len(onshell_list))
+        + EPS1
+    )
+    eps[..., 0] = torch.sqrt(mass**2 + torch.sum(eps[..., 1:] ** 2, dim=-1))
+    assert torch.isfinite(eps).all()
+    return eps
+
+
+def base_precisesiast(shape, onshell_list, onshell_mass, delta_r_min, generator=None):
+    """Base distribution for precisesiast: pt, eta gaussian; phi uniform; mass shifted gaussian"""
+    pt = torch.randn(shape[:-1], generator=generator)
+    if delta_r_min is None:
+        eta = torch.randn(shape[:-1], generator=generator)
+        phi = math.pi * (2 * torch.rand(shape[:-1], generator=generator) - 1)
+    else:
+        eta, phi = eta_phi_no_deltar_holes(
+            shape, generator=generator, delta_r_min=delta_r_min
+        )
+    mass = torch.randn(shape[:-1], generator=generator) - 3.0
+    mass[..., onshell_list] = torch.log(
+        torch.tensor(onshell_mass).unsqueeze(0).expand(shape[0], len(onshell_list))
+        + EPS1
+    )
+    eps = torch.stack((pt, phi, eta, mass), dim=-1)
+    assert torch.isfinite(eps).all()
+    return eps
+
+
+def eta_phi_no_deltar_holes(shape, generator=None, delta_r_min=0.4, safety_factor=10):
+    """Use rejection sampling to sample phi and eta based on 'shape' with delta_r > delta_r_min"""
+    phi = math.pi * (
+        2 * torch.rand(safety_factor * shape[0], shape[1], generator=generator) - 1
+    )
+    eta = torch.randn(safety_factor * shape[0], shape[1], generator=generator)
+    event = torch.stack(
+        (torch.zeros_like(phi), phi, eta, torch.zeros_like(phi)), dim=-1
+    )
+
+    mask = []
+    for idx1 in range(shape[1]):
+        for idx2 in range(shape[1]):
+            if idx1 >= idx2:
+                continue
+            mask_single = delta_r(event, idx1, idx2)
+            mask.append(mask_single > delta_r_min)
+    mask = torch.stack(mask, dim=-1).all(dim=-1)
+    assert mask.sum() > shape[0], (
+        f"Have mask.sum={mask.sum()} and shape[0]={shape[0]} "
+        f"-> Should increase the safety_factor={safety_factor}"
+    )
+    event = event[mask, ...][: shape[0], ...]
+    _, phi, eta, _ = torch.permute(event, (2, 0, 1))
+    return phi, eta
+
+
 class TransformerCFM(EventCFM):
     def __init__(
         self,
@@ -54,64 +118,16 @@ class TransformerCFM(EventCFM):
         embed_t_scale,
         type_token_channels,
         process_token_channels,
+        clamp_mse,
     ):
         super().__init__(
             embed_t_dim,
             embed_t_scale,
+            clamp_mse,
         )
         self.net = net
         self.type_token_channels = type_token_channels
         self.process_token_channels = process_token_channels
-
-    def preprocess(self, fourmomenta):
-        fourmomenta = fourmomenta / self.units
-        jetmomenta = fourmomenta_to_jetmomenta(fourmomenta)
-        precisesiast = jetmomenta_to_precisesiast(jetmomenta, self.pt_min)
-
-        # standardize components
-        if (
-            self.prep_params.get("std", None) is None
-            or self.prep_params.get("mean", None) is None
-        ):
-            self.prep_params["std"] = precisesiast.std(dim=[0, 1], keepdim=True)
-            self.prep_params["mean"] = precisesiast.mean(dim=[0, 1], keepdim=True)
-        precisesiast = (precisesiast - self.prep_params["mean"]) / self.prep_params[
-            "std"
-        ]
-        return precisesiast
-
-    def undo_preprocess(self, precisesiast):
-        precisesiast = precisesiast * prep_params["std"] + prep_params["mean"]
-        jetmomenta = precisesiast_to_jetmomenta(precisesiast, pt_min)
-        fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
-        fourmomenta = fourmomenta * self.units
-        return fourmomenta
-
-    def sample_base(self, shape, gen=None):
-        assert shape[-1] == 4
-        eps = torch.randn(shape, generator=gen)
-        eps[..., 1] = math.pi * (2 * torch.rand(*shape[:-1], generator=gen) - 1)
-        eps[..., 3] -= 3.0  # masses are typically smaller
-        eps[..., self.onshell_list, 3] = torch.log(
-            torch.tensor(self.onshell_mass)
-            .unsqueeze(0)
-            .expand(shape[0], len(self.onshell_list))
-            + EPS1
-        )
-        assert torch.isfinite(
-            eps
-        ).all(), f"{torch.isnan(eps).sum(dim=[0,1])} {torch.isinf(eps).sum(dim=[0,1])}"
-        return eps
-
-    def sample(self, *args):
-        x_t = super().sample(*args)
-
-        # enforce periodic phi
-        x_t[..., 1] = ensure_angle(x_t[..., 1])
-        return x_t
-
-    def log_prob_base(self, eps):
-        raise NotImplementedError
 
     def get_velocity(self, x, t, ijet):
         type_token = get_type_token(x, self.type_token_channels)
@@ -119,13 +135,63 @@ class TransformerCFM(EventCFM):
         t_embedding = self.t_embedding(t).expand(x.shape[0], x.shape[1], -1)
 
         x = torch.cat([x, type_token, process_token, t_embedding], dim=-1)
-
         v = self.net(x)
         return v
 
 
+class TransformerCFM4Momenta(TransformerCFM):
+    def preprocess(self, fourmomenta):
+        fourmomenta = fourmomenta / self.units
+        return fourmomenta
+
+    def undo_preprocess(self, fourmomenta):
+        fourmomenta = fourmomenta * self.units
+        return fourmomenta
+
+    def sample_base(self, shape, gen=None):
+        return base_4momenta(shape, self.onshell_list, self.onshell_mass, generator=gen)
+
+
+class TransformerCFMPrecisesiast(TransformerCFM):
+    def preprocess(self, fourmomenta):
+        fourmomenta = fourmomenta / self.units
+        jetmomenta = fourmomenta_to_jetmomenta(fourmomenta)
+        precisesiast = jetmomenta_to_precisesiast(jetmomenta, self.pt_min)
+        return precisesiast
+
+    def undo_preprocess(self, precisesiast):
+        jetmomenta = precisesiast_to_jetmomenta(precisesiast, self.pt_min)
+        fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
+        fourmomenta = fourmomenta * self.units
+        return fourmomenta
+
+    def sample_base(self, shape, gen=None):
+        return base_precisesiast(
+            shape, self.onshell_list, self.onshell_mass, self.delta_r_min, generator=gen
+        )
+
+    def get_velocity(self, x, t, ijet):
+        x[..., 1] = ensure_angle(x[..., 1])
+        v_precisesiast = super().get_velocity(x, t, ijet)
+        v_precisesiast[..., self.onshell_list, 3] = 0.0
+        return v_precisesiast
+
+    def get_trajectory(self, x0, eps, t):
+        distance = eps - x0
+        distance[..., 1] = ensure_angle(distance[..., 1])
+        x_t = x0 + distance * t
+        v_t = distance
+        return x_t, v_t
+
+    def sample(self, *args):
+        x_t = super().sample(*args)
+        x_t[..., 1] = ensure_angle(x_t[..., 1])
+        return x_t
+
+
 class GATrCFM(EventCFM):
     """
+    Abstract base class for all GATrCFM's
     Add GATr-specific parameters
     """
 
@@ -138,10 +204,12 @@ class GATrCFM(EventCFM):
         process_token_channels,
         beam_reference,
         add_time_reference,
+        clamp_mse,
     ):
         super().__init__(
             embed_t_dim,
             embed_t_scale,
+            clamp_mse,
         )
         self.net = net
         self.type_token_channels = type_token_channels
@@ -149,69 +217,12 @@ class GATrCFM(EventCFM):
         self.beam_reference = beam_reference
         self.add_time_reference = add_time_reference
 
-
-class GATrCFM4Momenta(GATrCFM):
-    def sample_base(self, shape, gen=None):
-        eps = torch.randn(shape, generator=gen)
-        mass = eps[..., 0].abs()
-
-        # not sure if this makes sense
-        # mass[..., self.onshell_list] = torch.tensor(self.onshell_mass).unsqueeze(0).expand(shape[0], len(self.onshell_list)) + EPS1
-
-        eps[..., 0] = torch.sqrt(mass**2 + torch.sum(eps[..., 1:] ** 2, dim=-1))
-        return eps
-
     def get_velocity(self, fourmomenta, t, ijet):
-        mv, s = self.embed_into_ga(fourmomenta, t, ijet)
-        mv_outputs, s_outputs = self.net(mv, s)
-        v_fourmomenta = self.extract_from_ga(mv_outputs, s_outputs)
-        return v_fourmomenta
-
-
-class GATrCFMNaive(GATrCFM):
-    def sample_base(self, shape, gen=None):
-        assert shape[-1] == 4
-        eps = torch.randn(shape, generator=gen)
-        eps[..., 1] = math.pi * (2 * torch.rand(*shape[:-1], generator=gen) - 1)
-        eps[..., 3] -= 3.0  # masses are typically smaller
-        eps[..., self.onshell_list, 3] = torch.log(
-            torch.tensor(self.onshell_mass)
-            .unsqueeze(0)
-            .expand(shape[0], len(self.onshell_list))
-            + EPS1
-        )
-        assert torch.isfinite(
-            eps
-        ).all(), f"{torch.isnan(eps).sum(dim=[0,1])} {torch.isinf(eps).sum(dim=[0,1])}"
-        return eps
-
-    def log_prob_base(self, eps):
-        raise NotImplementedError
-
-    def get_velocity(self, precisesiast, t, ijet):
-        # this is not necessary, because the transform handles it
-        precisesiast[..., 1] = ensure_angle(precisesiast[..., 1])
-
-        # precisesiast -> fourmomenta
-        jetmomenta = precisesiast_to_jetmomenta(precisesiast, self.pt_min)
-        fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
-
         # GATr in fourmomenta space
         mv, s = self.embed_into_ga(fourmomenta, t, ijet)
         mv_outputs, s_outputs = self.net(mv, s)
         v_fourmomenta = self.extract_from_ga(mv_outputs, s_outputs)
-
-        # velocities fourmomenta -> velocities precisesiast
-        v_jetmomenta = velocities_fourmomenta_to_jetmomenta(
-            v_fourmomenta, fourmomenta, jetmomenta
-        )
-        v_precisesiast = velocities_jetmomenta_to_precisesiast(
-            v_jetmomenta, jetmomenta, precisesiast
-        )
-
-        # set mass-velocities to zero for on-shell particles
-        v_precisesiast[..., self.onshell_list, 3] = 0.0
-        return v_precisesiast
+        return v_fourmomenta
 
     def embed_into_ga(self, x, t, ijet):
         # scalar embedding
@@ -234,6 +245,171 @@ class GATrCFMNaive(GATrCFM):
         return v
 
 
-class GATrCFMStable(GATrCFM):
-    def __init__(self, *args):
-        super().__init__(*args)
+class GATrCFM4Momenta(GATrCFM):
+    """
+    GATrCFM with flow matching in 4-momentum space
+    The precisesiast representation does not appear at any point
+    """
+
+    def preprocess(self, fourmomenta):
+        return fourmomenta / self.units
+
+    def undo_preprocess(self, fourmomenta):
+        return fourmomenta * self.units
+
+    def sample_base(self, shape, gen=None):
+        return base_4momenta(shape, self.onshell_list, self.onshell_mass, generator=gen)
+
+
+class GATrCFM4MomentaHacked(GATrCFM4Momenta):
+    def preprocess(self, fourmomenta):
+        return fourmomenta / self.units
+
+    def undo_preprocess(self, fourmomenta):
+        return fourmomenta * self.units
+
+    def sample_base(self, shape, gen=None):
+        return base_4momenta(shape, self.onshell_list, self.onshell_mass, generator=gen)
+
+    def extract_from_ga(self, mv, s):
+        v = extract_vector(mv).squeeze(dim=-2)
+        v_mass = extract_scalar(mv).squeeze(dim=[-2, -1])
+        v_mass[..., self.onshell_list] = 0.0
+        v[..., 0] = v_mass
+        return v
+
+    def sample_base(self, shape, gen=None):
+        eps = torch.randn(shape, generator=gen)
+        mass = eps[..., 0].abs()
+        mass[..., self.onshell_list] = (
+            torch.tensor(self.onshell_mass)
+            .unsqueeze(0)
+            .expand(shape[0], len(self.onshell_list))
+        )
+        eps[..., 0] = mass
+        assert torch.isfinite(eps).all()
+        return eps
+
+
+class GATrCFMPrecisesiast1(GATrCFM):
+    """
+    GATrCFM with straight trajectories in precisesiast and CFM metric in fourmomenta
+    """
+
+    def preprocess(self, fourmomenta):
+        fourmomenta = fourmomenta / self.units
+        jetmomenta = fourmomenta_to_jetmomenta(fourmomenta)
+        precisesiast = jetmomenta_to_precisesiast(jetmomenta, self.pt_min)
+        return precisesiast
+
+    def undo_preprocess(self, precisesiast):
+        jetmomenta = precisesiast_to_jetmomenta(precisesiast, self.pt_min)
+        fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
+        fourmomenta = fourmomenta * self.units
+        return fourmomenta
+
+    def sample_base(self, shape, gen=None):
+        return base_precisesiast(
+            shape, self.onshell_list, self.onshell_mass, self.delta_r_min, generator=gen
+        )
+
+    def get_velocity(self, precisesiast, t, ijet):
+        # this is not necessary, because the transform handles it
+        precisesiast[..., 1] = ensure_angle(precisesiast[..., 1])
+
+        # precisesiast -> fourmomenta
+        jetmomenta = precisesiast_to_jetmomenta(precisesiast, self.pt_min)
+        fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
+
+        v_fourmomenta = super().get_velocity(fourmomenta, t, ijet)
+        return v_fourmomenta
+
+    def get_trajectory(self, x0, eps, t):
+        distance = eps - x0
+        distance[..., 1] = ensure_angle(distance[..., 1])
+        x_t = x0 + distance * t
+        v_t = distance
+
+        precisesiast = x_t
+        v_precisesiast = v_t
+
+        # onshell particles have velocity zero
+        v_precisesiast[..., self.onshell_list, 3] = 0.0
+
+        # transform velocity to fourmomenta space
+        jetmomenta = precisesiast_to_jetmomenta(precisesiast, self.pt_min)
+        fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
+        v_jetmomenta = velocities_precisesiast_to_jetmomenta(
+            v_precisesiast, precisesiast, jetmomenta
+        )
+        v_fourmomenta = velocities_jetmomenta_to_fourmomenta(
+            v_jetmomenta, jetmomenta, fourmomenta
+        )
+        return precisesiast, v_fourmomenta
+
+    def get_distance(self, x0, x1):
+        distance = super().get_distance(x0, x1)
+        distance[..., 1] = ensure_angle(distance[..., 1])
+        return distance
+
+    def sample(self, *args):
+        x_t = super().sample(*args)
+        x_t[..., 1] = ensure_angle(x_t[..., 1])
+        return x_t
+
+
+class GATrCFMPrecisesiast2(GATrCFM):
+    """
+    GATrCFM with straight trajectories in precisesiast and CFM metric in precisesiast
+    """
+
+    def preprocess(self, fourmomenta):
+        fourmomenta = fourmomenta / self.units
+        jetmomenta = fourmomenta_to_jetmomenta(fourmomenta)
+        precisesiast = jetmomenta_to_precisesiast(jetmomenta, self.pt_min)
+        return precisesiast
+
+    def undo_preprocess(self, precisesiast):
+        jetmomenta = precisesiast_to_jetmomenta(precisesiast, self.pt_min)
+        fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
+        fourmomenta = fourmomenta * self.units
+        return fourmomenta
+
+    def sample_base(self, shape, gen=None):
+        return base_precisesiast(
+            shape, self.onshell_list, self.onshell_mass, self.delta_r_min, generator=gen
+        )
+
+    def get_velocity(self, precisesiast, t, ijet):
+        # this is not necessary, because the transform handles it
+        precisesiast[..., 1] = ensure_angle(precisesiast[..., 1])
+
+        # precisesiast -> fourmomenta
+        jetmomenta = precisesiast_to_jetmomenta(precisesiast, self.pt_min)
+        fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
+
+        v_fourmomenta = super().get_velocity(fourmomenta, t, ijet)
+
+        v_jetmomenta = velocities_fourmomenta_to_jetmomenta(
+            v_fourmomenta, fourmomenta, jetmomenta
+        )
+        v_precisesiast = velocities_jetmomenta_to_precisesiast(
+            v_jetmomenta, jetmomenta, precisesiast, self.pt_min
+        )
+        v_precisesiast[..., self.onshell_list, 3] = 0.0
+        return v_precisesiast
+
+    def get_trajectory(self, x0, eps, t):
+        distance = eps - x0
+        distance[..., 1] = ensure_angle(distance[..., 1])
+        x_t = x0 + distance * t
+        v_t = distance
+
+        # onshell particles have velocity zero
+        v_t[..., self.onshell_list, 3] = 0.0
+        return x_t, v_t
+
+    def sample(self, *args):
+        x_t = super().sample(*args)
+        x_t[..., 1] = ensure_angle(x_t[..., 1])
+        return x_t

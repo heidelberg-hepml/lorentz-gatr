@@ -76,18 +76,22 @@ class EventGenerationExperiment(BaseExperiment):
         units = torch.cat(self.events_raw, dim=-2).std()
         LOGGER.info(f"Changing to units of std(dataset)={units:.2f} GeV")
         self.model.init_physics(
-            units, self.pt_min, self.onshell_list, self.onshell_mass
+            units,
+            self.pt_min,
+            self.onshell_list,
+            self.onshell_mass,
+            self.delta_r_min if self.cfg.data.use_delta_r_min else None,
         )
 
         # preprocessing
-        self.events_prepd, self.prep_params = [], []
-        for _ in self.cfg.data.n_jets:
+        self.events_prepd = []
+        for ijet in range(len(self.cfg.data.n_jets)):
             # preprocess data
             data_raw = ensure_onshell(data_raw, self.onshell_list, self.onshell_mass)
             data_prepd = self.model.preprocess(data_raw)
 
+            self.events_raw[ijet] = data_raw
             self.events_prepd.append(data_prepd)
-            self.prep_params.append(prep_params)
 
     def _init_dataloader(self):
         assert sum(self.cfg.data.train_test_val) <= 1
@@ -168,7 +172,7 @@ class EventGenerationExperiment(BaseExperiment):
             loss = 0.0
             for ijet, data_single in enumerate(data):
                 x0 = data_single.to(self.device)
-                loss_single = self.model.batch_loss(x0, ijet, loss_fn=self.loss)
+                loss_single = self.model.batch_loss(x0, ijet)
                 loss += loss_single / len(self.cfg.data.n_jets)
                 mses[f"{self.cfg.data.n_jets[ijet]}j"].append(loss_single.cpu().item())
             losses.append(loss.cpu().item())
@@ -198,9 +202,7 @@ class EventGenerationExperiment(BaseExperiment):
             )
             t0 = time.time()
             for i in range(n_batches):
-                x_t = self.model.sample(
-                    ijet, shape, device=self.device, dtype=self.dtype
-                )
+                x_t = self.model.sample(ijet, shape, self.device, self.dtype)
                 sample.append(x_t)
             t1 = time.time()
             LOGGER.info(
@@ -264,7 +266,8 @@ class EventGenerationExperiment(BaseExperiment):
             plotter.plot_deta_dphi(filename=filename, **kwargs)
 
     def _init_loss(self):
-        self.loss = torch.nn.MSELoss()
+        # loss defined manually for each model
+        pass
 
     def _batch_loss(self, data):
 
@@ -273,7 +276,7 @@ class EventGenerationExperiment(BaseExperiment):
         mse = []
         for ijet, x0 in enumerate(data):
             x0 = x0.to(self.device)
-            loss_single = self.model.batch_loss(x0, ijet, loss_fn=self.loss)
+            loss_single = self.model.batch_loss(x0, ijet)
             loss += loss_single / len(self.cfg.data.n_jets)
             mse.append(loss_single.cpu().item())
         assert torch.isfinite(loss).all()

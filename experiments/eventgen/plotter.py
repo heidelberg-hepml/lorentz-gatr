@@ -221,6 +221,7 @@ def plot_delta(exp, filename, model_label):
                     )
                     xrange = [0.0, 8.0]
                     train = get_delta_r(exp.data_raw[ijet]["trn"])
+                    print(ijet, idx1, idx2, train.min())
                     test = get_delta_r(exp.data_raw[ijet]["tst"])
                     model = get_delta_r(exp.data_raw[ijet]["gen"])
                     plot_histogram(

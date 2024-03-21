@@ -11,14 +11,19 @@ data:
  data_path_4j: /media/jspinner/shared/Studium/project3/data/ttbar_4j_200M.npy
  subsample: 100000
  train_test_val: [.4, .5, .1]
+ use_delta_r_min: false
+
+tr_wrapper: TransformerCFM4Momenta
+gatr_wrapper: GATrCFM4Momenta
 
 training:
+ iterations: 50
  batchsize: 1024
 
 evaluation:
  nsamples: 1000
  batchsize: 1024
- eval_loss: [train, test, gen]
+ eval_loss: []
  eval_log_prob: []
 
 plot: true
@@ -32,7 +37,7 @@ plotting:
  deta_dphi: true
 
 defaults:
-- model: gatr_eventgen
+- model: gatr_eventgen_base
 - default
 - hydra
 - _self_
