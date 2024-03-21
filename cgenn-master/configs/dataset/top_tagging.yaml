@@ -1,3 +1,2 @@
 dataset:
-  #module: data.top_tagging.TopTaggingDataset
-  module: top_tagging_data.TopTaggingDataset
+  module: data.top_tagging.TopTaggingDataset

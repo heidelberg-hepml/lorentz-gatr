@@ -33,7 +33,7 @@ def main(config):
     #optimizer = engineer.load_module(optimizer_config.pop("module"))(
     #    model.parameters(), **optimizer_config
     #)
-    optimizer = torch.optim.Adam(model.parameters(), foreach=False)
+    optimizer = torch.optim.Adam(model.parameters())
     steps = config["trainer"]["max_steps"]
     scheduler = config["trainer"]["scheduler"]
     #scheduler = CosineAnnealingLR(

@@ -15,8 +15,9 @@ class JetDataset(Dataset):
     """
     PyTorch dataset.
     """
-
+    """
     def __init__(self, data, num_pts=-1, shuffle=True):
+
         self.data = data
 
         if num_pts > len(data["Nobj"]):
@@ -44,13 +45,31 @@ class JetDataset(Dataset):
         if self.perm is not None:
             idx = self.perm[idx]
         return {key: val[idx] for key, val in self.data.items()}
+    """
+    def __init__(self, data, num_pts=-1, shuffle=True):
 
+        self.data = data
+        self.num_pts = num_pts
+
+        if shuffle:
+            g = torch.Generator().manual_seed(42)
+            self.perm = torch.randperm(len(data["is_signal"]), generator=g)[: self.num_pts]
+        else:
+            self.perm = None
+
+    def __len__(self):
+        return self.num_pts
+
+    def __getitem__(self, idx):
+        if self.perm is not None:
+            idx = self.perm[idx]
+        return {key: val[idx] for key, val in self.data.items()}
 
 def initialize_datasets(datadir="./data", num_pts=None):
     """
     Initialize datasets.
     """
-
+    """
     ### ------ 1: Get the file names ------ ###
     # datadir should be the directory in which the HDF5 files (e.g. out_test.h5, out_train.h5, out_valid.h5) reside.
     # There may be many data files, in some cases the test/train/validate sets may themselves be split across files.
@@ -110,7 +129,7 @@ def initialize_datasets(datadir="./data", num_pts=None):
             with h5py.File(file, "r") as f:
                 datasets[split].append(
                     {
-                        key: torch.from_numpy(val[: num_pts[split]])
+                        key: torch.from_numpy(np.array(val)[: num_pts[split]])
                         for key, val in f.items()
                     }
                 )
@@ -134,6 +153,27 @@ def initialize_datasets(datadir="./data", num_pts=None):
         )
         for split in splits
     }
+
+    return torch_datasets
+"""
+
+    data_path = os.path.join(datadir, "zggg.npy")
+    data_raw = np.load(data_path)
+
+    n_data = data_raw.shape[0]
+    split_train = int(n_data*0.4)
+    split_test = int(n_data*0.9)
+    split_val = int(n_data*1.0)
+
+    train_raw = data_raw[0:split_train]
+    test_raw = data_raw[split_train:split_test]
+    val_raw = data_raw[split_test:split_val]
+
+    train = {'Pmu': torch.from_numpy(train_raw[:,:-1].reshape(train_raw.shape[0],-1,4)), 'is_signal': torch.from_numpy(train_raw[:,-1])}
+    val = {'Pmu': torch.from_numpy(val_raw[:,:-1].reshape(val_raw.shape[0],-1,4)), 'is_signal': torch.from_numpy(val_raw[:,-1])}
+    test = {'Pmu': torch.from_numpy(test_raw[:,:-1].reshape(test_raw.shape[0],-1,4)), 'is_signal': torch.from_numpy(test_raw[:,-1])}
+
+    torch_datasets = {"train": JetDataset(train, num_pts=train_raw.shape[0]), "test": JetDataset(test, num_pts=test_raw.shape[0]), "valid": JetDataset(val, num_pts=val_raw.shape[0])}
 
     return torch_datasets
 
@@ -320,6 +360,7 @@ def collate_fn(
     batch : dict of Pytorch tensors
         The collated data.
     """
+    """
     data = {
         prop: batch_stack([mol[prop] for mol in data], nobj=nobj)
         for prop in data[0].keys()
@@ -392,7 +433,42 @@ def collate_fn(
     data["edges"] = edges
 
     return data
+    """
+    data = {
+        prop: batch_stack([mol[prop] for mol in data], nobj=nobj)
+        for prop in data[0].keys()
+    }
 
+    atom_mask = data["Pmu"][..., 0] != 0.0
+    # Obtain edges
+    edge_mask = atom_mask.unsqueeze(1) * atom_mask.unsqueeze(2)
+
+    # mask diagonal
+    diag_mask = ~torch.eye(edge_mask.size(1), dtype=torch.bool).unsqueeze(0)
+    edge_mask *= diag_mask
+
+    data["atom_mask"] = atom_mask.to(torch.bool)
+    data["edge_mask"] = edge_mask.to(torch.bool)
+
+    batch_size, n_nodes, _ = data["Pmu"].size()
+
+    mass = normsq4(data["Pmu"]).unsqueeze(-1)
+    tokens = torch.unsqueeze(torch.tensor([0,0,1,2,2,2]), dim=0)
+    tokens = torch.unsqueeze(tokens, dim=-1)
+    tokens = tokens.repeat(batch_size, 1, 1)
+
+    #nodes = mass
+    nodes = torch.cat((mass,tokens), dim=-1)
+
+    edges = get_adj_matrix(n_nodes, batch_size, data["edge_mask"])
+    data["nodes"] = nodes
+    data["edges"] = edges
+
+    mean = torch.log(data["is_signal"]).mean()
+    std = torch.log(data["is_signal"]).std()
+    data["is_signal"] = (torch.log(data["is_signal"]) - mean) / std
+
+    return data
 
 def retrieve_dataloaders(batch_size, num_workers=4, num_train=-1, datadir="./data"):
     # Initialize dataloader
@@ -434,12 +510,12 @@ class TopTaggingDataset:
     ) -> None:
         self.batch_size = batch_size
         # self.num_workers = num_workers
-        datadir = os.path.join(os.environ["DATAROOT"], "top_tagging")
+        datadir = "./datasets"
         self.datasets = initialize_datasets(
             datadir, num_pts={"train": num_train, "valid": num_val, "test": num_test}
         )
         self.collate = lambda data: collate_fn(
-            data, scale=1, add_beams=True, beam_mass=1
+            data, scale=1, add_beams=False, beam_mass=1
         )
 
     def train_loader(self):

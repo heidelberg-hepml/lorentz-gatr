@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 from ..callbacks.checkpoint import Checkpoint
 from ..loggers.loggers import ConsoleLogger
 
+import numpy as np
 
 def human_format(num: float):
     num = float("{:.3g}".format(num))
@@ -172,6 +173,8 @@ class Trainer:
 
         self.global_step = 0
         self.current_epoch = 0
+        self.patience = 0
+        self.model_path = 'zggg_model.pt'
 
         self.should_raise = None
         self.should_test = False
@@ -189,6 +192,7 @@ class Trainer:
 
         batch = to_device(batch, self.device)
 
+        #loss, outputs = model(batch, self.global_step)
         loss, outputs = model(batch, self.global_step)
 
         #optimizer.zero_grad(set_to_none=True)
@@ -230,6 +234,9 @@ class Trainer:
         else:
             print_str = "Testing"
             prefix = "test"
+            state_dict = torch.load(self.model_path, map_location=self.device)["model"]
+            print("Loading model from ", self.model_path)
+            model.load_state_dict(state_dict)
 
         for batch_idx, batch in enumerate(test_loader):
             if batch_idx >= self.limit_val_batches:
@@ -261,12 +268,17 @@ class Trainer:
 
         metrics = self._add_prefix(metrics, prefix)
 
+        if not validation:
+            print(metrics['test/loss'].cpu())
+            torch.save(metrics['test/loss'].cpu(), 'loss_zggg_3.pt')
+
         if self.logger:
             self.logger.log_metrics(metrics, step=self.global_step)
 
         if validation:
             for callback in self.callbacks:
                 callback.on_test_end(self, model, optimizer, metrics)
+            return metrics['val/loss']
 
     @property
     def should_stop(self):
@@ -280,6 +292,10 @@ class Trainer:
             print("Stopping due to max_steps.")
             return True
         return False
+        #if self.patience > 10:
+        #    print("Stopping due to early stopping")
+        #    return True
+        #return False
 
     def fit(
         self,
@@ -313,6 +329,7 @@ class Trainer:
 
         t0 = time.time()
 
+        smallest_val_loss = 1e10
         last_global_step = self.global_step
 
         while not self.should_stop:
@@ -350,9 +367,15 @@ class Trainer:
                 if self.global_step % self.val_check_interval == 0:
                     if val_loader is not None and self.limit_val_batches > 0:
                         with torch.no_grad():
-                            self.test_loop(
+                            val_loss = self.test_loop(
                                 model, optimizer, val_loader, validation=True
                             )
+                        if val_loss < smallest_val_loss:
+                            smallest_val_loss = val_loss
+                            self.patience = 0
+                            torch.save({"model": model.state_dict(), "optimizer": optimizer.state_dict()}, self.model_path)
+                        else:
+                            self.patience +=1
 
                     t0 = time.time()
                     last_global_step = self.global_step

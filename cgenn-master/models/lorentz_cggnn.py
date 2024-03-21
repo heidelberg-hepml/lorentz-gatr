@@ -18,7 +18,10 @@ def get_invariants(algebra, input):
 
 def psi(p):
     """`\psi(p) = Sgn(p) \cdot \log(|p| + 1)`"""
-    return torch.sign(p) * torch.log(torch.abs(p) + 1)
+    p[:,0] = torch.sign(p[:,0]) * torch.log(torch.abs(p[:,0]) + 1)
+    #return torch.sign(p) * torch.log(torch.abs(p) + 1)
+    return p
+
 
 
 def unsorted_segment_sum(data, segment_ids, num_segments):
@@ -54,7 +57,7 @@ class CGLayer(nn.Module):
         edge_attr_x=3,
         edge_attr_h=0,
         node_attr_x=1,
-        node_attr_h=1,
+        node_attr_h=2,
         aggregation="mean",
         use_invariants_to_update=True,
         residual=False,
@@ -279,7 +282,7 @@ class LorentzCGGNN(nn.Module):
 
     def __init__(
         self,
-        in_features_h: int = 1,
+        in_features_h: int = 2,
         hidden_features_h: int = 72,
         in_features_x: int = 1,
         hidden_features_x: int = 8,
@@ -327,7 +330,7 @@ class LorentzCGGNN(nn.Module):
                     residual=residual,
                     aggregation=aggregation,
                     layer_type=layer_type,
-                    node_attr_h=1,
+                    node_attr_h=2,
                     node_attr_x=1,
                     edge_attr_x=3,
                 )
@@ -403,6 +406,7 @@ class LorentzCGGNN(nn.Module):
             n_nodes,
             self.hidden_features_h + self.hidden_features_x * self.algebra.n_subspaces,
         )
+
         h = torch.mean(h, dim=1)
         pred = self.graph_dec(h)
         return pred.squeeze(1)
