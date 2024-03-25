@@ -177,7 +177,7 @@ class EventGenerationExperiment(BaseExperiment):
         for key in self.cfg.evaluation.eval_loss:
             self._evaluate_loss_single(loaders[key], key)
         for key in self.cfg.evaluation.eval_log_prob:
-            self.evaluate_log_prob_single(loaders[key], key)
+            self._evaluate_log_prob_single(loaders[key], key)
 
     def _evaluate_loss_single(self, loader, title):
         # use the same random numbers for all datasets to get comparable results
@@ -186,7 +186,7 @@ class EventGenerationExperiment(BaseExperiment):
         self.model.eval()
         losses = []
         mses = {f"{n_jets}j": [] for n_jets in self.cfg.data.n_jets}
-        LOGGER.info(f"Starting to evaluate model on {title} dataset")
+        LOGGER.info(f"Starting to evaluate loss for model on {title} dataset")
         t0 = time.time()
         for i, data in enumerate(loader):
             loss = 0.0
@@ -197,15 +197,35 @@ class EventGenerationExperiment(BaseExperiment):
                 mses[f"{self.cfg.data.n_jets[ijet]}j"].append(loss_single.cpu().item())
             losses.append(loss.cpu().item())
         dt = time.time() - t0
-        LOGGER.info(f"Finished evaluating {title} dataset after {dt/60:.2f}min")
+        LOGGER.info(
+            f"Finished evaluating loss for {title} dataset after {dt/60:.2f}min"
+        )
 
         if self.cfg.use_mlflow:
             log_mlflow(f"eval.{title}.loss", np.mean(losses))
             for key, values in mses.items():
-                log_mlflow(f"eval.{title}.{key}.mse.{key}", np.mean(values))
+                log_mlflow(f"eval.{title}.{key}.mse", np.mean(values))
 
     def _evaluate_log_prob_single(self, loader, title):
-        raise NotImplementedError
+        self.model.eval()
+        log_probs = {f"{n_jets}j": [] for n_jets in self.cfg.data.n_jets}
+        LOGGER.info(f"Starting to evaluate log_prob for model on {title} dataset")
+        t0 = time.time()
+        for i, data in enumerate(loader):
+            for ijet, data_single in enumerate(data):
+                x0 = data_single.to(self.device)
+                log_prob = self.model.log_prob(x0, ijet).mean()
+                log_probs[f"{self.cfg.data.n_jets[ijet]}j"].append(
+                    log_prob.cpu().item()
+                )
+        dt = time.time() - t0
+        LOGGER.info(
+            f"Finished evaluating log_prob for {title} dataset after {dt/60:.2f}min"
+        )
+
+        if self.cfg.use_mlflow:
+            for key, values in log_probs.items():
+                log_mlflow(f"eval.{title}.{key}.log_prob", np.mean(values))
 
     def _sample_events(self):
         self.model.eval()

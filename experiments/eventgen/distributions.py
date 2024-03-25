@@ -34,7 +34,17 @@ class Naive4Momenta(BaseDistribution):
         return eps
 
     def log_prob(self, x):
-        pass
+        log_prob = torch.zeros_like(x)
+        log_prob[..., 1:] = log_prob_gauss(x[..., 1:])
+
+        # special treatment for the mass
+        mass = torch.sqrt(
+            torch.clamp(x[..., 0] ** 2 - torch.sum(x[..., 1:] ** 2, dim=-1), min=1e-10)
+        )
+        log_prob_mass = 2 * log_prob_gauss(mass)  # factor 2 because have half-gaussian
+        log_prob_mass[..., self.onshell_list] = 0.0  # no contribution from fixed masses
+        log_prob[..., 0] = log_prob_mass * x[..., 0] / mass  # p(E) = p(m) * dm/dE
+        return log_prob
 
 
 class FancyPrecisesiast(BaseDistribution):
@@ -118,3 +128,7 @@ def eta_phi_no_deltar_holes(
     event = event[mask, ...][: shape[0], ...]
     _, phi, eta, _ = torch.permute(event, (2, 0, 1))
     return phi, eta
+
+
+def log_prob_gauss(z, mean=0.0, std=1.0):
+    return -((z - mean) ** 2) / (2 * std**2) - 0.5 * math.log(2 * math.pi) + std

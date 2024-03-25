@@ -4,6 +4,7 @@
 import math
 import torch
 from torch import nn
+from torch.autograd import grad
 
 from torchdiffeq import odeint
 from experiments.eventgen.transforms import ensure_angle
@@ -25,6 +26,28 @@ class GaussianFourierProjection(nn.Module):
         return embedding
 
 
+def hutchinson_trace(x_out, x_in):
+    # Hutchinson's trace Jacobian estimator, needs O(1) calls to autograd
+    noise = torch.randint_like(x_in, low=0, high=2).float() * 2 - 1.0
+    x_out_noise = torch.sum(x_out * noise)
+    gradient = grad(x_out_noise, x_in)[0].detach()
+    return torch.sum(gradient * noise, dim=[1, 2])
+
+
+def autograd_trace(x_out, x_in):
+    # Standard way of calculating trace of the Jacobian, needs O(n) calls to autograd
+    trJ = 0.0
+    for i in range(x_out.shape[1]):
+        for j in range(x_out.shape[2]):
+            trJ += (
+                grad(x_out[:, i, j].sum(), x_in, retain_graph=True)[0]
+                .contiguous()[:, i, j]
+                .contiguous()
+                .detach()
+            )
+    return trJ.contiguous()
+
+
 class CFM(nn.Module):
     """
     Base class for all CFM models
@@ -37,12 +60,14 @@ class CFM(nn.Module):
         embed_t_dim,
         embed_t_scale,
         clamp_mse=None,
+        hutchinson=True,
     ):
         super().__init__()
         self.t_embedding = nn.Sequential(
             GaussianFourierProjection(embed_dim=embed_t_dim, scale=embed_t_scale),
             nn.Linear(embed_t_dim, embed_t_dim),
         )
+        self.trace_fn = hutchinson_trace if hutchinson else autograd_trace
 
         if clamp_mse is not None:
             self.loss = lambda v1, v2: torch.mean(
@@ -95,7 +120,28 @@ class CFM(nn.Module):
         raise NotImplementedError
 
     def log_prob(self, x, ijet):
-        raise NotImplementedError
+        def net_wrapper(t, state):
+            with torch.set_grad_enabled(True):
+                x_t = state[0].detach().requires_grad_(True)
+                t = t * torch.ones(x.shape[0], 1, 1, dtype=x.dtype, device=x.device)
+                v_t = self.get_velocity(x_t, t, ijet=ijet)
+                dlogp_dt = self.trace_fn(v_t, x_t).unsqueeze(-1)
+            return v_t.detach(), dlogp_dt.detach()
+
+        logp_diff = torch.zeros((x.shape[0], 1), dtype=x.dtype, device=x.device)
+        state = (x, logp_diff)
+        x_t, logp_diff = odeint(
+            net_wrapper,
+            state,
+            torch.tensor([0, 1], dtype=x.dtype, device=x.device),
+            method="rk4",
+            options={"step_size": 1e-2},
+        )
+        eps = x_t[-1].detach()
+        jac = logp_diff[-1].detach()
+        log_prob_base = self.distribution.log_prob(eps).sum(dim=[1, 2]).unsqueeze(-1)
+        log_prob = log_prob_base - jac
+        return log_prob
 
 
 class EventCFM(CFM):

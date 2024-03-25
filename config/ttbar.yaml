@@ -24,8 +24,8 @@ training:
 evaluation:
  nsamples: 1000
  batchsize: 1024
- eval_loss: []
- eval_log_prob: []
+ eval_loss: [test,gen]
+ eval_log_prob: [gen] # expensive
 
 plot: true
 plotting:
