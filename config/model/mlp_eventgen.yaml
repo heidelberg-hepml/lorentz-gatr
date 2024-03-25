@@ -1,0 +1,13 @@
+_target_: experiments.eventgen.wrappers.MLPCFM4Momenta
+embed_t_dim: 8
+embed_t_scale: 30.
+clamp_mse: null
+
+net:
+ _target_: experiments.baselines.MLP
+
+ in_shape: null
+ out_shape: null
+ hidden_channels: 64
+
+ hidden_layers: 2

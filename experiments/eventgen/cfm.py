@@ -43,11 +43,16 @@ class CFM(nn.Module):
             nn.Linear(embed_t_dim, embed_t_dim),
         )
 
-        self.loss = (
-            lambda v1, v2: nn.functional.mse_loss(v1, v2, reduction="none")
-            .clamp(min=0, max=clamp_mse)
-            .mean()
-        )
+        if clamp_mse is not None:
+            self.loss = lambda v1, v2: torch.mean(
+                1
+                / (
+                    1 / nn.functional.mse_loss(v1, v2, reduction="none").clamp(max=1e10)
+                    + 1 / clamp_mse
+                )
+            )
+        else:
+            self.loss = lambda v1, v2: nn.functional.mse_loss(v1, v2)
 
     def get_trajectory(self, x0, eps, t):
         # default: linear trajectory

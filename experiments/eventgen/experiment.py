@@ -19,33 +19,45 @@ class EventGenerationExperiment(BaseExperiment):
         self.define_process_specifics()
 
         # dynamically set wrapper properties
-        modelname = self.cfg.model.net._target_.rsplit(".", 1)[-1]
-        self.is_gatr = True if modelname == "GATr" else False
+        self.modelname = self.cfg.model.net._target_.rsplit(".", 1)[-1]
+        n_particles = self.n_hard_particles + max(self.cfg.data.n_jets)
+        n_datasets = len(self.cfg.data.n_jets)
         with open_dict(self.cfg):
-            self.cfg.model.type_token_channels = self.n_hard_particles + max(
-                self.cfg.data.n_jets
-            )
-            self.cfg.model.process_token_channels = len(self.cfg.data.n_jets)
-            if not self.is_gatr:
-                self.cfg.model.net.in_channels = (
-                    4
-                    + self.cfg.model.type_token_channels
-                    + self.cfg.model.process_token_channels
-                    + self.cfg.model.embed_t_dim
-                )
+            # preparation for joint training
+            if self.modelname in ["GATr", "Transformer"]:
+                self.cfg.model.process_token_channels = n_datasets
+                self.cfg.model.type_token_channels = n_particles
             else:
-                self.cfg.model.net.in_s_channels = (
-                    self.cfg.model.type_token_channels
-                    + self.cfg.model.process_token_channels
-                    + self.cfg.model.embed_t_dim
-                )
+                # no joint training possible
+                assert len(self.cfg.data.n_jets) == 1
 
-            if self.is_gatr and self.cfg.model.beam_reference is not None:
-                self.cfg.model.net.in_mv_channels += (
-                    2 if self.cfg.model.beam_reference == "cgenn" else 1
+            # dynamically set channel dimensions
+            if self.modelname == "GATr":
+                self.cfg.model.net.in_s_channels = (
+                    n_particles + n_datasets + self.cfg.model.embed_t_dim
                 )
-            if self.is_gatr and self.cfg.model.add_time_reference is not None:
-                self.cfg.model.net.in_mv_channels += 1
+            elif self.modelname == "Transformer":
+                self.cfg.model.net.in_channels = (
+                    4 + n_datasets + n_particles + self.cfg.model.embed_t_dim
+                )
+            elif self.modelname == "GAP":
+                self.cfg.model.net.in_mv_channels = n_particles
+                self.cfg.model.net.out_mv_channels = n_particles
+                self.cfg.model.net.in_s_channels = self.cfg.model.embed_t_dim
+            elif self.modelname == "MLP":
+                self.cfg.model.net.in_shape = (
+                    4 * n_particles + self.cfg.model.embed_t_dim
+                )
+                self.cfg.model.net.out_shape = 4 * n_particles
+
+            # extra treatment for lorentz-symmetry breaking inputs in equivariant models
+            if self.modelname in ["GATr", "GAP"]:
+                if self.cfg.model.beam_reference is not None:
+                    self.cfg.model.net.in_mv_channels += (
+                        2 if self.cfg.model.beam_reference == "cgenn" else 1
+                    )
+                if self.cfg.model.add_time_reference is not None:
+                    self.cfg.model.net.in_mv_channels += 1
 
     def init_data(self):
         LOGGER.info(f"Working with {self.cfg.data.n_jets} extra jets")
@@ -234,7 +246,7 @@ class EventGenerationExperiment(BaseExperiment):
         ]
         kwargs = {
             "exp": self,
-            "model_label": "GATr" if self.is_gatr else "Transformer",
+            "model_label": self.modelname,
         }
 
         if self.cfg.plotting.loss and self.cfg.train:
