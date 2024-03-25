@@ -78,6 +78,14 @@ class EventGenerationExperiment(BaseExperiment):
                     f"Reducing the size of the dataset from {data_raw.shape[0]} to {self.cfg.data.subsample}"
                 )
                 data_raw = data_raw[: self.cfg.data.subsample, :]
+            elif self.cfg.data.subsample_percent is not None:
+                assert self.cfg.data.subsample_percent < 1.0
+                subsample = int(self.cfg.data.subsample_percent * data_raw.shape[0])
+                LOGGER.info(
+                    f"Reducing the size of the dataset to {1e2*self.cfg.data.subsample_percent}% "
+                    f"(from {data_raw.shape[0]} to {subsample})"
+                )
+                data_raw = data_raw[:subsample, :]
             data_raw = data_raw.reshape(data_raw.shape[0], data_raw.shape[1] // 4, 4)
             data_raw = torch.tensor(data_raw, dtype=self.dtype)
 

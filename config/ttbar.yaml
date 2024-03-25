@@ -9,7 +9,8 @@ data:
  data_path_2j: /media/jspinner/shared/Studium/project3/data/ttbar_2j_200M.npy
  data_path_3j: /media/jspinner/shared/Studium/project3/data/ttbar_3j_200M.npy
  data_path_4j: /media/jspinner/shared/Studium/project3/data/ttbar_4j_200M.npy
- subsample: 100000
+ subsample: null
+ subsample_percent: 0.1
  train_test_val: [.4, .5, .1]
  use_delta_r_min: false
 
@@ -37,7 +38,7 @@ plotting:
  deta_dphi: true
 
 defaults:
-- model: gatr_eventgen_base
+- model: gatr_eventgen
 - default
 - hydra
 - _self_
