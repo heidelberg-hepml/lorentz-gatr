@@ -158,6 +158,19 @@ def ensure_angle(phi):
     return (phi + math.pi) % (2 * math.pi) - math.pi
 
 
+def ensure_onshell(fourmomenta, onshell_list, onshell_mass):
+    onshell_mass = torch.tensor(
+        onshell_mass, device=fourmomenta.device, dtype=fourmomenta.dtype
+    )
+    onshell_mass = onshell_mass.unsqueeze(0).expand(
+        fourmomenta.shape[0], onshell_mass.shape[-1]
+    )
+    fourmomenta[..., onshell_list, 0] = torch.sqrt(
+        onshell_mass**2 + torch.sum(fourmomenta[..., onshell_list, 1:] ** 2, dim=-1)
+    )
+    return fourmomenta
+
+
 def delta_phi(event, idx1, idx2, abs=False):
     dphi = event[..., idx1, 1] - event[..., idx2, 1]
     dphi = ensure_angle(dphi)

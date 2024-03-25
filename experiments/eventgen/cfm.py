@@ -7,6 +7,7 @@ from torch import nn
 
 from torchdiffeq import odeint
 from experiments.eventgen.transforms import ensure_angle
+from experiments.eventgen.distributions import BaseDistribution, Naive4Momenta
 
 
 class GaussianFourierProjection(nn.Module):
@@ -54,6 +55,9 @@ class CFM(nn.Module):
         else:
             self.loss = lambda v1, v2: nn.functional.mse_loss(v1, v2)
 
+        # should be implemented by child classes
+        self.distribution = BaseDistribution()
+
     def get_trajectory(self, x0, eps, t):
         # default: linear trajectory
         distance = eps - x0
@@ -63,7 +67,7 @@ class CFM(nn.Module):
 
     def batch_loss(self, x0, ijet):
         t = torch.rand(x0.shape[0], 1, 1, dtype=x0.dtype, device=x0.device)
-        eps = self.sample_base(x0.shape).to(device=x0.device, dtype=x0.dtype)
+        eps = self.distribution.sample(x0.shape).to(device=x0.device, dtype=x0.dtype)
         x_t, v_t = self.get_trajectory(x0, eps, t)
 
         v_pred = self.get_velocity(x_t, t, ijet=ijet)
@@ -77,7 +81,7 @@ class CFM(nn.Module):
             v_t = self.get_velocity(x_t, t, ijet=ijet)
             return v_t
 
-        eps = self.sample_base(shape).to(device=device, dtype=dtype)
+        eps = self.distribution.sample(shape).to(device=device, dtype=dtype)
         x_t = odeint(
             velocity,
             eps,
@@ -86,9 +90,6 @@ class CFM(nn.Module):
             options={"step_size": 1e-2},
         )[-1]
         return x_t
-
-    def sample_base(self, shape, gen=None):
-        raise NotImplementedError
 
     def get_velocity(self, x, t, ijet):
         raise NotImplementedError
@@ -115,6 +116,9 @@ class EventCFM(CFM):
 
         # same preprocessing for all multiplicities
         self.prep_params = {}
+
+        # base distribution
+        self.distribution = Naive4Momenta(self.onshell_list, self.onshell_mass)
 
     def preprocess(self, fourmomenta):
         raise NotImplementedError

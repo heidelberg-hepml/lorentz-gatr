@@ -6,7 +6,7 @@ from omegaconf import OmegaConf, open_dict
 
 from experiments.base_experiment import BaseExperiment
 from experiments.eventgen.dataset import EventDataset
-from experiments.eventgen.preprocessing import (
+from experiments.eventgen.transforms import (
     ensure_onshell,
 )
 import experiments.eventgen.plotter as plotter
