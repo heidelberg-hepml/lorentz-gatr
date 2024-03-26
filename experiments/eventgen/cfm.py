@@ -59,6 +59,7 @@ class CFM(nn.Module):
         self,
         embed_t_dim,
         embed_t_scale,
+        odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
         clamp_mse=None,
         hutchinson=True,
     ):
@@ -68,6 +69,7 @@ class CFM(nn.Module):
             nn.Linear(embed_t_dim, embed_t_dim),
         )
         self.trace_fn = hutchinson_trace if hutchinson else autograd_trace
+        self.odeint_kwargs = odeint_kwargs
 
         if clamp_mse is not None:
             self.loss = lambda v1, v2: torch.mean(
@@ -111,8 +113,7 @@ class CFM(nn.Module):
             velocity,
             eps,
             torch.tensor([1.0, 0.0]),
-            method="rk4",
-            options={"step_size": 1e-2},
+            **self.odeint_kwargs,
         )[-1]
         return x_t
 
@@ -134,8 +135,7 @@ class CFM(nn.Module):
             net_wrapper,
             state,
             torch.tensor([0, 1], dtype=x.dtype, device=x.device),
-            method="rk4",
-            options={"step_size": 1e-2},
+            **self.odeint_kwargs,
         )
         eps = x_t[-1].detach()
         jac = logp_diff[-1].detach()
@@ -150,8 +150,8 @@ class EventCFM(CFM):
     Save information at the wrapper level, have wrapper-specific preprocessing and undo_preprocessing
     """
 
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def init_physics(self, units, pt_min, onshell_list, onshell_mass, delta_r_min):
         self.units = units

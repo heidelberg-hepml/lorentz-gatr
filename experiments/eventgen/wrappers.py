@@ -54,12 +54,16 @@ class MLPCFM4Momenta(EventCFM):
         net,
         embed_t_dim,
         embed_t_scale,
-        clamp_mse,
+        odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
+        clamp_mse=None,
+        hutchinson=True,
     ):
         super().__init__(
             embed_t_dim,
             embed_t_scale,
-            clamp_mse,
+            odeint_kwargs=odeint_kwargs,
+            clamp_mse=clamp_mse,
+            hutchinson=hutchinson,
         )
         self.net = net
 
@@ -85,11 +89,19 @@ class GAPCFM4Momenta(EventCFM):
         net,
         embed_t_dim,
         embed_t_scale,
-        clamp_mse,
         beam_reference,
         add_time_reference,
+        odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
+        clamp_mse=None,
+        hutchinson=True,
     ):
-        super().__init__(embed_t_dim, embed_t_scale, clamp_mse)
+        super().__init__(
+            embed_t_dim,
+            embed_t_scale,
+            clamp_mse=clamp_mse,
+            odeint_kwargs=odeint_kwargs,
+            hutchinson=hutchinson,
+        )
         self.net = net
         self.beam_reference = beam_reference
         self.add_time_reference = add_time_reference
@@ -132,12 +144,16 @@ class TransformerCFM(EventCFM):
         embed_t_scale,
         type_token_channels,
         process_token_channels,
-        clamp_mse,
+        odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
+        clamp_mse=None,
+        hutchinson=True,
     ):
         super().__init__(
             embed_t_dim,
             embed_t_scale,
-            clamp_mse,
+            clamp_mse=clamp_mse,
+            odeint_kwargs=odeint_kwargs,
+            hutchinson=hutchinson,
         )
         self.net = net
         self.type_token_channels = type_token_channels
@@ -216,12 +232,16 @@ class GATrCFM(EventCFM):
         process_token_channels,
         beam_reference,
         add_time_reference,
-        clamp_mse,
+        odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
+        clamp_mse=None,
+        hutchinson=True,
     ):
         super().__init__(
             embed_t_dim,
             embed_t_scale,
-            clamp_mse,
+            clamp_mse=clamp_mse,
+            odeint_kwargs=odeint_kwargs,
+            hutchinson=hutchinson,
         )
         self.net = net
         self.type_token_channels = type_token_channels

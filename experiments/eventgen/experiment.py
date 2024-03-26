@@ -59,6 +59,8 @@ class EventGenerationExperiment(BaseExperiment):
                 if self.cfg.model.add_time_reference is not None:
                     self.cfg.model.net.in_mv_channels += 1
 
+            self.cfg.model.odeint_kwargs = self.cfg.odeint_kwargs
+
     def init_data(self):
         LOGGER.info(f"Working with {self.cfg.data.n_jets} extra jets")
 
