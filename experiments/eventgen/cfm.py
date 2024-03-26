@@ -140,7 +140,7 @@ class CFM(nn.Module):
         eps = x_t[-1].detach()
         jac = logp_diff[-1].detach()
         log_prob_base = self.distribution.log_prob(eps).sum(dim=[1, 2]).unsqueeze(-1)
-        log_prob = log_prob_base - jac
+        log_prob = log_prob_base + jac
         return log_prob
 
 

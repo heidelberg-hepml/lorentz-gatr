@@ -15,14 +15,15 @@ class BaseDistribution:
 
 
 class Naive4Momenta(BaseDistribution):
-    def __init__(self, onshell_list, onshell_mass):
+    def __init__(self, onshell_list, onshell_mass, std_mass=1.0):
         self.onshell_list = onshell_list
         self.onshell_mass = onshell_mass
+        self.std_mass = std_mass
 
     def sample(self, shape, generator=None):
         """Base distribution for 4-momenta: 3-momentum from standard gaussian, mass from half-gaussian"""
         eps = torch.randn(shape, generator=generator)
-        mass = eps[..., 0].abs()
+        mass = eps[..., 0].abs() * self.std_mass
         mass[..., self.onshell_list] = torch.log(
             torch.tensor(self.onshell_mass)
             .unsqueeze(0)
@@ -41,7 +42,9 @@ class Naive4Momenta(BaseDistribution):
         mass = torch.sqrt(
             torch.clamp(x[..., 0] ** 2 - torch.sum(x[..., 1:] ** 2, dim=-1), min=1e-10)
         )
-        log_prob_mass = 2 * log_prob_gauss(mass)  # factor 2 because have half-gaussian
+        log_prob_mass = 2 * log_prob_gauss(
+            mass, std=self.std_mass
+        )  # factor 2 because have half-gaussian
         log_prob_mass[..., self.onshell_list] = 0.0  # no contribution from fixed masses
         log_prob[..., 0] = log_prob_mass * x[..., 0] / mass  # p(E) = p(m) * dm/dE
         return log_prob

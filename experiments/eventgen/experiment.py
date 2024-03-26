@@ -224,9 +224,9 @@ class EventGenerationExperiment(BaseExperiment):
         LOGGER.info(
             f"Finished evaluating log_prob for {title} dataset after {dt/60:.2f}min"
         )
-
-        if self.cfg.use_mlflow:
-            for key, values in log_probs.items():
+        for key, values in log_probs.items():
+            LOGGER.info(f"log_prob_{key} = {np.mean(values)} +- {np.std(values)}")
+            if self.cfg.use_mlflow:
                 log_mlflow(f"eval.{title}.{key}.log_prob", np.mean(values))
                 log_mlflow(f"eval.{title}.{key}.log_prob_std", np.std(values))
 
