@@ -15,9 +15,9 @@ data:
  use_delta_r_min: false
 
 odeint_kwargs:
- method: dopri5
- rtol: 1e-5
- atol: 1e-7
+ method: rk4
+ rtol: 1e-3
+ atol: 1e-5
  options:
   step_size: 1e-2
 

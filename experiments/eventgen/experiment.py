@@ -95,7 +95,7 @@ class EventGenerationExperiment(BaseExperiment):
             self.events_raw.append(data_raw)
 
         # change global units
-        units = torch.cat(self.events_raw, dim=-2).std()
+        units = torch.cat([x.flatten() for x in self.events_raw]).std()
         LOGGER.info(f"Changing to units of std(dataset)={units:.2f} GeV")
         self.model.init_physics(
             units,
@@ -216,9 +216,9 @@ class EventGenerationExperiment(BaseExperiment):
         for i, data in enumerate(loader):
             for ijet, data_single in enumerate(data):
                 x0 = data_single.to(self.device)
-                log_prob = self.model.log_prob(x0, ijet).mean()
-                log_probs[f"{self.cfg.data.n_jets[ijet]}j"].append(
-                    log_prob.cpu().item()
+                log_prob = self.model.log_prob(x0, ijet).squeeze().cpu()
+                log_probs[f"{self.cfg.data.n_jets[ijet]}j"].extend(
+                    log_prob.numpy().tolist()
                 )
         dt = time.time() - t0
         LOGGER.info(
@@ -228,6 +228,7 @@ class EventGenerationExperiment(BaseExperiment):
         if self.cfg.use_mlflow:
             for key, values in log_probs.items():
                 log_mlflow(f"eval.{title}.{key}.log_prob", np.mean(values))
+                log_mlflow(f"eval.{title}.{key}.log_prob_std", np.std(values))
 
     def _sample_events(self):
         self.model.eval()
