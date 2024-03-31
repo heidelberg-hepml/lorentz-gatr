@@ -4,25 +4,18 @@
 import math
 import torch
 from torch import nn
+from torchdiffeq import odeint
 
 from gatr.interface import embed_vector, extract_vector, extract_scalar
 from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity
 from experiments.toptagging.dataset import embed_beam_reference
 from experiments.eventgen.cfm import EventCFM
 from experiments.eventgen.transforms import (
-    fourmomenta_to_jetmomenta,
-    jetmomenta_to_fourmomenta,
-    jetmomenta_to_precisesiast,
-    precisesiast_to_jetmomenta,
-    velocities_jetmomenta_to_fourmomenta,
-    velocities_precisesiast_to_jetmomenta,
-    velocities_jetmomenta_to_precisesiast,
-    velocities_fourmomenta_to_jetmomenta,
-    stable_arctanh,
     ensure_angle,
     delta_r,
 )
-from experiments.eventgen.distributions import FancyPrecisesiast
+import experiments.eventgen.distributions as distributions
+import experiments.eventgen.coordinates as coordinates
 
 
 def get_type_token(x_ref, type_token_channels):
@@ -48,30 +41,28 @@ def get_process_token(x_ref, ijet, process_token_channels):
     return process_token
 
 
-class MLPCFM4Momenta(EventCFM):
+### CFM on 4momenta
+
+
+class MLPCFMFourmomenta(EventCFM):
     def __init__(
         self,
         net,
         embed_t_dim,
         embed_t_scale,
         odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
-        clamp_mse=None,
         hutchinson=True,
     ):
         super().__init__(
             embed_t_dim,
             embed_t_scale,
             odeint_kwargs=odeint_kwargs,
-            clamp_mse=clamp_mse,
             hutchinson=hutchinson,
         )
         self.net = net
 
-    def preprocess(self, fourmomenta):
-        return fourmomenta / self.units
-
-    def undo_preprocess(self, fourmomenta):
-        return fourmomenta * self.units
+    def init_coordinates(self):
+        self.coordinates = coordinates.Fourmomenta()
 
     def get_velocity(self, x, t, ijet):
         t_embedding = self.t_embedding(t).squeeze()
@@ -83,7 +74,7 @@ class MLPCFM4Momenta(EventCFM):
         return v
 
 
-class GAPCFM4Momenta(EventCFM):
+class GAPCFMFourmomenta(EventCFM):
     def __init__(
         self,
         net,
@@ -92,13 +83,11 @@ class GAPCFM4Momenta(EventCFM):
         beam_reference,
         add_time_reference,
         odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
-        clamp_mse=None,
         hutchinson=True,
     ):
         super().__init__(
             embed_t_dim,
             embed_t_scale,
-            clamp_mse=clamp_mse,
             odeint_kwargs=odeint_kwargs,
             hutchinson=hutchinson,
         )
@@ -106,11 +95,8 @@ class GAPCFM4Momenta(EventCFM):
         self.beam_reference = beam_reference
         self.add_time_reference = add_time_reference
 
-    def preprocess(self, fourmomenta):
-        return fourmomenta / self.units
-
-    def undo_preprocess(self, fourmomenta):
-        return fourmomenta * self.units
+    def init_coordinates(self):
+        self.coordinates = coordinates.Fourmomenta()
 
     def get_velocity(self, fourmomenta, t, ijet):
         # GATr in fourmomenta space
@@ -120,6 +106,9 @@ class GAPCFM4Momenta(EventCFM):
         return v_fourmomenta
 
     def embed_into_ga(self, x, t, ijet):
+        # note: ijet is not used
+        # (joint training only supported for transformers)
+
         # scalar embedding
         s = self.t_embedding(t).squeeze()
 
@@ -145,13 +134,11 @@ class TransformerCFM(EventCFM):
         type_token_channels,
         process_token_channels,
         odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
-        clamp_mse=None,
         hutchinson=True,
     ):
         super().__init__(
             embed_t_dim,
             embed_t_scale,
-            clamp_mse=clamp_mse,
             odeint_kwargs=odeint_kwargs,
             hutchinson=hutchinson,
         )
@@ -160,6 +147,7 @@ class TransformerCFM(EventCFM):
         self.process_token_channels = process_token_channels
 
     def get_velocity(self, x, t, ijet):
+        # note: flow matching happens directly in x space
         type_token = get_type_token(x, self.type_token_channels)
         process_token = get_process_token(x, ijet, self.process_token_channels)
         t_embedding = self.t_embedding(t).expand(x.shape[0], x.shape[1], -1)
@@ -167,54 +155,6 @@ class TransformerCFM(EventCFM):
         x = torch.cat([x, type_token, process_token, t_embedding], dim=-1)
         v = self.net(x)
         return v
-
-
-class TransformerCFM4Momenta(TransformerCFM):
-    def preprocess(self, fourmomenta):
-        fourmomenta = fourmomenta / self.units
-        return fourmomenta
-
-    def undo_preprocess(self, fourmomenta):
-        fourmomenta = fourmomenta * self.units
-        return fourmomenta
-
-
-class TransformerCFMPrecisesiast(TransformerCFM):
-    def preprocess(self, fourmomenta):
-        fourmomenta = fourmomenta / self.units
-        jetmomenta = fourmomenta_to_jetmomenta(fourmomenta)
-        precisesiast = jetmomenta_to_precisesiast(jetmomenta, self.pt_min)
-        return precisesiast
-
-    def undo_preprocess(self, precisesiast):
-        jetmomenta = precisesiast_to_jetmomenta(precisesiast, self.pt_min)
-        fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
-        fourmomenta = fourmomenta * self.units
-        return fourmomenta
-
-    def get_velocity(self, x, t, ijet):
-        x[..., 1] = ensure_angle(x[..., 1])
-        v_precisesiast = super().get_velocity(x, t, ijet)
-        v_precisesiast[..., self.onshell_list, 3] = 0.0
-        return v_precisesiast
-
-    def get_trajectory(self, x0, eps, t):
-        distance = eps - x0
-        distance[..., 1] = ensure_angle(distance[..., 1])
-        x_t = x0 + distance * t
-        v_t = distance
-        return x_t, v_t
-
-    def sample(self, *args):
-        x_t = super().sample(*args)
-        x_t[..., 1] = ensure_angle(x_t[..., 1])
-        return x_t
-
-    def init_physics(self, *args):
-        super().init_physics(*args)
-        self.distribution = FancyPrecisesiast(
-            self.onshell_list, self.onshell_mass, self.delta_r_min
-        )
 
 
 class GATrCFM(EventCFM):
@@ -233,13 +173,11 @@ class GATrCFM(EventCFM):
         beam_reference,
         add_time_reference,
         odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
-        clamp_mse=None,
         hutchinson=True,
     ):
         super().__init__(
             embed_t_dim,
             embed_t_scale,
-            clamp_mse=clamp_mse,
             odeint_kwargs=odeint_kwargs,
             hutchinson=hutchinson,
         )
@@ -249,12 +187,19 @@ class GATrCFM(EventCFM):
         self.beam_reference = beam_reference
         self.add_time_reference = add_time_reference
 
-    def get_velocity(self, fourmomenta, t, ijet):
+    def get_velocity(self, x, t, ijet):
+        x = self.coordinates.final_checks(x)
+        fourmomenta = self.coordinates.x_to_fourmomenta(x)
+
         # GATr in fourmomenta space
         mv, s = self.embed_into_ga(fourmomenta, t, ijet)
         mv_outputs, s_outputs = self.net(mv, s)
         v_fourmomenta = self.extract_from_ga(mv_outputs, s_outputs)
-        return v_fourmomenta
+
+        v_x = self.coordinates.velocities_fourmomenta_to_x(
+            v_fourmomenta, fourmomenta, x
+        )
+        return v_x
 
     def embed_into_ga(self, x, t, ijet):
         # scalar embedding
@@ -277,140 +222,111 @@ class GATrCFM(EventCFM):
         return v
 
 
-class GATrCFM4Momenta(GATrCFM):
-    """
-    GATrCFM with flow matching in 4-momentum space
-    The precisesiast representation does not appear at any point
-    """
-
-    def preprocess(self, fourmomenta):
-        return fourmomenta / self.units
-
-    def undo_preprocess(self, fourmomenta):
-        return fourmomenta * self.units
+# Note: For now, have a seperate class for every coordinate set (to make it easier to hack things)
+# Later, either pick one coordinate set or have a switch for it
 
 
-class GATrCFMPrecisesiast1(GATrCFM):
-    """
-    GATrCFM with straight trajectories in precisesiast and CFM metric in fourmomenta
-    """
-
-    def preprocess(self, fourmomenta):
-        fourmomenta = fourmomenta / self.units
-        jetmomenta = fourmomenta_to_jetmomenta(fourmomenta)
-        precisesiast = jetmomenta_to_precisesiast(jetmomenta, self.pt_min)
-        return precisesiast
-
-    def undo_preprocess(self, precisesiast):
-        jetmomenta = precisesiast_to_jetmomenta(precisesiast, self.pt_min)
-        fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
-        fourmomenta = fourmomenta * self.units
-        return fourmomenta
-
-    def get_velocity(self, precisesiast, t, ijet):
-        # this is not necessary, because the transform handles it
-        precisesiast[..., 1] = ensure_angle(precisesiast[..., 1])
-
-        # precisesiast -> fourmomenta
-        jetmomenta = precisesiast_to_jetmomenta(precisesiast, self.pt_min)
-        fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
-
-        v_fourmomenta = super().get_velocity(fourmomenta, t, ijet)
-        return v_fourmomenta
-
-    def get_trajectory(self, x0, eps, t):
-        distance = eps - x0
-        distance[..., 1] = ensure_angle(distance[..., 1])
-        x_t = x0 + distance * t
-        v_t = distance
-
-        precisesiast = x_t
-        v_precisesiast = v_t
-
-        # onshell particles have velocity zero
-        v_precisesiast[..., self.onshell_list, 3] = 0.0
-
-        # transform velocity to fourmomenta space
-        jetmomenta = precisesiast_to_jetmomenta(precisesiast, self.pt_min)
-        fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
-        v_jetmomenta = velocities_precisesiast_to_jetmomenta(
-            v_precisesiast, precisesiast, jetmomenta
-        )
-        v_fourmomenta = velocities_jetmomenta_to_fourmomenta(
-            v_jetmomenta, jetmomenta, fourmomenta
-        )
-        return precisesiast, v_fourmomenta
-
-    def get_distance(self, x0, x1):
-        distance = super().get_distance(x0, x1)
-        distance[..., 1] = ensure_angle(distance[..., 1])
-        return distance
-
-    def sample(self, *args):
-        x_t = super().sample(*args)
-        x_t[..., 1] = ensure_angle(x_t[..., 1])
-        return x_t
-
-    def init_physics(self, *args):
-        super().init_physics(*args)
-        self.distribution = FancyPrecisesiast(
-            self.onshell_list, self.onshell_mass, self.delta_r_min
-        )
+class TransformerCFMFourmomenta(TransformerCFM):
+    def init_coordinates(self):
+        self.coordinates = coordinates.Fourmomenta()
 
 
-class GATrCFMPrecisesiast2(GATrCFM):
-    """
-    GATrCFM with straight trajectories in precisesiast and CFM metric in precisesiast
-    """
+class TransformerCFMJetmomenta(TransformerCFM):
+    def init_coordinates(self):
+        self.coordinates = coordinates.Jetmomenta()
 
-    def preprocess(self, fourmomenta):
-        fourmomenta = fourmomenta / self.units
-        jetmomenta = fourmomenta_to_jetmomenta(fourmomenta)
-        precisesiast = jetmomenta_to_precisesiast(jetmomenta, self.pt_min)
-        return precisesiast
 
-    def undo_preprocess(self, precisesiast):
-        jetmomenta = precisesiast_to_jetmomenta(precisesiast, self.pt_min)
-        fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
-        fourmomenta = fourmomenta * self.units
-        return fourmomenta
+class TransformerCFMPrecisesiast(TransformerCFM):
+    def init_coordinates(self):
+        self.coordinates = coordinates.Precisesiast(self.pt_min)
 
-    def get_velocity(self, precisesiast, t, ijet):
-        # this is not necessary, because the transform handles it
-        precisesiast[..., 1] = ensure_angle(precisesiast[..., 1])
 
-        # precisesiast -> fourmomenta
-        jetmomenta = precisesiast_to_jetmomenta(precisesiast, self.pt_min)
-        fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
+class GATrCFMFourmomenta(GATrCFM):
+    def init_coordinates(self):
+        self.coordinates = coordinates.Fourmomenta()
 
-        v_fourmomenta = super().get_velocity(fourmomenta, t, ijet)
 
-        v_jetmomenta = velocities_fourmomenta_to_jetmomenta(
-            v_fourmomenta, fourmomenta, jetmomenta
-        )
-        v_precisesiast = velocities_jetmomenta_to_precisesiast(
-            v_jetmomenta, jetmomenta, precisesiast, self.pt_min
-        )
-        v_precisesiast[..., self.onshell_list, 3] = 0.0
-        return v_precisesiast
+class GATrCFMPtPhiEtaE(GATrCFM):
+    def init_coordinates(self):
+        self.coordinates = coordinates.PtPhiEtaE()
+
+
+class GATrCFMPPPM(GATrCFM):
+    def init_coordinates(self):
+        self.coordinates = coordinates.PPPM()
+
+
+class GATrCFMPPPlogM2(GATrCFM):
+    def init_coordinates(self):
+        self.coordinates = coordinates.PPPlogM2()
+
+
+class GATrCFMPPPM2(GATrCFM):
+    def init_coordinates(self):
+        self.coordinates = coordinates.PPPM2()
+
+
+class GATrCFMJetmomenta(GATrCFM):
+    def init_coordinates(self):
+        self.coordinates = coordinates.Jetmomenta()
+
+
+class GATrCFMPrecisesiast(GATrCFM):
+    def init_coordinates(self):
+        self.coordinates = coordinates.Precisesiast(self.pt_min)
+
+
+# deltaR business
+
+
+class TransformerCFMPrecisesiastDeltaR(TransformerCFMPrecisesiast):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.alpha = 1.0
+        self.k = 0.5
 
     def get_trajectory(self, x0, eps, t):
-        distance = eps - x0
-        distance[..., 1] = ensure_angle(distance[..., 1])
-        x_t = x0 + distance * t
+        # naive distance
+        distance_naive = eps - x0
+        distance_naive[..., 1] = ensure_angle(distance_naive[..., 1])
+
+        # set naive distance (will overwrite the [..., [1,2]] components later)
+        x_t = x0 + distance_naive * t
         v_t = distance
 
-        # onshell particles have velocity zero
-        v_t[..., self.onshell_list, 3] = 0.0
+        def potential(diff):
+            return (diff[..., 1] ** 2 + diff[..., 2] ** 2 - self.delta_r_min**2) ** (
+                -self.k
+            )
+
+        def get_diff(x, i, j):
+            diff = x[..., i, :] - x[..., j, :]
+            diff[..., 0] = ensure_angle(diff[..., 0])
+            return diff
+
+        def potential_metric(x0, x1):
+            terms = 0.0
+            for i in range(x0.shape[1]):
+                for j in range(i):
+                    diff_x0, diff_x1 = diff(x0, i, j), diff(x1, i, j)
+                    terms += (potential(diff_x0) - potential(diff_x1)) ** 2
+            return self.alpha * terms
+
+        def velocity(ta, x_t):
+            # Fixed velocity function
+            # Note: ta is not the same as t; both are not used here
+            metric = torch.sum(
+                distance_naive[..., [1, 2]] ** 2, dim=-2
+            ) + potential_metric(x0, x_t)
+            gradient_phi = 0.0  # TBD
+            gradient_eta = 0.0  # TBD
+            v_t = (
+                metric
+                * torch.stack([gradient_phi, gradient_eta], dim=-1)
+                / torch.sqrt(gradient_phi**2 + gradient_eta**2)
+            )
+            return v_t
+
+        x_t = odeint(velocity, eps, torch.tensor([1.0, t]), **self.odeint_kwargs)[-1]
+        v_t = get_velocity(None, x_t)
         return x_t, v_t
-
-    def sample(self, *args):
-        x_t = super().sample(*args)
-        x_t[..., 1] = ensure_angle(x_t[..., 1])
-        return x_t
-
-    def init_physics(self, *args):
-        super().init_physics(*args)
-        self.distribution = FancyPrecisesiast(
-            self.onshell_list, self.onshell_mass, self.delta_r_min
-        )

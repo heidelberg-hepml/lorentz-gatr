@@ -2,13 +2,15 @@
 # All rights reserved.
 # import dgl
 import math
+import numpy as np
 import torch
 from torch import nn
 from torch.autograd import grad
 
 from torchdiffeq import odeint
 from experiments.eventgen.transforms import ensure_angle
-from experiments.eventgen.distributions import BaseDistribution, Naive4Momenta
+from experiments.eventgen.distributions import BaseDistribution, Distribution1
+from experiments.eventgen.coordinates import BaseCoordinates
 
 
 class GaussianFourierProjection(nn.Module):
@@ -60,7 +62,6 @@ class CFM(nn.Module):
         embed_t_dim,
         embed_t_scale,
         odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
-        clamp_mse=None,
         hutchinson=True,
     ):
         super().__init__()
@@ -70,20 +71,13 @@ class CFM(nn.Module):
         )
         self.trace_fn = hutchinson_trace if hutchinson else autograd_trace
         self.odeint_kwargs = odeint_kwargs
+        self.loss = lambda v1, v2: nn.functional.mse_loss(v1, v2)
 
-        if clamp_mse is not None:
-            self.loss = lambda v1, v2: torch.mean(
-                1
-                / (
-                    1 / nn.functional.mse_loss(v1, v2, reduction="none").clamp(max=1e10)
-                    + 1 / clamp_mse
-                )
-            )
-        else:
-            self.loss = lambda v1, v2: nn.functional.mse_loss(v1, v2)
-
-        # should be implemented by child classes
+    def init_distribution(self):
         self.distribution = BaseDistribution()
+
+    def init_coordinates(self):
+        self.coordinates = BaseCoordinates()
 
     def get_trajectory(self, x0, eps, t):
         # default: linear trajectory
@@ -92,9 +86,14 @@ class CFM(nn.Module):
         v_t = distance
         return x_t, v_t
 
+    def sample_base(self, shape, device, dtype):
+        fourmomenta = self.distribution.sample(shape).to(device=device, dtype=dtype)
+        x = self.coordinates.fourmomenta_to_x(fourmomenta)
+        return x
+
     def batch_loss(self, x0, ijet):
         t = torch.rand(x0.shape[0], 1, 1, dtype=x0.dtype, device=x0.device)
-        eps = self.distribution.sample(x0.shape).to(device=x0.device, dtype=x0.dtype)
+        eps = self.sample_base(x0.shape, x0.device, x0.dtype)
         x_t, v_t = self.get_trajectory(x0, eps, t)
 
         v_pred = self.get_velocity(x_t, t, ijet=ijet)
@@ -102,20 +101,70 @@ class CFM(nn.Module):
         loss = self.loss(v_pred, v_t)
         return loss
 
-    def sample(self, ijet, shape, device, dtype):
+    def sample(self, ijet, shape, device, dtype, trajectory_path=None):
+        # overhead for saving trajectories
+        save_trajectory = trajectory_path != None
+        if save_trajectory:
+            xts, vts, ts = [], [], []
+
         def velocity(t, x_t):
-            t = t * torch.ones(shape[0], 1, 1, dtype=dtype, device=device)
+            t = t * torch.ones(shape[0], 1, 1, dtype=x_t.dtype, device=x_t.device)
             v_t = self.get_velocity(x_t, t, ijet=ijet)
+
+            # collect trajectories
+            if save_trajectory:
+                xts.append(x_t)
+                vts.append(v_t)
+                ts.append(t[0, 0, 0])
             return v_t
 
-        eps = self.distribution.sample(shape).to(device=device, dtype=dtype)
-        x_t = odeint(
+        eps = self.sample_base(shape, device, dtype)
+        x = odeint(
             velocity,
             eps,
             torch.tensor([1.0, 0.0]),
             **self.odeint_kwargs,
         )[-1]
-        return x_t
+
+        # save trajectories to file
+        if save_trajectory:
+            # collect trajectories
+            xts_learned = torch.stack(xts, dim=0).cpu()
+            vts_learned = torch.stack(vts, dim=0).cpu()
+            ts = torch.stack(ts, dim=0)
+            xts_true, vts_true = self.get_trajectory(
+                xts_learned[-1, ...]
+                .reshape(1, *xts_learned.shape[1:])
+                .expand(xts_learned.shape),
+                xts_learned[0, ...]
+                .reshape(1, *xts_learned.shape[1:])
+                .expand(xts_learned.shape),
+                ts.reshape(ts.shape[0], 1, 1, 1),
+            )
+
+            # transform to fourmomenta space
+            xts_learned_fm = self.coordinates.x_to_fourmomenta(xts_learned)
+            xts_true_fm = self.coordinates.x_to_fourmomenta(xts_true)
+            vts_learned_fm = self.coordinates.velocities_x_to_fourmomenta(
+                vts_learned, xts_learned, xts_learned_fm
+            )
+            vts_true_fm = self.coordinates.velocities_x_to_fourmomenta(
+                vts_true, xts_true, xts_true_fm
+            )
+
+            # save
+            np.savez_compressed(
+                trajectory_path,
+                xts_learned=xts_learned_fm,
+                vts_learned=vts_learned_fm,
+                xts_true=xts_true_fm,
+                vts_true=vts_true_fm,
+                ts=ts,
+            )
+
+        # coordinate-specific checks
+        x = self.coordinates.final_checks(x)
+        return x
 
     def get_velocity(self, x, t, ijet):
         raise NotImplementedError
@@ -134,7 +183,7 @@ class CFM(nn.Module):
         x_t, logp_diff = odeint(
             net_wrapper,
             state,
-            torch.tensor([0, 1], dtype=x.dtype, device=x.device),
+            torch.tensor([0.0, 1.0], dtype=x.dtype, device=x.device),
             **self.odeint_kwargs,
         )
         eps = x_t[-1].detach()
@@ -163,11 +212,18 @@ class EventCFM(CFM):
         # same preprocessing for all multiplicities
         self.prep_params = {}
 
-        # base distribution
-        self.distribution = Naive4Momenta(self.onshell_list, self.onshell_mass)
+    def init_distribution(self):
+        # simple base distribution
+        self.distribution = Distribution1(
+            self.onshell_list, self.onshell_mass, self.units
+        )
 
     def preprocess(self, fourmomenta):
-        raise NotImplementedError
+        fourmomenta = fourmomenta / self.units
+        x = self.coordinates.fourmomenta_to_x(fourmomenta)
+        return x
 
     def undo_preprocess(self, x):
-        raise NotImplementedError
+        fourmomenta = self.coordinates.x_to_fourmomenta(x)
+        fourmomenta = fourmomenta * self.units
+        return fourmomenta

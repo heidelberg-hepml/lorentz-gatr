@@ -3,7 +3,6 @@ embed_t_dim: 8
 embed_t_scale: 30.
 beam_reference: spacelike
 add_time_reference: true
-clamp_mse: null
 
 net:
  _target_: gatr.nets.GATr

@@ -9,8 +9,7 @@ data:
  data_path_2j: /media/jspinner/shared/Studium/project3/data/ttbar_2j_200M.npy
  data_path_3j: /media/jspinner/shared/Studium/project3/data/ttbar_3j_200M.npy
  data_path_4j: /media/jspinner/shared/Studium/project3/data/ttbar_4j_200M.npy
- subsample: null
- subsample_percent: 0.1
+ subsample: 100000
  train_test_val: [.4, .5, .1]
  use_delta_r_min: false
 
@@ -21,8 +20,8 @@ odeint_kwargs:
  options:
   step_size: 1e-2
 
-tr_wrapper: TransformerCFM4Momenta
-gatr_wrapper: GATrCFM4Momenta
+tr_wrapper: TransformerCFMFourmomenta
+gatr_wrapper: GATrCFMFourmomenta
 
 training:
  iterations: 50
@@ -31,8 +30,8 @@ training:
 evaluation:
  nsamples: 1000
  batchsize: 1024
- eval_loss: [test,gen]
- eval_log_prob: [gen] # expensive
+ eval_loss: []
+ eval_log_prob: [] # expensive
 
 plot: true
 plotting:
@@ -43,6 +42,7 @@ plotting:
  virtual: true
  delta: true
  deta_dphi: true
+ save_trajectories: true
 
 defaults:
 - model: gatr_eventgen

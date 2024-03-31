@@ -1,7 +1,6 @@
 _target_: experiments.eventgen.wrappers.${tr_wrapper}
 embed_t_dim: 8
 embed_t_scale: 30.
-clamp_mse: null
 
 net:
  _target_: experiments.baselines.Transformer

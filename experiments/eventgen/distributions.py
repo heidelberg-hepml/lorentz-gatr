@@ -14,11 +14,12 @@ class BaseDistribution:
         raise NotImplementedError
 
 
-class Naive4Momenta(BaseDistribution):
-    def __init__(self, onshell_list, onshell_mass, std_mass=1.0):
+class Distribution1(BaseDistribution):
+    def __init__(self, onshell_list, onshell_mass, units, std_mass=1.0):
         self.onshell_list = onshell_list
-        self.onshell_mass = onshell_mass
-        self.std_mass = std_mass
+        self.onshell_mass = [m / units for m in onshell_mass]
+        self.units = units
+        self.std_mass = std_mass / units
 
     def sample(self, shape, generator=None):
         """Base distribution for 4-momenta: 3-momentum from standard gaussian, mass from half-gaussian"""
@@ -50,11 +51,12 @@ class Naive4Momenta(BaseDistribution):
         return log_prob
 
 
-class FancyPrecisesiast(BaseDistribution):
+class Base2(BaseDistribution):
     def __init__(
         self,
         onshell_list,
         onshell_mass,
+        units,
         delta_r_min,
         std_pt=0.8,
         mean_pt=-1,
@@ -63,13 +65,14 @@ class FancyPrecisesiast(BaseDistribution):
         std_eta=1.5,
     ):
         self.onshell_list = onshell_list
-        self.onshell_mass = onshell_mass
+        self.onshell_mass = [m / units for m in onshell_mass]
+        self.units = units
         self.delta_r_min = delta_r_min
 
-        self.std_pt = std_pt
-        self.mean_pt = mean_pt
-        self.std_mass = std_mass
-        self.mean_mass = mean_mass
+        self.std_pt = std_pt / units
+        self.mean_pt = mean_pt / units
+        self.std_mass = std_mass / units
+        self.mean_mass = mean_mass / units
         self.std_eta = std_eta
 
     def sample(self, shape, generator=None):
@@ -134,4 +137,4 @@ def eta_phi_no_deltar_holes(
 
 
 def log_prob_gauss(z, mean=0.0, std=1.0):
-    return -((z - mean) ** 2) / (2 * std**2) - 0.5 * math.log(2 * math.pi) + std
+    return -((z - mean) ** 2) / (2 * std**2) - 0.5 * math.log(2 * math.pi) - std

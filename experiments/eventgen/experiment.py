@@ -80,14 +80,6 @@ class EventGenerationExperiment(BaseExperiment):
                     f"Reducing the size of the dataset from {data_raw.shape[0]} to {self.cfg.data.subsample}"
                 )
                 data_raw = data_raw[: self.cfg.data.subsample, :]
-            elif self.cfg.data.subsample_percent is not None:
-                assert self.cfg.data.subsample_percent < 1.0
-                subsample = int(self.cfg.data.subsample_percent * data_raw.shape[0])
-                LOGGER.info(
-                    f"Reducing the size of the dataset to {1e2*self.cfg.data.subsample_percent}% "
-                    f"(from {data_raw.shape[0]} to {subsample})"
-                )
-                data_raw = data_raw[:subsample, :]
             data_raw = data_raw.reshape(data_raw.shape[0], data_raw.shape[1] // 4, 4)
             data_raw = torch.tensor(data_raw, dtype=self.dtype)
 
@@ -104,6 +96,8 @@ class EventGenerationExperiment(BaseExperiment):
             self.onshell_mass,
             self.delta_r_min if self.cfg.data.use_delta_r_min else None,
         )
+        self.model.init_distribution()
+        self.model.init_coordinates()
 
         # preprocessing
         self.events_prepd = []
@@ -234,6 +228,18 @@ class EventGenerationExperiment(BaseExperiment):
         self.model.eval()
 
         for ijet, n_jets in enumerate(self.cfg.data.n_jets):
+            if self.cfg.save and self.cfg.plotting.save_trajectories:
+                os.makedirs(
+                    os.path.join(self.cfg.run_dir, "trajectories"), exist_ok=True
+                )
+                trajectory_path = os.path.join(
+                    self.cfg.run_dir,
+                    "trajectories",
+                    f"run{self.cfg.run_idx}_{n_jets}j.npz",
+                )
+                LOGGER.info(f"Will save {n_jets}j trajectories to {trajectory_path}")
+            else:
+                trajectory_path = None
 
             sample = []
             shape = (self.cfg.evaluation.batchsize, self.n_hard_particles + n_jets, 4)
@@ -245,7 +251,13 @@ class EventGenerationExperiment(BaseExperiment):
             )
             t0 = time.time()
             for i in range(n_batches):
-                x_t = self.model.sample(ijet, shape, self.device, self.dtype)
+                x_t = self.model.sample(
+                    ijet,
+                    shape,
+                    self.device,
+                    self.dtype,
+                    trajectory_path=trajectory_path if i == 0 else None,
+                )
                 sample.append(x_t)
             t1 = time.time()
             LOGGER.info(
@@ -259,6 +271,9 @@ class EventGenerationExperiment(BaseExperiment):
 
             samples_raw = self.model.undo_preprocess(samples)
             self.data_raw[ijet]["gen"] = samples_raw
+
+            mass2 = samples_raw[..., 0] ** 2 - (samples_raw[..., 1:] ** 2).sum(dim=-1)
+            LOGGER.info(f"Fraction of events with m^2<0: {(mass2 < 0).float().mean()}")
 
         self.sample_loader = torch.utils.data.DataLoader(
             dataset=EventDataset([x["gen"] for x in self.data_prepd], dtype=self.dtype),

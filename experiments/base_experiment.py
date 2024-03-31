@@ -495,6 +495,11 @@ class BaseExperiment:
         loss, metrics = self._batch_loss(data)
         self.optimizer.zero_grad()
         loss.backward()
+        if self.cfg.training.clip_grad_value is not None:
+            torch.nn.utils.clip_grad_value_(
+                self.model.parameters(),
+                self.cfg.training.clip_grad_value,
+            )
         grad_norm = (
             torch.nn.utils.clip_grad_norm_(
                 self.model.parameters(),
