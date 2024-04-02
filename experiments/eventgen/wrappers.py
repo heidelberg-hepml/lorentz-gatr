@@ -41,6 +41,13 @@ def get_process_token(x_ref, ijet, process_token_channels):
     return process_token
 
 
+def distance_phi(x0, eps):
+    # take into account that phi is cyclic when computing shortest distance
+    distance = eps - x0
+    distance[..., 1] = ensure_angle(distance[..., 1])
+    return distance
+
+
 ### CFM on 4momenta
 
 
@@ -236,9 +243,7 @@ class TransformerCFMJetmomenta(TransformerCFM):
         self.coordinates = coordinates.Jetmomenta()
 
     def get_distance(self, x0, eps):
-        distance = eps - x0
-        distance[..., 1] = ensure_angle(distance[..., 1])
-        return distance
+        return distance_phi(x0, eps)
 
 
 class TransformerCFMPrecisesiast(TransformerCFM):
@@ -246,9 +251,7 @@ class TransformerCFMPrecisesiast(TransformerCFM):
         self.coordinates = coordinates.Precisesiast(self.pt_min, self.units)
 
     def get_distance(self, x0, eps):
-        distance = eps - x0
-        distance[..., 1] = ensure_angle(distance[..., 1])
-        return distance
+        return distance_phi(x0, eps)
 
 
 class GATrCFMFourmomenta(GATrCFM):
@@ -261,9 +264,7 @@ class GATrCFMPtPhiEtaE(GATrCFM):
         self.coordinates = coordinates.PtPhiEtaE()
 
     def get_distance(self, x0, eps):
-        distance = eps - x0
-        distance[..., 1] = ensure_angle(distance[..., 1])
-        return distance
+        return distance_phi(x0, eps)
 
 
 class GATrCFMPPPM(GATrCFM):
@@ -291,9 +292,7 @@ class GATrCFMJetmomenta(GATrCFM):
         self.coordinates = coordinates.Jetmomenta()
 
     def get_distance(self, x0, eps):
-        distance = eps - x0
-        distance[..., 1] = ensure_angle(distance[..., 1])
-        return distance
+        return distance_phi(x0, eps)
 
 
 class GATrCFMJetmomenta2(GATrCFM):
@@ -301,9 +300,7 @@ class GATrCFMJetmomenta2(GATrCFM):
         self.coordinates = coordinates.Jetmomenta2()
 
     def get_distance(self, x0, eps):
-        distance = eps - x0
-        distance[..., 1] = ensure_angle(distance[..., 1])
-        return distance
+        return distance_phi(x0, eps)
 
 
 class GATrCFMPrecisesiast(GATrCFM):
@@ -311,9 +308,7 @@ class GATrCFMPrecisesiast(GATrCFM):
         self.coordinates = coordinates.Precisesiast(self.pt_min, self.units)
 
     def get_distance(self, x0, eps):
-        distance = eps - x0
-        distance[..., 1] = ensure_angle(distance[..., 1])
-        return distance
+        return distance_phi(x0, eps)
 
 
 class GATrCFMPrecisesiast2(GATrCFM):
@@ -321,9 +316,7 @@ class GATrCFMPrecisesiast2(GATrCFM):
         self.coordinates = coordinates.Precisesiast2(self.pt_min, self.units)
 
     def get_distance(self, x0, eps):
-        distance = eps - x0
-        distance[..., 1] = ensure_angle(distance[..., 1])
-        return distance
+        return distance_phi(x0, eps)
 
 
 # deltaR business

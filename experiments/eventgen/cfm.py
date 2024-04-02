@@ -88,7 +88,7 @@ class CFM(nn.Module):
 
     def get_trajectory(self, x0, eps, t):
         # default: linear trajectory
-        distance = self.get_distance(eps, x0)
+        distance = self.get_distance(x0, eps)
         x_t = x0 + distance * t
         v_t = distance
         return x_t, v_t
