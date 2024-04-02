@@ -14,13 +14,16 @@ from tests.helpers import MILD_TOLERANCES as TOLERANCES
         c.PtPhiEtaE,
         c.PPPM,
         c.PPPM2,
+        c.PPPlogM,
         c.PPPlogM2,
         c.Jetmomenta,
-        # c.Precisesiast, # TBD (weird errors)
+        c.Jetmomenta2,
+        c.Precisesiast,
+        c.Precisesiast2,
     ],
 )
 def test_x_invertible(coordinates):
-    """Test the the transformation from fourmomenta to x is invertible."""
+    """Test that the transformation from fourmomenta to x is invertible."""
     # set up experiment
     with initialize(config_path="../../../config", version_base=None):
         overrides = [
@@ -35,8 +38,8 @@ def test_x_invertible(coordinates):
         exp()
 
     # set up coordinates
-    if coordinates.__name__ == "Precisesiast":
-        coord = coordinates(exp.model.pt_min)
+    if coordinates.__name__ in ["Precisesiast", "Precisesiast2"]:
+        coord = coordinates(exp.model.pt_min, exp.units)
     else:
         coord = coordinates()
 
@@ -48,8 +51,8 @@ def test_x_invertible(coordinates):
     torch.testing.assert_close(fourmomenta, fourmomenta_check, **TOLERANCES)
 
     # base distribution
-    fourmomenta = (
-        exp.model.sample_base(fourmomenta.shape, fourmomenta.device, fourmomenta.dtype)
+    fourmomenta = exp.model.sample_base(
+        fourmomenta.shape, fourmomenta.device, fourmomenta.dtype
     )
     x = coord.fourmomenta_to_x(fourmomenta)
     fourmomenta_check = coord.x_to_fourmomenta(x)
@@ -64,13 +67,16 @@ def test_x_invertible(coordinates):
         c.PtPhiEtaE,
         c.PPPM,
         c.PPPM2,
+        c.PPPlogM,
         c.PPPlogM2,
         c.Jetmomenta,
-        # c.Precisesiast,
+        c.Jetmomenta2,
+        c.Precisesiast,
+        c.Precisesiast2,
     ],
 )
-def test_v_invertibile(coordinates):
-    """Test the the transformation from fourmomenta to x is invertible."""
+def test_v_invertible(coordinates):
+    """Test that the jacobians for the transformation from fourmomenta to x and vice versa cancel."""
     # set up experiment
     with initialize(config_path="../../../config", version_base=None):
         overrides = [
@@ -85,8 +91,8 @@ def test_v_invertibile(coordinates):
         exp()
 
     # set up coordinates
-    if coordinates.__name__ == "Precisesiast":
-        coord = coordinates(exp.model.pt_min)
+    if coordinates.__name__ in ["Precisesiast", "Precisesiast2"]:
+        coord = coordinates(exp.model.pt_min, exp.units)
     else:
         coord = coordinates()
 
@@ -100,8 +106,8 @@ def test_v_invertibile(coordinates):
     torch.testing.assert_close(v_fourmomenta, v_fourmomenta_check, **TOLERANCES)
 
     # base distribution
-    fourmomenta = (
-        exp.model.sample_base(fourmomenta.shape, fourmomenta.device, fourmomenta.dtype)
+    fourmomenta = exp.model.sample_base(
+        fourmomenta.shape, fourmomenta.device, fourmomenta.dtype
     )
     x = coord.fourmomenta_to_x(fourmomenta)
     v_fourmomenta = torch.randn(exp.events_raw[0].shape)

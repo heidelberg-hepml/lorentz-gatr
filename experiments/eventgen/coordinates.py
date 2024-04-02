@@ -1,18 +1,14 @@
 import torch
 from experiments.eventgen.transforms import (
     EPS1,
+    EPS2,
     CUTOFF,
     ensure_angle,
     get_mass,
     fourmomenta_to_jetmomenta,
     jetmomenta_to_fourmomenta,
+    unpack_last,
 )
-
-
-def unpack_last(x):
-    # unpack along the last dimension
-    n = len(x.shape)
-    return torch.permute(x, (n - 1, *list(range(n - 1))))
 
 
 class BaseCoordinates:
@@ -155,7 +151,7 @@ class PPPM(BaseCoordinates):
         E, px, py, pz = unpack_last(fourmomenta)
         v_E, v_px, v_py, v_pz = unpack_last(v_fourmomenta)
 
-        v_mass = (E * v_E - px * v_px - py * v_py - pz * v_pz) / mass
+        v_mass = (E * v_E - px * v_px - py * v_py - pz * v_pz) / mass.clamp(min=EPS2)
         v_mass /= self.mass_scale
 
         v_pppm = torch.stack((v_px, v_py, v_pz, v_mass), dim=-1)
@@ -200,7 +196,6 @@ class PPPM2(BaseCoordinates):
         return fourmomenta
 
     def velocities_fourmomenta_to_x(self, v_fourmomenta, fourmomenta, pppm2):
-        px, py, pz, m2 = unpack_last(pppm2)
         E, px, py, pz = unpack_last(fourmomenta)
         v_E, v_px, v_py, v_pz = unpack_last(v_fourmomenta)
 
@@ -212,7 +207,6 @@ class PPPM2(BaseCoordinates):
         return v_pppm2
 
     def velocities_x_to_fourmomenta(self, v_pppm2, pppm2, fourmomenta):
-        px, py, pz, m2 = unpack_last(pppm2)
         E, px, py, pz = unpack_last(fourmomenta)
         v_px, v_py, v_pz, v_m2 = unpack_last(v_pppm2)
 
@@ -221,6 +215,58 @@ class PPPM2(BaseCoordinates):
 
         v_fourmomenta = torch.stack((v_E, v_px, v_py, v_pz), dim=-1)
         assert torch.isfinite(v_fourmomenta).all()
+        return v_fourmomenta
+
+
+class PPPlogM(PPPM):
+    def __init__(self, mass_scale=1.0):
+        super().__init__(mass_scale=mass_scale)
+
+    def fourmomenta_to_x(self, fourmomenta):
+        pppm = super().fourmomenta_to_x(fourmomenta)
+        px, py, pz, m = unpack_last(pppm)
+
+        logm = torch.log(m.clamp(min=0) + EPS1)
+
+        ppplogm = torch.stack((px, py, pz, logm), dim=-1)
+        assert torch.isfinite(ppplogm).all()
+        return ppplogm
+
+    def x_to_fourmomenta(self, ppplogm):
+        px, py, pz, logm = unpack_last(ppplogm)
+
+        m = logm.clamp(max=CUTOFF).exp() - EPS1
+
+        pppm = torch.stack((px, py, pz, m), dim=-1)
+        assert torch.isfinite(pppm).all()
+
+        fourmomenta = super().x_to_fourmomenta(pppm)
+        return fourmomenta
+
+    def velocities_fourmomenta_to_x(self, v_fourmomenta, fourmomenta, ppplogm):
+        pppm = super().fourmomenta_to_x(fourmomenta)
+        v_pppm = super().velocities_fourmomenta_to_x(v_fourmomenta, fourmomenta, pppm)
+
+        v_px, v_py, v_pz, v_m = unpack_last(v_pppm)
+        _, _, _, m = unpack_last(pppm)
+        v_logm = v_m / (m + EPS1).clamp(min=EPS2)
+
+        v_ppplogm = torch.stack((v_px, v_py, v_pz, v_logm), dim=-1)
+        assert torch.isfinite(v_ppplogm).all()
+        return v_ppplogm
+
+    def velocities_x_to_fourmomenta(self, v_ppplogm, ppplogm, fourmomenta):
+        pppm = super().fourmomenta_to_x(fourmomenta)
+        px, py, pz, logm = unpack_last(ppplogm)
+        px, py, pz, m = unpack_last(pppm)
+        v_px, v_py, v_pz, v_logm = unpack_last(v_ppplogm)
+
+        v_m = (m + EPS1) * v_logm
+
+        v_pppm = torch.stack((v_px, v_py, v_pz, v_m), dim=-1)
+        assert torch.isfinite(v_pppm).all()
+
+        v_fourmomenta = super().velocities_x_to_fourmomenta(v_pppm, pppm, fourmomenta)
         return v_fourmomenta
 
 
@@ -255,7 +301,7 @@ class PPPlogM2(PPPM2):
 
         v_px, v_py, v_pz, v_m2 = unpack_last(v_pppm2)
         _, _, _, m2 = unpack_last(pppm2)
-        v_logm2 = v_m2 / (m2 + EPS1)
+        v_logm2 = v_m2 / (m2 + EPS1).clamp(min=EPS2)
 
         v_ppplogm2 = torch.stack((v_px, v_py, v_pz, v_logm2), dim=-1)
         assert torch.isfinite(v_ppplogm2).all()
@@ -265,7 +311,6 @@ class PPPlogM2(PPPM2):
         pppm2 = super().fourmomenta_to_x(fourmomenta)
         px, py, pz, logm2 = unpack_last(ppplogm2)
         px, py, pz, m2 = unpack_last(pppm2)
-        E, px, py, pz = unpack_last(fourmomenta)
         v_px, v_py, v_pz, v_logm2 = unpack_last(v_ppplogm2)
 
         v_m2 = (m2 + EPS1) * v_logm2
@@ -278,11 +323,16 @@ class PPPlogM2(PPPM2):
 
 
 class Jetmomenta(BaseCoordinates):
+    def __init__(self, mass_scale=1.0):
+        self.mass_scale = mass_scale
+
     def fourmomenta_to_x(self, fourmomenta):
         jetmomenta = fourmomenta_to_jetmomenta(fourmomenta)
+        jetmomenta[..., 3] /= self.mass_scale
         return jetmomenta
 
     def x_to_fourmomenta(self, jetmomenta):
+        jetmomenta[..., 3] *= self.mass_scale
         fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
         return fourmomenta
 
@@ -298,7 +348,8 @@ class Jetmomenta(BaseCoordinates):
             / pt**2
             / torch.sqrt(px**2 + py**2 + pz**2)
         )
-        v_mass = (E * v_E - px * v_px - py * v_py - pz * v_pz) / mass.clamp(min=1e-5)
+        v_mass = (E * v_E - px * v_px - py * v_py - pz * v_pz) / mass.clamp(min=EPS2)
+        v_mass /= self.mass_scale
 
         v_jetmomenta = torch.stack((v_pt, v_phi, v_eta, v_mass), dim=-1)
         assert torch.isfinite(v_jetmomenta).all()
@@ -309,6 +360,7 @@ class Jetmomenta(BaseCoordinates):
         E, px, py, pz = unpack_last(fourmomenta)
         v_pt, v_phi, v_eta, v_mass = unpack_last(v_jetmomenta)
 
+        v_mass *= self.mass_scale
         v_px = torch.cos(phi) * v_pt - torch.sin(phi) * pt * v_phi
         v_py = torch.sin(phi) * v_pt + torch.cos(phi) * pt * v_phi
         v_pz = torch.cosh(eta) * pt * v_eta + torch.sinh(eta) * v_pt
@@ -328,7 +380,8 @@ class Jetmomenta(BaseCoordinates):
 
 
 class Precisesiast(Jetmomenta):
-    def __init__(self, pt_min, units):
+    def __init__(self, pt_min, units, mass_scale=1.0):
+        super().__init__(mass_scale)
         self.pt_min = torch.tensor(pt_min).unsqueeze(0) / units
 
     def fourmomenta_to_x(self, fourmomenta):
@@ -336,19 +389,19 @@ class Precisesiast(Jetmomenta):
         pt, phi, eta, mass = unpack_last(jetmomenta)
 
         pt_min_local = self.pt_min[:, : pt.shape[-1]].clone().to(pt.device)
-        x_pt = torch.log(pt - pt_min_local + EPS1)
-        x_mass = torch.log(mass + EPS1)
+        logpt = torch.log(pt - pt_min_local + EPS1)
+        logmass = torch.log(mass + EPS1)
 
-        precisesiast = torch.stack((x_pt, phi, eta, x_mass), dim=-1)
+        precisesiast = torch.stack((logpt, phi, eta, logmass), dim=-1)
         assert torch.isfinite(precisesiast).all()
         return precisesiast
 
     def x_to_fourmomenta(self, precisesiast):
-        x_pt, phi, eta, x_mass = unpack_last(precisesiast)
+        logpt, phi, eta, logmass = unpack_last(precisesiast)
 
-        pt_min_local = self.pt_min[:, : x_pt.shape[-1]].clone().to(x_pt.device)
-        pt = x_pt.clamp(max=CUTOFF).exp() + pt_min_local - EPS1
-        mass = x_mass.clamp(max=CUTOFF).exp() - EPS1
+        pt_min_local = self.pt_min[:, : logpt.shape[-1]].clone().to(logpt.device)
+        pt = logpt.clamp(max=CUTOFF).exp() + pt_min_local - EPS1
+        mass = logmass.clamp(max=CUTOFF).exp() - EPS1
 
         jetmomenta = torch.stack((pt, phi, eta, mass), dim=-1)
         assert torch.isfinite(jetmomenta).all()
@@ -358,31 +411,32 @@ class Precisesiast(Jetmomenta):
 
     def velocities_fourmomenta_to_x(self, v_fourmomenta, fourmomenta, precisesiast):
         jetmomenta = super().fourmomenta_to_x(fourmomenta)
-        v_jetmomenta = super().velocities_fourmomenta_to_ - x(
+        v_jetmomenta = super().velocities_fourmomenta_to_x(
             v_fourmomenta, fourmomenta, jetmomenta
         )
 
-        x_pt, x_phi, eta, mass = unpack_last(precisesiast)
+        logpt, phi, eta, logmass = unpack_last(precisesiast)
         pt, phi, eta, mass = unpack_last(jetmomenta)
         v_pt, v_phi, v_eta, v_mass = unpack_last(v_jetmomenta)
 
-        pt_min_local = self.pt_min[:, : x_pt.shape[-1]].clone().to(x_pt.device)
-        v_x_pt = v_pt / (pt - pt_min_local)
-        v_x_mass = v_mass / (mass + EPS1)
+        pt_min_local = self.pt_min[:, : logpt.shape[-1]].clone().to(logpt.device)
+        v_logpt = v_pt / (pt - pt_min_local + EPS1)
+        v_logmass = v_mass / (mass + EPS1).clamp(min=EPS2)
 
-        v_precisesiast = torch.stack((v_x_pt, v_phi, v_eta, v_x_mass), dim=-1)
+        v_precisesiast = torch.stack((v_logpt, v_phi, v_eta, v_logmass), dim=-1)
         assert torch.isfinite(v_precisesiast).all()
         return v_precisesiast
 
     def velocities_x_to_fourmomenta(self, v_precisesiast, precisesiast, fourmomenta):
         jetmomenta = super().fourmomenta_to_x(fourmomenta)
 
-        x_pt, x_phi, eta, mass = unpack_last(precisesiast)
+        logpt, phi, eta, mass = unpack_last(precisesiast)
         pt, phi, eta, mass = unpack_last(jetmomenta)
-        v_x_pt, v_phi, v_eta, v_x_mass = unpack_last(v_precisesiast)
+        v_logpt, v_phi, v_eta, v_logmass = unpack_last(v_precisesiast)
 
-        v_pt = pt * v_x_pt
-        v_mass = mass * v_x_mass
+        pt_min_local = self.pt_min[:, : logpt.shape[-1]].clone().to(logpt.device)
+        v_pt = (pt - pt_min_local + EPS1) * v_logpt
+        v_mass = (mass + EPS1) * v_logmass
 
         v_jetmomenta = torch.stack((v_pt, v_phi, v_eta, v_mass), dim=-1)
         assert torch.isfinite(v_jetmomenta).all()
@@ -390,4 +444,132 @@ class Precisesiast(Jetmomenta):
         v_fourmomenta = super().velocities_x_to_fourmomenta(
             v_jetmomenta, jetmomenta, fourmomenta
         )
+        return v_fourmomenta
+
+
+class Jetmomenta2(BaseCoordinates):
+    def __init__(self, mass_scale=1.0):
+        self.mass_scale = mass_scale
+
+    def fourmomenta_to_x(self, fourmomenta):
+        jetmomenta = fourmomenta_to_jetmomenta(fourmomenta)
+        jetmomenta[..., 3] = jetmomenta[..., 3] ** 2
+        jetmomenta[..., 3] /= self.mass_scale**2
+        return jetmomenta
+
+    def x_to_fourmomenta(self, jetmomenta):
+        jetmomenta[..., 3] *= self.mass_scale**2
+        jetmomenta[..., 3] = torch.sqrt(jetmomenta[..., 3])
+        fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
+        return fourmomenta
+
+    def velocities_fourmomenta_to_x(self, v_fourmomenta, fourmomenta, jetmomenta):
+        pt, phi, eta, mass = unpack_last(jetmomenta)
+        E, px, py, pz = unpack_last(fourmomenta)
+        v_E, v_px, v_py, v_pz = unpack_last(v_fourmomenta)
+
+        v_pt = (px * v_px + py * v_py) / pt
+        v_phi = (px * v_py - py * v_px) / pt**2
+        v_eta = (
+            (pt**2 * v_pz - pz * (px * v_px + py * v_py))
+            / pt**2
+            / torch.sqrt(px**2 + py**2 + pz**2)
+        )
+        v_m2 = 2 * (E * v_E - px * v_px - py * v_py - pz * v_pz)
+        v_m2 /= self.mass_scale**2
+
+        v_jetmomenta = torch.stack((v_pt, v_phi, v_eta, v_m2), dim=-1)
+        assert torch.isfinite(v_jetmomenta).all()
         return v_jetmomenta
+
+    def velocities_x_to_fourmomenta(self, v_jetmomenta, jetmomenta, fourmomenta):
+        pt, phi, eta, mass = unpack_last(jetmomenta)
+        E, px, py, pz = unpack_last(fourmomenta)
+        v_pt, v_phi, v_eta, v_m2 = unpack_last(v_jetmomenta)
+
+        v_m2 *= self.mass_scale**2
+        v_px = torch.cos(phi) * v_pt - torch.sin(phi) * pt * v_phi
+        v_py = torch.sin(phi) * v_pt + torch.cos(phi) * pt * v_phi
+        v_pz = torch.cosh(eta) * pt * v_eta + torch.sinh(eta) * v_pt
+        v_E = (
+            v_m2 / 2
+            + torch.cosh(eta) ** 2 * pt * v_pt
+            + torch.cosh(eta) * torch.sinh(eta) * pt**2 * v_eta
+        ) / E
+
+        v_fourmomenta = torch.stack((v_E, v_px, v_py, v_pz), dim=-1)
+        assert torch.isfinite(v_fourmomenta).all()
+        return v_fourmomenta
+
+    def final_checks(self, jetmomenta):
+        jetmomenta[..., 1] = ensure_angle(jetmomenta[..., 1])
+        return jetmomenta
+
+
+class Precisesiast2(Jetmomenta2):
+    # just copied the Precisesiast code here
+    def __init__(self, pt_min, units, mass_scale=1.0):
+        super().__init__(mass_scale)
+        self.pt_min = torch.tensor(pt_min).unsqueeze(0) / units
+
+    def fourmomenta_to_x(self, fourmomenta):
+        jetmomenta = super().fourmomenta_to_x(fourmomenta)
+        pt, phi, eta, mass = unpack_last(jetmomenta)
+
+        pt_min_local = self.pt_min[:, : pt.shape[-1]].clone().to(pt.device)
+        logpt = torch.log(pt - pt_min_local + EPS1)
+        logmass = torch.log(mass + EPS1)
+
+        precisesiast = torch.stack((logpt, phi, eta, logmass), dim=-1)
+        assert torch.isfinite(precisesiast).all()
+        return precisesiast
+
+    def x_to_fourmomenta(self, precisesiast):
+        logpt, phi, eta, logmass = unpack_last(precisesiast)
+
+        pt_min_local = self.pt_min[:, : logpt.shape[-1]].clone().to(logpt.device)
+        pt = logpt.clamp(max=CUTOFF).exp() + pt_min_local - EPS1
+        mass = logmass.clamp(max=CUTOFF).exp() - EPS1
+
+        jetmomenta = torch.stack((pt, phi, eta, mass), dim=-1)
+        assert torch.isfinite(jetmomenta).all()
+
+        fourmomenta = super().x_to_fourmomenta(jetmomenta)
+        return fourmomenta
+
+    def velocities_fourmomenta_to_x(self, v_fourmomenta, fourmomenta, precisesiast):
+        jetmomenta = super().fourmomenta_to_x(fourmomenta)
+        v_jetmomenta = super().velocities_fourmomenta_to_x(
+            v_fourmomenta, fourmomenta, jetmomenta
+        )
+
+        logpt, phi, eta, logmass = unpack_last(precisesiast)
+        pt, phi, eta, mass = unpack_last(jetmomenta)
+        v_pt, v_phi, v_eta, v_mass = unpack_last(v_jetmomenta)
+
+        pt_min_local = self.pt_min[:, : logpt.shape[-1]].clone().to(logpt.device)
+        v_logpt = v_pt / (pt - pt_min_local + EPS1)
+        v_logmass = v_mass / (mass + EPS1).clamp(min=EPS2)
+
+        v_precisesiast = torch.stack((v_logpt, v_phi, v_eta, v_logmass), dim=-1)
+        assert torch.isfinite(v_precisesiast).all()
+        return v_precisesiast
+
+    def velocities_x_to_fourmomenta(self, v_precisesiast, precisesiast, fourmomenta):
+        jetmomenta = super().fourmomenta_to_x(fourmomenta)
+
+        logpt, phi, eta, mass = unpack_last(precisesiast)
+        pt, phi, eta, mass = unpack_last(jetmomenta)
+        v_logpt, v_phi, v_eta, v_logmass = unpack_last(v_precisesiast)
+
+        pt_min_local = self.pt_min[:, : logpt.shape[-1]].clone().to(logpt.device)
+        v_pt = (pt - pt_min_local + EPS1) * v_logpt
+        v_mass = (mass + EPS1) * v_logmass
+
+        v_jetmomenta = torch.stack((v_pt, v_phi, v_eta, v_mass), dim=-1)
+        assert torch.isfinite(v_jetmomenta).all()
+
+        v_fourmomenta = super().velocities_x_to_fourmomenta(
+            v_jetmomenta, jetmomenta, fourmomenta
+        )
+        return v_fourmomenta

@@ -12,8 +12,8 @@ data:
  subsample: 100000
  train_test_val: [.4, .5, .1]
  base_type: 1
- use_delta_r_min: false
- use_pt_min: false
+ use_delta_r_min: true
+ use_pt_min: true
 
 odeint_kwargs:
  method: rk4

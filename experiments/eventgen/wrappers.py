@@ -256,14 +256,19 @@ class GATrCFMPPPM(GATrCFM):
         self.coordinates = coordinates.PPPM()
 
 
-class GATrCFMPPPlogM2(GATrCFM):
-    def init_coordinates(self):
-        self.coordinates = coordinates.PPPlogM2()
-
-
 class GATrCFMPPPM2(GATrCFM):
     def init_coordinates(self):
         self.coordinates = coordinates.PPPM2()
+
+
+class GATrCFMPPPlogM(GATrCFM):
+    def init_coordinates(self):
+        self.coordinates = coordinates.PPPlogM()
+
+
+class GATrCFMPPPlogM2(GATrCFM):
+    def init_coordinates(self):
+        self.coordinates = coordinates.PPPlogM2()
 
 
 class GATrCFMJetmomenta(GATrCFM):
@@ -271,9 +276,19 @@ class GATrCFMJetmomenta(GATrCFM):
         self.coordinates = coordinates.Jetmomenta()
 
 
+class GATrCFMJetmomenta2(GATrCFM):
+    def init_coordinates(self):
+        self.coordinates = coordinates.Jetmomenta2()
+
+
 class GATrCFMPrecisesiast(GATrCFM):
     def init_coordinates(self):
         self.coordinates = coordinates.Precisesiast(self.pt_min, self.units)
+
+
+class GATrCFMPrecisesiast2(GATrCFM):
+    def init_coordinates(self):
+        self.coordinates = coordinates.Precisesiast2(self.pt_min, self.units)
 
 
 # deltaR business
