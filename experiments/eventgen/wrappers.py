@@ -235,10 +235,20 @@ class TransformerCFMJetmomenta(TransformerCFM):
     def init_coordinates(self):
         self.coordinates = coordinates.Jetmomenta()
 
+    def get_distance(self, x0, eps):
+        distance = eps - x0
+        distance[..., 1] = ensure_angle(distance[..., 1])
+        return distance
+
 
 class TransformerCFMPrecisesiast(TransformerCFM):
     def init_coordinates(self):
         self.coordinates = coordinates.Precisesiast(self.pt_min, self.units)
+
+    def get_distance(self, x0, eps):
+        distance = eps - x0
+        distance[..., 1] = ensure_angle(distance[..., 1])
+        return distance
 
 
 class GATrCFMFourmomenta(GATrCFM):
@@ -249,6 +259,11 @@ class GATrCFMFourmomenta(GATrCFM):
 class GATrCFMPtPhiEtaE(GATrCFM):
     def init_coordinates(self):
         self.coordinates = coordinates.PtPhiEtaE()
+
+    def get_distance(self, x0, eps):
+        distance = eps - x0
+        distance[..., 1] = ensure_angle(distance[..., 1])
+        return distance
 
 
 class GATrCFMPPPM(GATrCFM):
@@ -275,20 +290,40 @@ class GATrCFMJetmomenta(GATrCFM):
     def init_coordinates(self):
         self.coordinates = coordinates.Jetmomenta()
 
+    def get_distance(self, x0, eps):
+        distance = eps - x0
+        distance[..., 1] = ensure_angle(distance[..., 1])
+        return distance
+
 
 class GATrCFMJetmomenta2(GATrCFM):
     def init_coordinates(self):
         self.coordinates = coordinates.Jetmomenta2()
+
+    def get_distance(self, x0, eps):
+        distance = eps - x0
+        distance[..., 1] = ensure_angle(distance[..., 1])
+        return distance
 
 
 class GATrCFMPrecisesiast(GATrCFM):
     def init_coordinates(self):
         self.coordinates = coordinates.Precisesiast(self.pt_min, self.units)
 
+    def get_distance(self, x0, eps):
+        distance = eps - x0
+        distance[..., 1] = ensure_angle(distance[..., 1])
+        return distance
+
 
 class GATrCFMPrecisesiast2(GATrCFM):
     def init_coordinates(self):
         self.coordinates = coordinates.Precisesiast2(self.pt_min, self.units)
+
+    def get_distance(self, x0, eps):
+        distance = eps - x0
+        distance[..., 1] = ensure_angle(distance[..., 1])
+        return distance
 
 
 # deltaR business
