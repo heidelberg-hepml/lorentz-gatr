@@ -87,14 +87,16 @@ class EventGenerationExperiment(BaseExperiment):
             self.events_raw.append(data_raw)
 
         # change global units
-        units = torch.cat([x.flatten() for x in self.events_raw]).std()
-        LOGGER.info(f"Changing to units of std(dataset)={units:.2f} GeV")
         self.model.init_physics(
-            units,
+            self.units,
             self.pt_min,
+            self.delta_r_min,
             self.onshell_list,
             self.onshell_mass,
-            self.delta_r_min if self.cfg.data.use_delta_r_min else None,
+            self.base_kwargs,
+            self.cfg.data.base_type,
+            self.cfg.data.use_pt_min,
+            self.cfg.data.use_delta_r_min,
         )
         self.model.init_distribution()
         self.model.init_coordinates()

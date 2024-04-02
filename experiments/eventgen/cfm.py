@@ -9,7 +9,11 @@ from torch.autograd import grad
 
 from torchdiffeq import odeint
 from experiments.eventgen.transforms import ensure_angle
-from experiments.eventgen.distributions import BaseDistribution, Distribution1
+from experiments.eventgen.distributions import (
+    BaseDistribution,
+    Distribution1,
+    Distribution2,
+)
 from experiments.eventgen.coordinates import BaseCoordinates
 
 
@@ -155,10 +159,10 @@ class CFM(nn.Module):
             # save
             np.savez_compressed(
                 trajectory_path,
-                xts_learned=xts_learned_fm,
-                vts_learned=vts_learned_fm,
-                xts_true=xts_true_fm,
-                vts_true=vts_true_fm,
+                xts_learned=xts_learned_fm * self.units,
+                vts_learned=vts_learned_fm * self.units,
+                xts_true=xts_true_fm * self.units,
+                vts_true=vts_true_fm * self.units,
                 ts=ts,
             )
 
@@ -202,21 +206,57 @@ class EventCFM(CFM):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def init_physics(self, units, pt_min, onshell_list, onshell_mass, delta_r_min):
+    def init_physics(
+        self,
+        units,
+        pt_min,
+        delta_r_min,
+        onshell_list,
+        onshell_mass,
+        base_kwargs,
+        base_type,
+        use_pt_min,
+        use_delta_r_min,
+    ):
         self.units = units
-        self.pt_min = torch.tensor(pt_min).unsqueeze(0) / self.units
+        self.pt_min = pt_min
+        self.delta_r_min = delta_r_min
         self.onshell_list = onshell_list
         self.onshell_mass = onshell_mass
-        self.delta_r_min = delta_r_min
+        self.base_kwargs = base_kwargs
+        self.base_type = base_type
+        self.use_delta_r_min = use_delta_r_min
+        self.use_pt_min = use_pt_min
 
         # same preprocessing for all multiplicities
         self.prep_params = {}
 
     def init_distribution(self):
         # simple base distribution
-        self.distribution = Distribution1(
-            self.onshell_list, self.onshell_mass, self.units
-        )
+        if self.base_type == 1:
+            self.distribution = Distribution1(
+                self.onshell_list,
+                self.onshell_mass,
+                self.units,
+                self.base_kwargs,
+                self.delta_r_min,
+                self.pt_min,
+                self.use_delta_r_min,
+                self.use_pt_min,
+            )
+        elif self.base_type == 2:
+            self.distribution = Distribution1(
+                self.onshell_list,
+                self.onshell_mass,
+                self.units,
+                self.base_kwargs,
+                self.delta_r_min,
+                self.pt_min,
+                self.use_delta_r_min,
+                self.use_pt_min,
+            )
+        else:
+            raise ValueError(f"base_type={self.base_type} not implemented")
 
     def preprocess(self, fourmomenta):
         fourmomenta = fourmomenta / self.units

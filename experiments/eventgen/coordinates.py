@@ -328,8 +328,8 @@ class Jetmomenta(BaseCoordinates):
 
 
 class Precisesiast(Jetmomenta):
-    def __init__(self, pt_min):
-        self.pt_min = pt_min
+    def __init__(self, pt_min, units):
+        self.pt_min = torch.tensor(pt_min).unsqueeze(0) / units
 
     def fourmomenta_to_x(self, fourmomenta):
         jetmomenta = super().fourmomenta_to_x(fourmomenta)

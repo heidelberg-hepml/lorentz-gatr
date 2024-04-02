@@ -50,7 +50,6 @@ def test_x_invertible(coordinates):
     # base distribution
     fourmomenta = (
         exp.model.sample_base(fourmomenta.shape, fourmomenta.device, fourmomenta.dtype)
-        / exp.model.units
     )
     x = coord.fourmomenta_to_x(fourmomenta)
     fourmomenta_check = coord.x_to_fourmomenta(x)
@@ -103,7 +102,6 @@ def test_v_invertibile(coordinates):
     # base distribution
     fourmomenta = (
         exp.model.sample_base(fourmomenta.shape, fourmomenta.device, fourmomenta.dtype)
-        / exp.model.units
     )
     x = coord.fourmomenta_to_x(fourmomenta)
     v_fourmomenta = torch.randn(exp.events_raw[0].shape)

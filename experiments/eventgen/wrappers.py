@@ -238,7 +238,7 @@ class TransformerCFMJetmomenta(TransformerCFM):
 
 class TransformerCFMPrecisesiast(TransformerCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.Precisesiast(self.pt_min)
+        self.coordinates = coordinates.Precisesiast(self.pt_min, self.units)
 
 
 class GATrCFMFourmomenta(GATrCFM):
@@ -273,7 +273,7 @@ class GATrCFMJetmomenta(GATrCFM):
 
 class GATrCFMPrecisesiast(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.Precisesiast(self.pt_min)
+        self.coordinates = coordinates.Precisesiast(self.pt_min, self.units)
 
 
 # deltaR business
