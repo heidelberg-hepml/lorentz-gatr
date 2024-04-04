@@ -11,8 +11,8 @@ from torchdiffeq import odeint
 from experiments.eventgen.transforms import ensure_angle
 from experiments.eventgen.distributions import (
     BaseDistribution,
-    Distribution1,
-    Distribution2,
+    FourmomentaDistribution,
+    JetmomentaDistribution,
 )
 from experiments.eventgen.coordinates import BaseCoordinates
 
@@ -57,8 +57,8 @@ def autograd_trace(x_out, x_in):
 class CFM(nn.Module):
     """
     Base class for all CFM models
-    - sample_base and get_velocity should be implemented by subclasses
-    - get_trajectory, batch_loss, sample and log_prob might be overwritten or extended by subclasses
+    - get_velocity, init_distribution and init_coordinates should be implemented by subclasses
+    - get_distance, get_trajectory might be overwritten or extended by subclasses
     """
 
     def __init__(
@@ -77,18 +77,21 @@ class CFM(nn.Module):
         self.odeint_kwargs = odeint_kwargs
         self.loss = lambda v1, v2: nn.functional.mse_loss(v1, v2)
 
-    def init_distribution(self):
         self.distribution = BaseDistribution()
-
-    def init_coordinates(self):
         self.coordinates = BaseCoordinates()
 
-    def get_distance(self, x0, eps):
-        return eps - x0
+    def init_distribution(self):
+        raise NotImplementedError
 
-    def get_trajectory(self, x0, eps, t):
+    def init_coordinates(self):
+        raise NotImplementedError
+
+    def get_distance(self, x0, x1):
+        return x1 - x0
+
+    def get_trajectory(self, x0, x1, t):
         # default: linear trajectory
-        distance = self.get_distance(x0, eps)
+        distance = self.get_distance(x0, x1)
         x_t = x0 + distance * t
         v_t = distance
         return x_t, v_t
@@ -99,9 +102,25 @@ class CFM(nn.Module):
         return x
 
     def batch_loss(self, x0, ijet):
+        """
+        Construct the flow matching MSE (CFM training objective)
+        We use the convention x0 = target space, x1 = latent space
+
+        Parameters
+        ----------
+        x0 : torch.tensor with shape (batchsize, n_particles, 4)
+            Target space particles in the coordinates specified in self.coordinates
+        ijet: int
+            Process information (eg ttbar+0j vs ttbar+1j)
+            Only used in transformer architectures
+
+        Returns
+        -------
+        loss : torch.tensor with shape (1)
+        """
         t = torch.rand(x0.shape[0], 1, 1, dtype=x0.dtype, device=x0.device)
-        eps = self.sample_base(x0.shape, x0.device, x0.dtype)
-        x_t, v_t = self.get_trajectory(x0, eps, t)
+        x1 = self.sample_base(x0.shape, x0.device, x0.dtype)
+        x_t, v_t = self.get_trajectory(x0, x1, t)
 
         v_pred = self.get_velocity(x_t, t, ijet=ijet)
 
@@ -111,8 +130,33 @@ class CFM(nn.Module):
     def sample(
         self, ijet, shape, device, dtype, trajectory_path=None, n_trajectories=100
     ):
+        """
+        Sample from CFM model:
+        Have to solve an ODE using a NN-parametrized velocity field
+        Option to save trajectories for manual inspection.
+
+        Parameters
+        ----------
+        ijet : int
+            Process information (eg ttbar+0j vs ttbar+1j)
+            Only used in transformer architectures
+        shape : List[int]
+            Shape of events that should be generated
+        device : torch.device
+        dtype : torch.dtype
+        trajectory_path : str
+            path where trajectories should be saved
+            no trajectories will be saved if (trajectory_path is None)
+        n_trajectories: int
+            Number of trajectories to keep, out of the full batchsize trajectories
+
+        Returns
+        -------
+        x0 : torch.tensor with shape shape = (batchsize, n_particles, 4)
+            Generated events
+        """
         # overhead for saving trajectories
-        save_trajectory = trajectory_path != None
+        save_trajectory = trajectory_path is not None
         if save_trajectory:
             xts, vts, ts = [], [], []
 
@@ -127,10 +171,10 @@ class CFM(nn.Module):
                 ts.append(t[0, 0, 0])
             return v_t
 
-        eps = self.sample_base(shape, device, dtype)
-        x = odeint(
+        x1 = self.sample_base(shape, device, dtype)
+        x0 = odeint(
             velocity,
-            eps,
+            x1,
             torch.tensor([1.0, 0.0]),
             **self.odeint_kwargs,
         )[-1]
@@ -172,13 +216,35 @@ class CFM(nn.Module):
             )
 
         # coordinate-specific checks
-        x = self.coordinates.final_checks(x)
-        return x
+        x0 = self.coordinates.final_checks(x0)
+        return x0
 
     def get_velocity(self, x, t, ijet):
         raise NotImplementedError
 
-    def log_prob(self, x, ijet):
+    def log_prob(self, x0, ijet):
+        """
+        Evaluate log_prob for existing target samples in a CFM model
+        Have to solve an ODE involving the trace of the velocity field, which is more expensive than plain sampling
+        The 'self.hutchinson' parameter controls if the trace should be evaluated
+        with the hutchinson trace estimator that needs O(1) calls to the network,
+        as opposed to the exact autograd trace that needs O(n_particles) calls to the network
+        Note: We could also have a sample_and_logprob method, but we have no use case for this
+
+        Parameters
+        ----------
+        x0 : torch.tensor with shape (batchsize, n_particles, 4)
+            Target space particles in the coordinates specified in self.coordinates
+        ijet: int
+            Process information (eg ttbar+0j vs ttbar+1j)
+            Only used in transformer architectures
+
+        Returns
+        -------
+        log_prob : torch.tensor with shape (batchsize)
+            log_prob of each event in x0
+        """
+
         def net_wrapper(t, state):
             with torch.set_grad_enabled(True):
                 x_t = state[0].detach().requires_grad_(True)
@@ -187,18 +253,18 @@ class CFM(nn.Module):
                 dlogp_dt = self.trace_fn(v_t, x_t).unsqueeze(-1)
             return v_t.detach(), dlogp_dt.detach()
 
-        logp_diff = torch.zeros((x.shape[0], 1), dtype=x.dtype, device=x.device)
-        state = (x, logp_diff)
-        x_t, logp_diff = odeint(
+        logp_diff0 = torch.zeros((x.shape[0], 1), dtype=x.dtype, device=x.device)
+        state0 = (x0, logp_diff0)
+        x_t, logp_diff_t = odeint(
             net_wrapper,
             state,
             torch.tensor([0.0, 1.0], dtype=x.dtype, device=x.device),
             **self.odeint_kwargs,
         )
-        eps = x_t[-1].detach()
-        jac = logp_diff[-1].detach()
-        log_prob_base = self.distribution.log_prob(eps).unsqueeze(-1)
-        log_prob = log_prob_base + jac
+        x1 = x_t[-1].detach()
+        logp_diff1 = logp_diff_t[-1].detach()
+        log_prob_base = self.distribution.log_prob(x1).unsqueeze(-1)
+        log_prob = log_prob_base + logp_diff1
         return log_prob
 
 
@@ -224,6 +290,41 @@ class EventCFM(CFM):
         use_delta_r_min,
         mass_scale,
     ):
+        """
+        Pass physics information to the CFM class
+
+        Parameters
+        ----------
+        units: float
+            Scale of dimensionful quantities
+            I call it 'units' because we can really choose it arbitrarily without losing anything
+            Hard-coded in EventGenerationExperiment
+        pt_min: List[float]
+            Minimum pt value for each particle
+            Hard-coded in EventGenerationExperiment
+        delta_r_min: float
+            Minimum delta_r value
+            We do not support different minimum delta_r for each particle yet
+            Hard-coded in EventGenerationExperiment
+        onshell_list: List[int]
+            Indices of the onshell particles
+            Hard-coded in EventGenerationExperiment
+        onshell_mass: List[float]
+            Masses of the onshell particles in the same order as in onshell_list
+            Hard-coded in EventGenerationExperiment
+        base_kwargs: Dict[float]
+            Properties of the base distribution
+            Hard-coded in EventGenerationExperiment
+        base_type: int
+            Which base distribution to use
+        use_delta_r_min: bool
+            Whether the base distribution should have delta_r cuts
+        use_pt_min: bool
+            Whether the base distribution should have pt cuts
+        mass_scale: float
+            Option for the coordinates class to manually rescale the mass
+            Only supported by coordinates that explicitly involve the mass (like Jetmomenta, PPPM)
+        """
         self.units = units
         self.pt_min = pt_min
         self.delta_r_min = delta_r_min
@@ -239,9 +340,8 @@ class EventCFM(CFM):
         self.prep_params = {}
 
     def init_distribution(self):
-        # simple base distribution
         if self.base_type == 1:
-            self.distribution = Distribution1(
+            self.distribution = FourmomentaDistribution(
                 self.onshell_list,
                 self.onshell_mass,
                 self.units,
@@ -252,7 +352,7 @@ class EventCFM(CFM):
                 self.use_pt_min,
             )
         elif self.base_type == 2:
-            self.distribution = Distribution2(
+            self.distribution = JetmomentaDistribution(
                 self.onshell_list,
                 self.onshell_mass,
                 self.units,

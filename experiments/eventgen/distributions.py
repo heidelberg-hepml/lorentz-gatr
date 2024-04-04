@@ -114,7 +114,7 @@ class Distribution(BaseDistribution):
         return log_prob
 
 
-class Distribution1(Distribution):
+class FourmomentaDistribution(Distribution):
     """Base distribution 1: 3-momentum from fitted normal, mass from fitted log-normal"""
 
     def __init__(
@@ -190,7 +190,7 @@ class Distribution1(Distribution):
         return log_prob
 
 
-class Distribution2(Distribution):
+class JetmomentaDistribution(Distribution):
     """Base distribution 1: phi uniform; eta, log(pt), log(mass) from fitted normal"""
 
     def __init__(
