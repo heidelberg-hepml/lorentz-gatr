@@ -8,6 +8,7 @@ from experiments.eventgen.transforms import (
     fourmomenta_to_jetmomenta,
     jetmomenta_to_fourmomenta,
     unpack_last,
+    stay_positive,
 )
 
 
@@ -57,7 +58,8 @@ class Fourmomenta(BaseCoordinates):
         # should try with and without this setting (can do both for trained model)
         p_abs = (fourmomenta[..., 1:] ** 2).sum(dim=-1)
         mass2 = fourmomenta[..., 0] ** 2 - p_abs
-        mass2[mass2 < 0] = -mass2[mass2 < 0]
+        mass2 = stay_positive(mass2)
+        fourmomenta = fourmomenta.clone()
         fourmomenta[..., 0] = torch.sqrt(mass2 + p_abs)
         return fourmomenta
 
@@ -138,6 +140,7 @@ class PPPM(BaseCoordinates):
 
     def x_to_fourmomenta(self, pppm):
         px, py, pz, mass = unpack_last(pppm)
+        mass = stay_positive(mass)
 
         mass *= self.mass_scale
         E = torch.sqrt(mass**2 + px**2 + py**2 + pz**2)
@@ -151,6 +154,7 @@ class PPPM(BaseCoordinates):
         E, px, py, pz = unpack_last(fourmomenta)
         v_E, v_px, v_py, v_pz = unpack_last(v_fourmomenta)
 
+        mass = stay_positive(mass)
         v_mass = (E * v_E - px * v_px - py * v_py - pz * v_pz) / mass.clamp(min=EPS2)
         v_mass /= self.mass_scale
 
@@ -163,12 +167,17 @@ class PPPM(BaseCoordinates):
         E, px, py, pz = unpack_last(fourmomenta)
         v_px, v_py, v_pz, v_m = unpack_last(v_pppm)
 
+        mass = stay_positive(mass)
         v_m *= self.mass_scale
         v_E = (mass * v_m + px * v_px + py * v_py + pz * v_pz) / E
 
         v_fourmomenta = torch.stack((v_E, v_px, v_py, v_pz), dim=-1)
         assert torch.isfinite(v_fourmomenta).all()
         return v_fourmomenta
+
+    def final_checks(self, pppm):
+        pppm[..., 3] = stay_positive(pppm[..., 3])
+        return pppm
 
 
 class PPPM2(BaseCoordinates):
@@ -188,6 +197,7 @@ class PPPM2(BaseCoordinates):
     def x_to_fourmomenta(self, pppm2):
         px, py, pz, m2 = unpack_last(pppm2)
 
+        m2 = stay_positive(m2)
         m2 *= self.mass_scale**2
         E = torch.sqrt(m2 + px**2 + py**2 + pz**2)
 
@@ -216,6 +226,10 @@ class PPPM2(BaseCoordinates):
         v_fourmomenta = torch.stack((v_E, v_px, v_py, v_pz), dim=-1)
         assert torch.isfinite(v_fourmomenta).all()
         return v_fourmomenta
+
+    def final_checks(self, pppm2):
+        pppm2[..., 3] = stay_positive(pppm2[..., 3])
+        return pppm2
 
 
 class PPPlogM(PPPM):
@@ -341,6 +355,7 @@ class Jetmomenta(BaseCoordinates):
         E, px, py, pz = unpack_last(fourmomenta)
         v_E, v_px, v_py, v_pz = unpack_last(v_fourmomenta)
 
+        mass = stay_positive(mass)
         v_pt = (px * v_px + py * v_py) / pt
         v_phi = (px * v_py - py * v_px) / pt**2
         v_eta = (
@@ -360,7 +375,9 @@ class Jetmomenta(BaseCoordinates):
         E, px, py, pz = unpack_last(fourmomenta)
         v_pt, v_phi, v_eta, v_mass = unpack_last(v_jetmomenta)
 
+        mass = stay_positive(mass)
         v_mass *= self.mass_scale
+        eta = eta.clamp(min=-CUTOFF, max=CUTOFF)
         v_px = torch.cos(phi) * v_pt - torch.sin(phi) * pt * v_phi
         v_py = torch.sin(phi) * v_pt + torch.cos(phi) * pt * v_phi
         v_pz = torch.cosh(eta) * pt * v_eta + torch.sinh(eta) * v_pt
@@ -376,19 +393,20 @@ class Jetmomenta(BaseCoordinates):
 
     def final_checks(self, jetmomenta):
         jetmomenta[..., 1] = ensure_angle(jetmomenta[..., 1])
+        jetmomenta[..., 3] = stay_positive(jetmomenta[..., 3])
         return jetmomenta
 
 
 class Precisesiast(Jetmomenta):
     def __init__(self, pt_min, units, mass_scale=1.0):
         super().__init__(mass_scale)
-        self.pt_min = torch.tensor(pt_min).unsqueeze(0) / units
+        self.pt_min = torch.tensor(pt_min) / units
 
     def fourmomenta_to_x(self, fourmomenta):
         jetmomenta = super().fourmomenta_to_x(fourmomenta)
         pt, phi, eta, mass = unpack_last(jetmomenta)
 
-        pt_min_local = self.pt_min[:, : pt.shape[-1]].clone().to(pt.device)
+        pt_min_local = self.pt_min[pt.shape[-1]].to(pt.device)
         logpt = torch.log(pt - pt_min_local + EPS1)
         logmass = torch.log(mass + EPS1)
 
@@ -399,7 +417,7 @@ class Precisesiast(Jetmomenta):
     def x_to_fourmomenta(self, precisesiast):
         logpt, phi, eta, logmass = unpack_last(precisesiast)
 
-        pt_min_local = self.pt_min[:, : logpt.shape[-1]].clone().to(logpt.device)
+        pt_min_local = self.pt_min[logpt.shape[-1]].to(logpt.device)
         pt = logpt.clamp(max=CUTOFF).exp() + pt_min_local - EPS1
         mass = logmass.clamp(max=CUTOFF).exp() - EPS1
 
@@ -419,7 +437,7 @@ class Precisesiast(Jetmomenta):
         pt, phi, eta, mass = unpack_last(jetmomenta)
         v_pt, v_phi, v_eta, v_mass = unpack_last(v_jetmomenta)
 
-        pt_min_local = self.pt_min[:, : logpt.shape[-1]].clone().to(logpt.device)
+        pt_min_local = self.pt_min[logpt.shape[-1]].to(logpt.device)
         v_logpt = v_pt / (pt - pt_min_local + EPS1)
         v_logmass = v_mass / (mass + EPS1).clamp(min=EPS2)
 
@@ -434,7 +452,7 @@ class Precisesiast(Jetmomenta):
         pt, phi, eta, mass = unpack_last(jetmomenta)
         v_logpt, v_phi, v_eta, v_logmass = unpack_last(v_precisesiast)
 
-        pt_min_local = self.pt_min[:, : logpt.shape[-1]].clone().to(logpt.device)
+        pt_min_local = self.pt_min[logpt.shape[-1]].to(logpt.device)
         v_pt = (pt - pt_min_local + EPS1) * v_logpt
         v_mass = (mass + EPS1) * v_logmass
 
@@ -448,6 +466,7 @@ class Precisesiast(Jetmomenta):
 
 
 class Jetmomenta2(BaseCoordinates):
+    # copied the Jetmomenta code here with minimal adaptations
     def __init__(self, mass_scale=1.0):
         self.mass_scale = mass_scale
 
@@ -468,6 +487,7 @@ class Jetmomenta2(BaseCoordinates):
         E, px, py, pz = unpack_last(fourmomenta)
         v_E, v_px, v_py, v_pz = unpack_last(v_fourmomenta)
 
+        mass = stay_positive(mass)
         v_pt = (px * v_px + py * v_py) / pt
         v_phi = (px * v_py - py * v_px) / pt**2
         v_eta = (
@@ -487,7 +507,9 @@ class Jetmomenta2(BaseCoordinates):
         E, px, py, pz = unpack_last(fourmomenta)
         v_pt, v_phi, v_eta, v_m2 = unpack_last(v_jetmomenta)
 
+        mass = stay_positive(mass)
         v_m2 *= self.mass_scale**2
+        eta = eta.clamp(min=-CUTOFF, max=CUTOFF)
         v_px = torch.cos(phi) * v_pt - torch.sin(phi) * pt * v_phi
         v_py = torch.sin(phi) * v_pt + torch.cos(phi) * pt * v_phi
         v_pz = torch.cosh(eta) * pt * v_eta + torch.sinh(eta) * v_pt
@@ -503,6 +525,7 @@ class Jetmomenta2(BaseCoordinates):
 
     def final_checks(self, jetmomenta):
         jetmomenta[..., 1] = ensure_angle(jetmomenta[..., 1])
+        jetmomenta[..., 3] = stay_positive(jetmomenta[..., 3])
         return jetmomenta
 
 

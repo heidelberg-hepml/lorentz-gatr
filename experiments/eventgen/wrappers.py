@@ -269,27 +269,27 @@ class GATrCFMPtPhiEtaE(GATrCFM):
 
 class GATrCFMPPPM(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.PPPM()
+        self.coordinates = coordinates.PPPM(mass_scale=self.mass_scale)
 
 
 class GATrCFMPPPM2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.PPPM2()
+        self.coordinates = coordinates.PPPM2(mass_scale=self.mass_scale)
 
 
 class GATrCFMPPPlogM(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.PPPlogM()
+        self.coordinates = coordinates.PPPlogM(mass_scale=self.mass_scale)
 
 
 class GATrCFMPPPlogM2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.PPPlogM2()
+        self.coordinates = coordinates.PPPlogM2(mass_scale=self.mass_scale)
 
 
 class GATrCFMJetmomenta(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.Jetmomenta()
+        self.coordinates = coordinates.Jetmomenta(mass_scale=self.mass_scale)
 
     def get_distance(self, x0, eps):
         return distance_phi(x0, eps)
@@ -297,7 +297,7 @@ class GATrCFMJetmomenta(GATrCFM):
 
 class GATrCFMJetmomenta2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.Jetmomenta2()
+        self.coordinates = coordinates.Jetmomenta2(mass_scale=self.mass_scale)
 
     def get_distance(self, x0, eps):
         return distance_phi(x0, eps)
@@ -305,7 +305,9 @@ class GATrCFMJetmomenta2(GATrCFM):
 
 class GATrCFMPrecisesiast(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.Precisesiast(self.pt_min, self.units)
+        self.coordinates = coordinates.Precisesiast(
+            self.pt_min, self.units, mass_scale=self.mass_scale
+        )
 
     def get_distance(self, x0, eps):
         return distance_phi(x0, eps)
@@ -313,7 +315,9 @@ class GATrCFMPrecisesiast(GATrCFM):
 
 class GATrCFMPrecisesiast2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.Precisesiast2(self.pt_min, self.units)
+        self.coordinates = coordinates.Precisesiast2(
+            self.pt_min, self.units, mass_scale=self.mass_scale
+        )
 
     def get_distance(self, x0, eps):
         return distance_phi(x0, eps)

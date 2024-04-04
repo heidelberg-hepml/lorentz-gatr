@@ -3,7 +3,7 @@ import torch
 
 # log(x) -> log(x+EPS1)
 # in (invertible) preprocessing functions to avoid being close to log(0)
-EPS1 = 1e-2
+EPS1 = 1e-5
 
 # generic numerical stability cutoff
 EPS2 = 1e-10
@@ -42,6 +42,12 @@ def jetmomenta_to_fourmomenta(jetmomenta):
     return fourmomenta
 
 
+def stay_positive(x):
+    # flip sign for entries with x<0 such that always x>0
+    x[x < 0] = -x[x < 0]
+    return x
+
+
 def get_pt(particle):
     return torch.sqrt(particle[..., 1] ** 2 + particle[..., 2] ** 2)
 
@@ -63,7 +69,7 @@ def stable_arctanh(x, eps=EPS2):
 
 def get_mass(particle, eps=EPS2):
     m2 = particle[..., 0] ** 2 - torch.sum(particle[..., 1:] ** 2, dim=-1)
-    m2[m2 < 0] = -m2[m2 < 0]  # enforce m^2 > 0
+    m2 = stay_positive(m2)
     m = torch.sqrt(m2.clamp(min=EPS2))
     return m
 

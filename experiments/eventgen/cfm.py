@@ -108,7 +108,9 @@ class CFM(nn.Module):
         loss = self.loss(v_pred, v_t)
         return loss
 
-    def sample(self, ijet, shape, device, dtype, trajectory_path=None):
+    def sample(
+        self, ijet, shape, device, dtype, trajectory_path=None, n_trajectories=100
+    ):
         # overhead for saving trajectories
         save_trajectory = trajectory_path != None
         if save_trajectory:
@@ -120,8 +122,8 @@ class CFM(nn.Module):
 
             # collect trajectories
             if save_trajectory:
-                xts.append(x_t)
-                vts.append(v_t)
+                xts.append(x_t[:, :n_trajectories, ...])
+                vts.append(v_t[:, :n_trajectories, ...])
                 ts.append(t[0, 0, 0])
             return v_t
 
@@ -136,8 +138,8 @@ class CFM(nn.Module):
         # save trajectories to file
         if save_trajectory:
             # collect trajectories
-            xts_learned = torch.stack(xts, dim=0).cpu()
-            vts_learned = torch.stack(vts, dim=0).cpu()
+            xts_learned = torch.stack(xts, dim=0)
+            vts_learned = torch.stack(vts, dim=0)
             ts = torch.stack(ts, dim=0)
             xts_true, vts_true = self.get_trajectory(
                 xts_learned[-1, ...]
@@ -162,11 +164,11 @@ class CFM(nn.Module):
             # save
             np.savez_compressed(
                 trajectory_path,
-                xts_learned=xts_learned_fm * self.units,
-                vts_learned=vts_learned_fm * self.units,
-                xts_true=xts_true_fm * self.units,
-                vts_true=vts_true_fm * self.units,
-                ts=ts,
+                xts_learned=xts_learned_fm.cpu() * self.units,
+                vts_learned=vts_learned_fm.cpu() * self.units,
+                xts_true=xts_true_fm.cpu() * self.units,
+                vts_true=vts_true_fm.cpu() * self.units,
+                ts=ts.cpu(),
             )
 
         # coordinate-specific checks
@@ -195,7 +197,7 @@ class CFM(nn.Module):
         )
         eps = x_t[-1].detach()
         jac = logp_diff[-1].detach()
-        log_prob_base = self.distribution.log_prob(eps).sum(dim=[1, 2]).unsqueeze(-1)
+        log_prob_base = self.distribution.log_prob(eps).unsqueeze(-1)
         log_prob = log_prob_base + jac
         return log_prob
 
@@ -220,6 +222,7 @@ class EventCFM(CFM):
         base_type,
         use_pt_min,
         use_delta_r_min,
+        mass_scale,
     ):
         self.units = units
         self.pt_min = pt_min
@@ -230,6 +233,7 @@ class EventCFM(CFM):
         self.base_type = base_type
         self.use_delta_r_min = use_delta_r_min
         self.use_pt_min = use_pt_min
+        self.mass_scale = mass_scale
 
         # same preprocessing for all multiplicities
         self.prep_params = {}
@@ -248,7 +252,7 @@ class EventCFM(CFM):
                 self.use_pt_min,
             )
         elif self.base_type == 2:
-            self.distribution = Distribution1(
+            self.distribution = Distribution2(
                 self.onshell_list,
                 self.onshell_mass,
                 self.units,

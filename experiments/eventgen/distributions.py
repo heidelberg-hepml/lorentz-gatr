@@ -3,6 +3,7 @@ import math
 
 from experiments.eventgen.transforms import (
     EPS1,
+    CUTOFF,
     get_mass,
     get_pt,
     delta_r,
@@ -153,7 +154,7 @@ class Distribution1(Distribution):
         logmass = eps[..., 0] * self.logmass_std + self.logmass_mean
 
         # construct mass
-        mass = logmass.exp()
+        mass = logmass.exp() - EPS1
         mass[..., self.onshell_list] = (
             torch.tensor(self.onshell_mass)
             .unsqueeze(0)
@@ -177,7 +178,7 @@ class Distribution1(Distribution):
         # special treatment for the mass
         mass = get_mass(fourmomenta)
         log_prob_logmass = log_prob_normal(
-            mass.log(), mean=self.logmass_mean, std=self.logmass_std
+            (mass + EPS1).log(), mean=self.logmass_mean, std=self.logmass_std
         )
         log_prob_logmass[
             ..., self.onshell_list
@@ -185,6 +186,7 @@ class Distribution1(Distribution):
         log_prob_mass = log_prob_logmass / mass
         log_prob[..., 0] = log_prob_mass * fourmomenta[..., 0] / mass
         log_prob = log_prob.sum(dim=[1, 2])
+        assert torch.isfinite(log_prob).all()
         return log_prob
 
 
@@ -211,9 +213,17 @@ class Distribution2(Distribution):
             use_delta_r_min,
             use_pt_min,
         )
+        assert use_pt_min, f"use_pt_min=False not implemented for Distribution2"
 
-        self.logpt_mean = base_kwargs["logpt_mean"]
-        self.logpt_std = base_kwargs["pxy_std"]
+        # construct mean and std on log(pt-pt_min) from mean and std on log(pt)
+        logpt_mean = torch.tensor([base_kwargs["logpt_mean"]])
+        logpt_std = torch.tensor([base_kwargs["logpt_std"]])
+        self.logpt_mean = torch.log(logpt_mean.exp() - self.pt_min - EPS1)
+        self.logpt_std = torch.log(
+            (torch.exp(logpt_mean + logpt_std) - self.pt_min - EPS1)
+            / (torch.exp(logpt_mean) - self.pt_min - EPS1)
+        )
+
         self.logmass_mean = base_kwargs["logmass_mean"]
         self.logmass_std = base_kwargs["logmass_std"]
         self.eta_std = base_kwargs["eta_std"]
@@ -224,14 +234,16 @@ class Distribution2(Distribution):
         shape = list(shape)
         shape[0] = int(shape[0] * SAMPLING_FACTOR)
         eps = torch.randn(shape, generator=generator)
-        logpt = eps[..., 0] * self.logpt_std + self.logpt_mean
-        eta = eps[..., 2] * self.std_eta
+        eta = eps[..., 2] * self.eta_std
         logmass = eps[..., 3] * self.logmass_std + self.logmass_mean
-        phi = math.pi * (2 * torch.rand(shape[..., 0], generator=generator) - 1)
-        pt = logpt.exp()
+        phi = math.pi * (2 * torch.rand(shape[:-1], generator=generator) - 1)
+
+        # construct pt
+        logpt = eps[..., 0] * self.logpt_std[: shape[1]] + self.logpt_mean[: shape[1]]
+        pt = logpt.exp() + self.pt_min[: shape[1]] - EPS1
 
         # construct mass
-        mass = logmass.exp()
+        mass = logmass.exp() - EPS1
         mass[..., self.onshell_list] = (
             torch.tensor(self.onshell_mass)
             .unsqueeze(0)
@@ -253,36 +265,32 @@ class Distribution2(Distribution):
         E, px, py, pz = torch.permute(fourmomenta, (2, 0, 1))
         pt, phi, eta, mass = torch.permute(jetmomenta, (2, 0, 1))
         log_prob_logpt = log_prob_normal(
-            pt.log(), mean=self.logpt_mean, std=self.logpt_std
+            (pt - self.pt_min[: fourmomenta.shape[1]] + EPS1).log(),
+            mean=self.logpt_mean[: fourmomenta.shape[1]],
+            std=self.logpt_std[: fourmomenta.shape[1]],
         )
-        log_prob_phi = -math.log(2 * math.pi)
+        log_prob_phi = -math.log(2 * math.pi) * torch.ones_like(log_prob_logpt)
         log_prob_eta = log_prob_normal(eta, std=self.eta_std)
         log_prob_logmass = log_prob_normal(
-            mass.log(), mean=self.logmass_mean, std=self.logmass_std
+            (mass + EPS1).log(), mean=self.logmass_mean, std=self.logmass_std
         )
         log_prob_logmass[..., self.onshell_list] = 0.0
 
         # collect log_prob in jetmomenta space
-        log_prob_mass = log_prob_logmass / mass
-        log_prob_pt = log_prob_logpt / pt
+        log_prob_mass = log_prob_logmass / (mass + EPS1)
+        log_prob_pt = log_prob_logpt / (pt - self.pt_min[: fourmomenta.shape[1]] + EPS1)
         log_prob_jet = torch.stack(
             (log_prob_pt, log_prob_phi, log_prob_eta, log_prob_mass), dim=-1
         )
-        log_prob_jet = log_prob_jet.sum(dim=[1, 2])
 
+        log_prob_jet = log_prob_jet.sum(dim=[1, 2])
+        assert torch.isfinite(log_prob_jet).all()
         # transform log_prob's to fourmomenta
-        # see coordinates.py::Jetmomenta.velocities_... for very similar expressions
-        eta = eta.clamp(min=-CUTOFF, max=CUTOFF)
         jac = (
-            mass
-            / E
-            * pt**2
-            * (
-                torch.cosh(eta) * torch.cos(phi) ** 2
-                + torch.sinh(eta) * torch.sin(phi) ** 2
-            )
+            mass * pt**2 * torch.cosh(eta.clamp(min=-CUTOFF, max=CUTOFF)) / E
         )  # dfourmomenta/djetmomenta
-        log_prob = log_prob_jet - jac.log()
+        log_prob = log_prob_jet - jac.log().sum(dim=-1)
+        assert torch.isfinite(log_prob).all()
         return log_prob
 
 
@@ -305,4 +313,5 @@ def get_delta_r_mask(fourmomenta, delta_r_min):
 
 
 def log_prob_normal(z, mean=0.0, std=1.0):
-    return -((z - mean) ** 2) / (2 * std**2) - 0.5 * math.log(2 * math.pi) - std
+    std_term = torch.log(std) if type(std) == torch.Tensor else math.log(std)
+    return -((z - mean) ** 2) / (2 * std**2) - 0.5 * math.log(2 * math.pi) - std_term
