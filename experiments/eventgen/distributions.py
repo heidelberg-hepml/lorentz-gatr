@@ -89,23 +89,26 @@ class Distribution(BaseDistribution):
         fourmomenta = fourmomenta[: shape[0], ...]
         return fourmomenta
 
-    def get_efficiency_factor(self, shape):
+    def get_normalization_factor(self, shape):
         """
-        Effective volume of space that we sample from
+        Take effective volume of space that we sample from into account
         (i.e. not rejected because of pt_min or delta_r_min)
-        Should rescale probability by 1/efficiency
+
+        We do p_actual = 1/normalization * p_naive,
+        where p_naive is only normalized when also defined on the rejected regions
+        The 'normalization' factor is estimated by the acceptance rate of rejection sampling
         """
         fourmomenta = self.propose(shape)
         mask = self.create_cut_mask(fourmomenta)
-        efficiency = mask.float().mean()
-        return efficiency
+        normalization = mask.float().mean()
+        return normalization
 
     def log_prob(self, fourmomenta):
         log_prob_raw = self.log_prob_raw(fourmomenta)
 
-        # include efficiency effect
-        efficiency = self.get_efficiency_factor(fourmomenta.shape)
-        log_prob = log_prob_raw - math.log(efficiency)
+        # include normalization effect
+        normalization = self.get_normalization_factor(fourmomenta.shape)
+        log_prob = log_prob_raw - math.log(normalization)
         return log_prob
 
     def log_prob_raw(self, fourmomenta):
