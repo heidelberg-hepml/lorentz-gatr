@@ -3,6 +3,7 @@ import torch
 
 import os, time
 from omegaconf import OmegaConf, open_dict
+from tqdm import trange, tqdm
 
 from experiments.base_experiment import BaseExperiment
 from experiments.eventgen.dataset import EventDataset, EventDataLoader
@@ -215,7 +216,7 @@ class EventGenerationExperiment(BaseExperiment):
         log_probs = {f"{n_jets}j": [] for n_jets in self.cfg.data.n_jets}
         LOGGER.info(f"Starting to evaluate log_prob for model on {title} dataset")
         t0 = time.time()
-        for i, data in enumerate(loader):
+        for i, data in enumerate(tqdm(loader)):
             for ijet, data_single in enumerate(data):
                 x0 = data_single.to(self.device)
                 log_prob = self.model.log_prob(x0, ijet).squeeze().cpu()
@@ -258,7 +259,7 @@ class EventGenerationExperiment(BaseExperiment):
                 f"Starting to generate {self.cfg.evaluation.nsamples} {n_jets}j events"
             )
             t0 = time.time()
-            for i in range(n_batches):
+            for i in trange(n_batches, desc="Sampled batches"):
                 x_t = self.model.sample(
                     ijet,
                     shape,

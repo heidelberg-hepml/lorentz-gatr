@@ -10,6 +10,7 @@ from hydra.core.config_store import ConfigStore
 from hydra.utils import instantiate
 import mlflow
 from torch_ema import ExponentialMovingAverage
+from tqdm import trange
 
 import gatr.primitives.attention
 from experiments.misc import get_device, flatten_dict
@@ -422,7 +423,7 @@ class BaseExperiment:
                     yield x
 
         iterator = iter(cycle(self.train_loader))
-        for step in range(self.cfg.training.iterations):
+        for step in trange(self.cfg.training.iterations):
 
             # training
             self.model.train()
