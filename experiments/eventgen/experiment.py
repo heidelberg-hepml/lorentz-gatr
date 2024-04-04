@@ -5,7 +5,7 @@ import os, time
 from omegaconf import OmegaConf, open_dict
 
 from experiments.base_experiment import BaseExperiment
-from experiments.eventgen.dataset import EventDataset
+from experiments.eventgen.dataset import EventDataset, EventDataLoader
 from experiments.eventgen.transforms import (
     ensure_onshell,
 )
@@ -138,19 +138,19 @@ class EventGenerationExperiment(BaseExperiment):
             self.data_prepd.append(data_prepd)
 
         # create dataloaders
-        self.train_loader = torch.utils.data.DataLoader(
+        self.train_loader = EventDataLoader(
             dataset=EventDataset([x["trn"] for x in self.data_prepd], dtype=self.dtype),
             batch_size=self.cfg.training.batchsize,
             shuffle=True,
         )
 
-        self.test_loader = torch.utils.data.DataLoader(
+        self.test_loader = EventDataLoader(
             dataset=EventDataset([x["tst"] for x in self.data_prepd], dtype=self.dtype),
             batch_size=self.cfg.evaluation.batchsize,
             shuffle=False,
         )
 
-        self.val_loader = torch.utils.data.DataLoader(
+        self.val_loader = EventDataLoader(
             dataset=EventDataset([x["val"] for x in self.data_prepd], dtype=self.dtype),
             batch_size=self.cfg.evaluation.batchsize,
             shuffle=False,

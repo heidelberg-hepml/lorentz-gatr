@@ -3,6 +3,7 @@ import math
 
 from experiments.eventgen.transforms import (
     EPS1,
+    EPS2,
     CUTOFF,
     get_mass,
     get_pt,
@@ -22,9 +23,6 @@ class BaseDistribution:
     i.e. they generate fourmomenta and return log_prob in fourmomenta space
     """
 
-    def __init__(self):
-        pass
-
     def sample(self, shape, generator=None, **kwargs):
         raise NotImplementedError
 
@@ -34,8 +32,9 @@ class BaseDistribution:
 
 class Distribution(BaseDistribution):
     """
-    Base class for distributions
-    Has rejection sampling based on pt and delta_r
+    Implement rejection sampling based on delta_r and pt
+    This class is still abstract,
+    the 'propose' and 'log_prob_raw' methods have to be implemented by subclasses
     """
 
     def __init__(
@@ -60,18 +59,20 @@ class Distribution(BaseDistribution):
     def propose(self, shape, generator=None):
         raise NotImplementedError
 
+    def create_cut_mask(self, fourmomenta):
+        mask = torch.ones_like(fourmomenta[:, 0, 0], dtype=torch.bool)
+        if self.use_pt_min:
+            pt_mask = get_pt_mask(fourmomenta * self.units, self.pt_min)
+            mask *= pt_mask
+        if self.use_delta_r_min:
+            delta_r_mask = get_delta_r_mask(fourmomenta * self.units, self.delta_r_min)
+            mask *= delta_r_mask
+        return mask
+
     def sample(self, shape, generator=None):
         def collect():
             fourmomenta = self.propose(shape, generator=generator)
-            mask = torch.ones_like(fourmomenta[:, 0, 0], dtype=torch.bool)
-            if self.use_pt_min:
-                pt_mask = get_pt_mask(fourmomenta * self.units, self.pt_min)
-                mask *= pt_mask
-            if self.use_delta_r_min:
-                delta_r_mask = get_delta_r_mask(
-                    fourmomenta * self.units, self.delta_r_min
-                )
-                mask *= delta_r_mask
+            mask = self.create_cut_mask(fourmomenta)
             fourmomenta = fourmomenta[mask, ...]
             return fourmomenta
 
@@ -95,13 +96,7 @@ class Distribution(BaseDistribution):
         Should rescale probability by 1/efficiency
         """
         fourmomenta = self.propose(shape)
-        mask = torch.ones_like(fourmomenta[:, 0, 0], dtype=torch.bool)
-        if self.use_pt_min:
-            pt_mask = get_pt_mask(fourmomenta * self.units, self.pt_min)
-            mask *= pt_mask
-        if self.use_delta_r_min:
-            delta_r_mask = get_delta_r_mask(fourmomenta * self.units, self.delta_r_min)
-            mask *= delta_r_mask
+        mask = self.create_cut_mask(fourmomenta)
         efficiency = mask.float().mean()
         return efficiency
 
@@ -112,6 +107,9 @@ class Distribution(BaseDistribution):
         efficiency = self.get_efficiency_factor(fourmomenta.shape)
         log_prob = log_prob_raw - math.log(efficiency)
         return log_prob
+
+    def log_prob_raw(self, fourmomenta):
+        raise NotImplementedError
 
 
 class FourmomentaDistribution(Distribution):
@@ -183,9 +181,11 @@ class FourmomentaDistribution(Distribution):
         log_prob_logmass[
             ..., self.onshell_list
         ] = 0.0  # no contribution from fixed masses
-        log_prob_mass = log_prob_logmass / mass
-        log_prob[..., 0] = log_prob_mass * fourmomenta[..., 0] / mass
-        log_prob = log_prob.sum(dim=[1, 2])
+        log_prob_mass = log_prob_logmass - mass.clamp(min=EPS2).log()
+        log_prob[..., 0] = log_prob_mass + torch.log(
+            fourmomenta[..., 0] / mass.clamp(min=EPS2)
+        )
+        log_prob = log_prob.sum(dim=[-1, -2])
         assert torch.isfinite(log_prob).all()
         return log_prob
 
@@ -277,13 +277,16 @@ class JetmomentaDistribution(Distribution):
         log_prob_logmass[..., self.onshell_list] = 0.0
 
         # collect log_prob in jetmomenta space
-        log_prob_mass = log_prob_logmass / (mass + EPS1)
-        log_prob_pt = log_prob_logpt / (pt - self.pt_min[: fourmomenta.shape[1]] + EPS1)
+        log_prob_mass = log_prob_logmass - (mass + EPS1).clamp(min=EPS2).log()
+        log_prob_pt = (
+            log_prob_logpt
+            - (pt - self.pt_min[: fourmomenta.shape[1]] + EPS1).clamp(min=EPS2).log()
+        )
         log_prob_jet = torch.stack(
             (log_prob_pt, log_prob_phi, log_prob_eta, log_prob_mass), dim=-1
         )
 
-        log_prob_jet = log_prob_jet.sum(dim=[1, 2])
+        log_prob_jet = log_prob_jet.sum(dim=[-1, -2])
         assert torch.isfinite(log_prob_jet).all()
         # transform log_prob's to fourmomenta
         jac = (

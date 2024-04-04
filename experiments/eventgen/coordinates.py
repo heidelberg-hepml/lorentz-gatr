@@ -14,6 +14,7 @@ from experiments.eventgen.transforms import (
 
 class BaseCoordinates:
     # abstract base class for all coordinates
+    # anything that goes in our of ot this class has shape (batchsize, n_particles, 4)
     def __init__(self):
         pass
 
