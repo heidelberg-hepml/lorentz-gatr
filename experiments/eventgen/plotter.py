@@ -2,7 +2,7 @@ import numpy as np
 import math
 from matplotlib.backends.backend_pdf import PdfPages
 
-from experiments.eventgen.transforms import (
+from experiments.eventgen.helpers import (
     delta_eta,
     delta_phi,
     delta_r,

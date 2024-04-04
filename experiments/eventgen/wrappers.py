@@ -10,7 +10,7 @@ from gatr.interface import embed_vector, extract_vector, extract_scalar
 from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity
 from experiments.toptagging.dataset import embed_beam_reference
 from experiments.eventgen.cfm import EventCFM
-from experiments.eventgen.transforms import (
+from experiments.eventgen.helpers import (
     ensure_angle,
     delta_r,
 )

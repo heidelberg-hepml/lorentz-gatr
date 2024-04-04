@@ -1,7 +1,7 @@
 import torch
 import math
 
-from experiments.eventgen.transforms import (
+from experiments.eventgen.helpers import (
     EPS1,
     EPS2,
     CUTOFF,
