@@ -13,7 +13,7 @@ from experiments.eventgen.helpers import (
 )
 
 # sample a few extra events to speed up rejection sampling
-SAMPLING_FACTOR = 100
+SAMPLING_FACTOR = 3  # typically acceptance_rate > 0.5
 
 
 class BaseDistribution:

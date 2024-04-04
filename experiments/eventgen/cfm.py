@@ -1,6 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
-# import dgl
 import math
 import numpy as np
 import torch
