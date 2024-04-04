@@ -34,6 +34,9 @@ class BaseCoordinates:
         raise NotImplementedError
 
     def final_checks(self, x):
+        # checks to ensure that the configuration is valid
+        # this function is called in the end of the sample()
+        # and the beginning of the get_velocity() methods of the CFM class
         # default: do nothing
         return x
 
@@ -60,8 +63,9 @@ class Fourmomenta(BaseCoordinates):
         p_abs = (fourmomenta[..., 1:] ** 2).sum(dim=-1)
         mass2 = fourmomenta[..., 0] ** 2 - p_abs
         mass2 = stay_positive(mass2)
-        fourmomenta = fourmomenta.clone()
-        fourmomenta[..., 0] = torch.sqrt(mass2 + p_abs)
+        fourmomenta = torch.cat(
+            (torch.sqrt(mass2 + p_abs).unsqueeze(-1), fourmomenta[..., 1:]), dim=-1
+        )
         return fourmomenta
 
 
