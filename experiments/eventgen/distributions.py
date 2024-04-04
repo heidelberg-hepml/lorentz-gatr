@@ -7,7 +7,7 @@ from experiments.eventgen.transforms import (
     CUTOFF,
     get_mass,
     get_pt,
-    delta_r,
+    delta_r_fast,
     fourmomenta_to_jetmomenta,
     jetmomenta_to_fourmomenta,
 )
@@ -306,12 +306,12 @@ def get_pt_mask(fourmomenta, pt_min):
 
 def get_delta_r_mask(fourmomenta, delta_r_min):
     jetmomenta = fourmomenta_to_jetmomenta(fourmomenta)
-    n_particles = fourmomenta.shape[1]
-    mask = torch.ones_like(fourmomenta[:, 0, 0], dtype=torch.bool)
-    for idx1 in range(n_particles):
-        for idx2 in range(idx1):
-            dr = delta_r(jetmomenta, idx1, idx2)
-            mask *= dr > delta_r_min
+    dr = delta_r_fast(jetmomenta.unsqueeze(1), jetmomenta.unsqueeze(2))
+
+    # diagonal should not be < delta_r_min
+    dr[..., torch.arange(jetmomenta.shape[1]), torch.arange(jetmomenta.shape[1])] = 42
+
+    mask = (dr > delta_r_min).all(dim=[-1, -2])
     return mask
 
 

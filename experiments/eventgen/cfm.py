@@ -248,17 +248,17 @@ class CFM(nn.Module):
         def net_wrapper(t, state):
             with torch.set_grad_enabled(True):
                 x_t = state[0].detach().requires_grad_(True)
-                t = t * torch.ones(x.shape[0], 1, 1, dtype=x.dtype, device=x.device)
+                t = t * torch.ones(x0.shape[0], 1, 1, dtype=x0.dtype, device=x0.device)
                 v_t = self.get_velocity(x_t, t, ijet=ijet)
                 dlogp_dt = self.trace_fn(v_t, x_t).unsqueeze(-1)
             return v_t.detach(), dlogp_dt.detach()
 
-        logp_diff0 = torch.zeros((x.shape[0], 1), dtype=x.dtype, device=x.device)
+        logp_diff0 = torch.zeros((x0.shape[0], 1), dtype=x0.dtype, device=x0.device)
         state0 = (x0, logp_diff0)
         x_t, logp_diff_t = odeint(
             net_wrapper,
-            state,
-            torch.tensor([0.0, 1.0], dtype=x.dtype, device=x.device),
+            state0,
+            torch.tensor([0.0, 1.0], dtype=x0.dtype, device=x0.device),
             **self.odeint_kwargs,
         )
         x1 = x_t[-1].detach()

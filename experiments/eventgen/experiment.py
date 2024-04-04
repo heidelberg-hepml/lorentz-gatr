@@ -176,6 +176,11 @@ class EventGenerationExperiment(BaseExperiment):
         for key in self.cfg.evaluation.eval_loss:
             self._evaluate_loss_single(loaders[key], key)
         for key in self.cfg.evaluation.eval_log_prob:
+            if key == "gen":
+                # log_probs of generated events are not interesting
+                # + they are not well-defined, because generated events might be in regions
+                # that are not included in the base distribution (because of pt_min, delta_r_min)
+                continue
             self._evaluate_log_prob_single(loaders[key], key)
 
     def _evaluate_loss_single(self, loader, title):
@@ -274,9 +279,6 @@ class EventGenerationExperiment(BaseExperiment):
 
             samples_raw = self.model.undo_preprocess(samples)
             self.data_raw[ijet]["gen"] = samples_raw
-
-            mass2 = samples_raw[..., 0] ** 2 - (samples_raw[..., 1:] ** 2).sum(dim=-1)
-            LOGGER.info(f"Fraction of events with m^2<0: {(mass2 < 0).float().mean()}")
 
         self.sample_loader = torch.utils.data.DataLoader(
             dataset=EventDataset([x["gen"] for x in self.data_prepd], dtype=self.dtype),

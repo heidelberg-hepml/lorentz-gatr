@@ -109,6 +109,12 @@ def delta_r(event, idx1, idx2):
     ) ** 0.5
 
 
+def delta_r_fast(particle1, particle2):
+    dphi = ensure_angle(particle1[..., 1] - particle2[..., 1])
+    deta = particle1[..., 2] - particle2[..., 2]
+    return (dphi**2 + deta**2) ** 0.5
+
+
 def get_virtual_particle(event, components):
     jetmomenta = event.clone()
     fourmomenta = jetmomenta_to_fourmomenta(jetmomenta)
