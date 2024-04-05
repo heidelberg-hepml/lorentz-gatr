@@ -56,7 +56,7 @@ class Distribution(BaseDistribution):
         self.use_delta_r_min = use_delta_r_min
         self.use_pt_min = use_pt_min
 
-    def propose(self, shape, generator=None):
+    def propose(self, shape, device, dtype, generator=None):
         raise NotImplementedError
 
     def create_cut_mask(self, fourmomenta):
@@ -69,9 +69,11 @@ class Distribution(BaseDistribution):
             mask *= delta_r_mask
         return mask
 
-    def sample(self, shape, generator=None):
+    def sample(self, shape, device, dtype, generator=None):
         def collect():
-            fourmomenta = self.propose(shape, generator=generator)
+            fourmomenta = self.propose(
+                shape, device=device, dtype=dtype, generator=generator
+            )
             mask = self.create_cut_mask(fourmomenta)
             fourmomenta = fourmomenta[mask, ...]
             return fourmomenta
@@ -144,11 +146,11 @@ class FourmomentaDistribution(Distribution):
         self.logmass_mean = base_kwargs["logmass_mean"]
         self.logmass_std = base_kwargs["logmass_std"]
 
-    def propose(self, shape, generator=None):
+    def propose(self, shape, device, dtype, generator=None):
         # sample (logmass, px, py, pz)
         shape = list(shape)
         shape[0] = int(shape[0] * SAMPLING_FACTOR)
-        eps = torch.randn(shape, generator=generator)
+        eps = torch.randn(shape, device=device, dtype=dtype, generator=generator)
         px = eps[..., 1] * self.pxy_std
         py = eps[..., 2] * self.pxy_std
         pz = eps[..., 3] * self.pz_std
@@ -231,15 +233,16 @@ class JetmomentaDistribution(Distribution):
         self.logmass_std = base_kwargs["logmass_std"]
         self.eta_std = base_kwargs["eta_std"]
 
-    def propose(self, shape, generator=None):
+    def propose(self, shape, device, dtype, generator=None):
         """Base distribution for precisesiast: pt, eta gaussian; phi uniform; mass shifted gaussian"""
         # sample (logpt, phi, eta, logmass)
         shape = list(shape)
         shape[0] = int(shape[0] * SAMPLING_FACTOR)
-        eps = torch.randn(shape, generator=generator)
+        eps = torch.randn(shape, device=device, dtype=dtype, generator=generator)
         eta = eps[..., 2] * self.eta_std
         logmass = eps[..., 3] * self.logmass_std + self.logmass_mean
-        phi = math.pi * (2 * torch.rand(shape[:-1], generator=generator) - 1)
+        u = torch.rand(shape[:-1], device=device, dtype=dtype, generator=generator)
+        phi = math.pi * (2 * u - 1)
 
         # construct pt
         logpt = eps[..., 0] * self.logpt_std[: shape[1]] + self.logpt_mean[: shape[1]]

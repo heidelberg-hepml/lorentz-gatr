@@ -93,8 +93,10 @@ class CFM(nn.Module):
         v_t = distance
         return x_t, v_t
 
-    def sample_base(self, shape, device, dtype):
-        fourmomenta = self.distribution.sample(shape).to(device=device, dtype=dtype)
+    def sample_base(self, shape, device, dtype, generator=None):
+        fourmomenta = self.distribution.sample(
+            shape, device, dtype, generator=generator
+        )
         x = self.coordinates.fourmomenta_to_x(fourmomenta)
         return x
 
