@@ -163,8 +163,8 @@ class CFM(nn.Module):
 
             # collect trajectories
             if save_trajectory:
-                xts.append(x_t[:, :n_trajectories, ...])
-                vts.append(v_t[:, :n_trajectories, ...])
+                xts.append(x_t[:n_trajectories, ...])
+                vts.append(v_t[:n_trajectories, ...])
                 ts.append(t[0, 0, 0])
             return v_t
 
