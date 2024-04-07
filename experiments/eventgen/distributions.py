@@ -91,7 +91,7 @@ class Distribution(BaseDistribution):
         fourmomenta = fourmomenta[: shape[0], ...]
         return fourmomenta
 
-    def get_normalization_factor(self, shape):
+    def get_normalization_factor(self, shape, device, dtype, generator=None):
         """
         Take effective volume of space that we sample from into account
         (i.e. not rejected because of pt_min or delta_r_min)
@@ -100,7 +100,7 @@ class Distribution(BaseDistribution):
         where p_naive is only normalized when also defined on the rejected regions
         The 'normalization' factor is estimated by the acceptance rate of rejection sampling
         """
-        fourmomenta = self.propose(shape)
+        fourmomenta = self.propose(shape, device, dtype, generator=None)
         mask = self.create_cut_mask(fourmomenta)
         normalization = mask.float().mean()
         return normalization
@@ -109,7 +109,9 @@ class Distribution(BaseDistribution):
         log_prob_raw = self.log_prob_raw(fourmomenta)
 
         # include normalization effect
-        normalization = self.get_normalization_factor(fourmomenta.shape)
+        normalization = self.get_normalization_factor(
+            fourmomenta.shape, fourmomenta.device, fourmomenta.dtype
+        )
         log_prob = log_prob_raw - math.log(normalization)
         return log_prob
 

@@ -6,6 +6,7 @@ class EventDataset(torch.utils.data.Dataset):
         self.events = [
             torch.tensor(events_onedataset, dtype=dtype) for events_onedataset in events
         ]
+        self.events_eff = [e.clone() for e in self.events]
         self.lens = [len(events_onedataset) for events_onedataset in self.events]
 
     def __len__(self):
