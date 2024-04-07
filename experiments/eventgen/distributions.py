@@ -23,7 +23,7 @@ class BaseDistribution:
     i.e. they generate fourmomenta and return log_prob in fourmomenta space
     """
 
-    def sample(self, shape, generator=None, **kwargs):
+    def sample(self, shape, device, dtype, generator=None, **kwargs):
         raise NotImplementedError
 
     def log_prob(self, x, **kwargs):
@@ -117,7 +117,7 @@ class Distribution(BaseDistribution):
         raise NotImplementedError
 
 
-class Naive4Momenta(BaseDistribution):
+class NaiveDistribution(Distribution):
     """Base distribution 1: 3-momentum from standard normal, mass from standard half-normal"""
 
     def __init__(
@@ -131,7 +131,15 @@ class Naive4Momenta(BaseDistribution):
         use_delta_r_min,
         use_pt_min,
     ):
-        pass
+        super().__init__(
+            onshell_list,
+            onshell_mass,
+            units,
+            delta_r_min,
+            pt_min,
+            use_delta_r_min,
+            use_pt_min,
+        )
 
     def propose(self, shape, device, dtype, generator=None):
         """Base distribution for 4-momenta: 3-momentum from standard gaussian, mass from half-gaussian"""

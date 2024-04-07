@@ -5,6 +5,7 @@ import experiments.eventgen.coordinates as c
 from experiments.eventgen.distributions import (
     FourmomentaDistribution,
     JetmomentaDistribution,
+    NaiveDistribution,
 )
 from experiments.eventgen.helpers import get_mass
 from tests.helpers import MILD_TOLERANCES as TOLERANCES
@@ -25,6 +26,7 @@ ttbar_base_kwargs = {
     [
         FourmomentaDistribution,
         JetmomentaDistribution,
+        NaiveDistribution,
     ],
 )
 @pytest.mark.parametrize("nevents", [100000])

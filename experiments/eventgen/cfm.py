@@ -10,7 +10,7 @@ from experiments.eventgen.distributions import (
     BaseDistribution,
     FourmomentaDistribution,
     JetmomentaDistribution,
-    Naive4Momenta,
+    NaiveDistribution,
 )
 from experiments.eventgen.coordinates import BaseCoordinates
 
@@ -360,7 +360,7 @@ class EventCFM(CFM):
                 self.use_pt_min,
             )
         elif self.base_type == 3:
-            self.distribution = Naive4Momenta(
+            self.distribution = NaiveDistribution(
                 self.onshell_list,
                 self.onshell_mass,
                 self.units,
