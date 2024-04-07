@@ -192,7 +192,7 @@ class GATrCFM(EventCFM):
         self.add_time_reference = add_time_reference
 
     def get_velocity(self, x, t, ijet):
-        x = self.coordinates.final_checks(x)
+        # x = self.coordinates.final_checks(x)
         fourmomenta = self.coordinates.x_to_fourmomenta(x)
 
         # GATr in fourmomenta space

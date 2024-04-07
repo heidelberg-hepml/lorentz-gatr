@@ -60,11 +60,11 @@ class Fourmomenta(BaseCoordinates):
     def final_checks(self, fourmomenta):
         # set m[m<0] = -m[m<0] (helps for GATr)
         # should try with and without this setting (can do both for trained model)
-        p_abs = (fourmomenta[..., 1:] ** 2).sum(dim=-1)
-        mass2 = fourmomenta[..., 0] ** 2 - p_abs
+        p2_abs = (fourmomenta[..., 1:] ** 2).sum(dim=-1)
+        mass2 = fourmomenta[..., 0] ** 2 - p2_abs
         mass2 = stay_positive(mass2)
         fourmomenta = torch.cat(
-            (torch.sqrt(mass2 + p_abs).unsqueeze(-1), fourmomenta[..., 1:]), dim=-1
+            (torch.sqrt(mass2 + p2_abs).unsqueeze(-1), fourmomenta[..., 1:]), dim=-1
         )
         return fourmomenta
 

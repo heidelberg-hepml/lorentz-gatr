@@ -10,6 +10,7 @@ from experiments.eventgen.distributions import (
     BaseDistribution,
     FourmomentaDistribution,
     JetmomentaDistribution,
+    Naive4Momenta,
 )
 from experiments.eventgen.coordinates import BaseCoordinates
 
@@ -215,7 +216,7 @@ class CFM(nn.Module):
             )
 
         # coordinate-specific checks
-        x0 = self.coordinates.final_checks(x0)
+        # x0 = self.coordinates.final_checks(x0)
         return x0
 
     def get_velocity(self, x, t, ijet):
@@ -352,6 +353,17 @@ class EventCFM(CFM):
             )
         elif self.base_type == 2:
             self.distribution = JetmomentaDistribution(
+                self.onshell_list,
+                self.onshell_mass,
+                self.units,
+                self.base_kwargs,
+                self.delta_r_min,
+                self.pt_min,
+                self.use_delta_r_min,
+                self.use_pt_min,
+            )
+        elif self.base_type == 3:
+            self.distribution = Naive4Momenta(
                 self.onshell_list,
                 self.onshell_mass,
                 self.units,

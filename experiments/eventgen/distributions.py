@@ -30,6 +30,32 @@ class BaseDistribution:
         raise NotImplementedError
 
 
+class Naive4Momenta(BaseDistribution):
+    def __init__(
+        self,
+        onshell_list,
+        onshell_mass,
+        units,
+        base_kwargs,
+        delta_r_min,
+        pt_min,
+        use_delta_r_min,
+        use_pt_min,
+    ):
+        pass
+
+    def sample(self, shape, device, dtype, generator=None):
+        """Base distribution for 4-momenta: 3-momentum from standard gaussian, mass from half-gaussian"""
+        eps = torch.randn(shape, device=device, dtype=dtype, generator=generator)
+        mass = eps[..., 0].abs()
+        eps[..., 0] = torch.sqrt(mass**2 + torch.sum(eps[..., 1:] ** 2, dim=-1))
+        assert torch.isfinite(eps).all()
+        return eps
+
+    def log_prob(self, x):
+        raise NotImplementedError
+
+
 class Distribution(BaseDistribution):
     """
     Implement rejection sampling based on delta_r and pt
@@ -159,7 +185,7 @@ class FourmomentaDistribution(Distribution):
         # construct mass
         mass = logmass.exp() - EPS1
         mass[..., self.onshell_list] = (
-            torch.tensor(self.onshell_mass)
+            torch.tensor(self.onshell_mass, device=device, dtype=dtype)
             .unsqueeze(0)
             .expand(shape[0], len(self.onshell_list))
         )
@@ -245,13 +271,15 @@ class JetmomentaDistribution(Distribution):
         phi = math.pi * (2 * u - 1)
 
         # construct pt
-        logpt = eps[..., 0] * self.logpt_std[: shape[1]] + self.logpt_mean[: shape[1]]
-        pt = logpt.exp() + self.pt_min[: shape[1]] - EPS1
+        logpt = eps[..., 0] * self.logpt_std[: shape[1]].to(
+            device, dtype=dtype
+        ) + self.logpt_mean[: shape[1]].to(device, dtype=dtype)
+        pt = logpt.exp() + self.pt_min[: shape[1]].to(device, dtype=dtype) - EPS1
 
         # construct mass
         mass = logmass.exp() - EPS1
         mass[..., self.onshell_list] = (
-            torch.tensor(self.onshell_mass)
+            torch.tensor(self.onshell_mass, device=device, dtype=dtype)
             .unsqueeze(0)
             .expand(shape[0], len(self.onshell_list))
         )
@@ -305,7 +333,9 @@ class JetmomentaDistribution(Distribution):
 
 def get_pt_mask(fourmomenta, pt_min):
     pt = get_pt(fourmomenta)
-    pt_min = pt_min[: fourmomenta.shape[1]]
+    pt_min = pt_min[: fourmomenta.shape[1]].to(
+        fourmomenta.device, dtype=fourmomenta.dtype
+    )
     mask = (pt > pt_min).all(dim=-1)
     return mask
 
@@ -315,7 +345,8 @@ def get_delta_r_mask(fourmomenta, delta_r_min):
     dr = delta_r_fast(jetmomenta.unsqueeze(1), jetmomenta.unsqueeze(2))
 
     # diagonal should not be < delta_r_min
-    dr[..., torch.arange(jetmomenta.shape[1]), torch.arange(jetmomenta.shape[1])] = 42
+    arange = torch.arange(jetmomenta.shape[1], device=jetmomenta.device)
+    dr[..., arange, arange] = 42
 
     mask = (dr > delta_r_min).all(dim=[-1, -2])
     return mask
