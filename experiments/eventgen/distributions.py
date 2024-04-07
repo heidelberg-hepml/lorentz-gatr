@@ -140,20 +140,24 @@ class NaiveDistribution(Distribution):
             use_delta_r_min,
             use_pt_min,
         )
+        self.mass_std = 1.0
 
     def propose(self, shape, device, dtype, generator=None):
         """Base distribution for 4-momenta: 3-momentum from standard gaussian, mass from half-gaussian"""
         eps = torch.randn(shape, device=device, dtype=dtype, generator=generator)
-        mass = eps[..., 0].abs()
+        mass = eps[..., 0].abs() * self.mass_std
         E = torch.sqrt(mass**2 + torch.sum(eps[..., 1:] ** 2, dim=-1))
         fourmomenta = torch.cat((E.unsqueeze(-1), eps[..., 1:]), dim=-1)
         assert torch.isfinite(fourmomenta).all()
         return fourmomenta
 
     def log_prob_raw(self, fourmomenta):
-        mass = torch.sqrt(
-            fourmomenta[..., 0] ** 2 + torch.sum(fourmomenta[..., 1:] ** 2, dim=-1)
-        ).unsqueeze(-1)
+        mass = (
+            torch.sqrt(
+                fourmomenta[..., 0] ** 2 + torch.sum(fourmomenta[..., 1:] ** 2, dim=-1)
+            ).unsqueeze(-1)
+            / self.mass_std
+        )
         eps = torch.cat((mass, fourmomenta[..., 1:]), dim=-1)
 
         log_prob = log_prob_normal(eps)
