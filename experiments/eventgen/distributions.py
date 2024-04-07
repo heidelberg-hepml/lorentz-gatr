@@ -30,32 +30,6 @@ class BaseDistribution:
         raise NotImplementedError
 
 
-class Naive4Momenta(BaseDistribution):
-    def __init__(
-        self,
-        onshell_list,
-        onshell_mass,
-        units,
-        base_kwargs,
-        delta_r_min,
-        pt_min,
-        use_delta_r_min,
-        use_pt_min,
-    ):
-        pass
-
-    def sample(self, shape, device, dtype, generator=None):
-        """Base distribution for 4-momenta: 3-momentum from standard gaussian, mass from half-gaussian"""
-        eps = torch.randn(shape, device=device, dtype=dtype, generator=generator)
-        mass = eps[..., 0].abs()
-        eps[..., 0] = torch.sqrt(mass**2 + torch.sum(eps[..., 1:] ** 2, dim=-1))
-        assert torch.isfinite(eps).all()
-        return eps
-
-    def log_prob(self, x):
-        raise NotImplementedError
-
-
 class Distribution(BaseDistribution):
     """
     Implement rejection sampling based on delta_r and pt
@@ -141,6 +115,44 @@ class Distribution(BaseDistribution):
 
     def log_prob_raw(self, fourmomenta):
         raise NotImplementedError
+
+
+class Naive4Momenta(BaseDistribution):
+    """Base distribution 1: 3-momentum from standard normal, mass from standard half-normal"""
+
+    def __init__(
+        self,
+        onshell_list,
+        onshell_mass,
+        units,
+        base_kwargs,
+        delta_r_min,
+        pt_min,
+        use_delta_r_min,
+        use_pt_min,
+    ):
+        pass
+
+    def propose(self, shape, device, dtype, generator=None):
+        """Base distribution for 4-momenta: 3-momentum from standard gaussian, mass from half-gaussian"""
+        eps = torch.randn(shape, device=device, dtype=dtype, generator=generator)
+        mass = eps[..., 0].abs()
+        E = torch.sqrt(mass**2 + torch.sum(eps[..., 1:] ** 2, dim=-1))
+        fourmomenta = torch.cat((E.unsqueeze(-1), eps[..., 1:]), dim=-1)
+        assert torch.isfinite(fourmomenta).all()
+        return fourmomenta
+
+    def log_prob_raw(self, fourmomenta):
+        mass = torch.sqrt(
+            fourmomenta[..., 0] ** 2 + torch.sum(fourmomenta[..., 1:] ** 2, dim=-1)
+        ).unsqueeze(-1)
+        eps = torch.cat((mass, fourmomenta[..., 1:]), dim=-1)
+
+        log_prob = log_prob_normal(eps)
+        log_prob[..., 0] += math.log(2)  # mass from half-normal, hence prob -> 2*prob
+        log_prob = log_prob.sum(dim=[-1, -2])
+        assert torch.isfinite(log_prob).all()
+        return log_prob
 
 
 class FourmomentaDistribution(Distribution):
