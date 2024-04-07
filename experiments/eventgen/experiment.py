@@ -107,10 +107,10 @@ class EventGenerationExperiment(BaseExperiment):
         self.events_prepd = []
         for ijet in range(len(self.cfg.data.n_jets)):
             # preprocess data
-            data_raw = ensure_onshell(data_raw, self.onshell_list, self.onshell_mass)
-            data_prepd = self.model.preprocess(data_raw)
-
-            self.events_raw[ijet] = data_raw
+            self.events_raw[ijet] = ensure_onshell(
+                self.events_raw[ijet], self.onshell_list, self.onshell_mass
+            )
+            data_prepd = self.model.preprocess(self.events_raw[ijet])
             self.events_prepd.append(data_prepd)
 
     def _init_dataloader(self):
