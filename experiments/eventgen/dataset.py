@@ -6,30 +6,32 @@ class EventDataset(torch.utils.data.Dataset):
         self.events = [
             torch.tensor(events_onedataset, dtype=dtype) for events_onedataset in events
         ]
-
-        # The model should see each event class (eg ttbar+0j, ttbar+1j etc) the same number of times
-        # We implement this by defining epochs as 'the model sees the same amount of samples from
-        # each event class', and the minimum-event class determines how long an epoch lasts'
-        # We re-create the 'used' part of the dataset for each epoch, see the EventDataLoader class
-        self.len = min([len(events_onedataset) for events_onedataset in self.events])
-        self.events_eff = [events[: self.len] for events in self.events]
+        self.lens = [len(events_onedataset) for events_onedataset in self.events]
 
     def __len__(self):
-        return self.len
+        return max(self.lens)
 
     def __getitem__(self, idx):
-        return [events[idx] for events in self.events_eff]
+        # if sub-dataset has less than max(self.lens) events,
+        # some events will be sampled more than one time
+        # Note that the model sees events with smaller idx more often
+        return [events[idx % _len] for events, _len in zip(self.events_eff, self.lens)]
 
 
 class EventDataLoader(torch.utils.data.DataLoader):
+    def __init__(self, dataset, batch_size, shuffle=True, drop_last=False):
+        super().__init__(
+            dataset, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
+        )
+        self.shuffle = shuffle
+
     def __iter__(self):
-        # re-sample the used data in each epoch
-        perms = [
-            torch.randperm(len(events))[: self.dataset.len]
-            for events in self.dataset.events
-        ]
-        self.dataset.events_eff = [
-            events[perm] for events, perm in zip(self.dataset.events, perms)
-        ]
+        if self.shuffle:
+            # manually shuffle the dataset after each epoch
+            # this is necessary to avoid having small-idx events more often in the custom __getitem__ method
+            perms = [torch.randperm(len(events)) for events in self.dataset.events]
+            self.dataset.events_eff = [
+                events[perm] for events, perm in zip(self.dataset.events, perms)
+            ]
 
         return super().__iter__()
