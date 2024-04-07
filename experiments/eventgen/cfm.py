@@ -84,12 +84,9 @@ class CFM(nn.Module):
     def init_coordinates(self):
         raise NotImplementedError
 
-    def get_distance(self, x0, x1):
-        return x1 - x0
-
     def get_trajectory(self, x0, x1, t):
         # default: linear trajectory
-        distance = self.get_distance(x0, x1)
+        distance = x1 - x0
         x_t = x0 + distance * t
         v_t = distance
         return x_t, v_t

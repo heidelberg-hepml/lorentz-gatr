@@ -38,12 +38,14 @@ def get_process_token(x_ref, ijet, process_token_channels):
     return process_token
 
 
-def distance_phi(x0, x1):
+def trajectory_phi(x0, x1, t):
     # take into account that phi is cyclic when computing shortest distance
     distance = x1 - x0
     distance[..., 1] = ensure_angle(distance[..., 1])
-    return distance
-
+    x_t = x0 + distance * t
+    x_t[..., 1] = ensure_angle(x_t[..., 1])
+    v_t = distance
+    return x_t, v_t
 
 ### CFM on 4momenta
 
@@ -239,16 +241,16 @@ class TransformerCFMJetmomenta(TransformerCFM):
     def init_coordinates(self):
         self.coordinates = coordinates.Jetmomenta()
 
-    def get_distance(self, x0, x1):
-        return distance_phi(x0, x1)
+    def get_trajectory(self, x0, x1, t):
+        return trajectory_phi(x0, x1, t)
 
 
 class TransformerCFMPrecisesiast(TransformerCFM):
     def init_coordinates(self):
         self.coordinates = coordinates.Precisesiast(self.pt_min, self.units)
 
-    def get_distance(self, x0, x1):
-        return distance_phi(x0, x1)
+    def get_trajectory(self, x0, x1, t):
+        return trajectory_phi(x0, x1, t)
 
 
 class GATrCFMFourmomenta(GATrCFM):
@@ -260,8 +262,8 @@ class GATrCFMPtPhiEtaE(GATrCFM):
     def init_coordinates(self):
         self.coordinates = coordinates.PtPhiEtaE()
 
-    def get_distance(self, x0, x1):
-        return distance_phi(x0, x1)
+    def get_trajectory(self, x0, x1, t):
+        return trajectory_phi(x0, x1, t)
 
 
 class GATrCFMPPPM(GATrCFM):
@@ -288,16 +290,16 @@ class GATrCFMJetmomenta(GATrCFM):
     def init_coordinates(self):
         self.coordinates = coordinates.Jetmomenta(mass_scale=self.mass_scale)
 
-    def get_distance(self, x0, x1):
-        return distance_phi(x0, x1)
+    def get_trajectory(self, x0, x1, t):
+        return trajectory_phi(x0, x1, t)
 
 
 class GATrCFMJetmomenta2(GATrCFM):
     def init_coordinates(self):
         self.coordinates = coordinates.Jetmomenta2(mass_scale=self.mass_scale)
 
-    def get_distance(self, x0, x1):
-        return distance_phi(x0, x1)
+    def get_trajectory(self, x0, x1, t):
+        return trajectory_phi(x0, x1, t)
 
 
 class GATrCFMPrecisesiast(GATrCFM):
@@ -306,8 +308,8 @@ class GATrCFMPrecisesiast(GATrCFM):
             self.pt_min, self.units, mass_scale=self.mass_scale
         )
 
-    def get_distance(self, x0, x1):
-        return distance_phi(x0, x1)
+    def get_trajectory(self, x0, x1, t):
+        return trajectory_phi(x0, x1, t)
 
 
 class GATrCFMPrecisesiast2(GATrCFM):
@@ -316,8 +318,8 @@ class GATrCFMPrecisesiast2(GATrCFM):
             self.pt_min, self.units, mass_scale=self.mass_scale
         )
 
-    def get_distance(self, x0, x1):
-        return distance_phi(x0, x1)
+    def get_trajectory(self, x0, x1, t):
+        return trajectory_phi(x0, x1, t)
 
 
 # deltaR business
