@@ -17,11 +17,11 @@ data:
  mass_scale: 1.
 
 odeint_kwargs:
- method: rk4
- rtol: 1e-3
+ method: dopri5
+ rtol: 1e-5
  atol: 1e-5
  options:
-  step_size: 1e-2
+  step_size: 0.01
 
 tr_wrapper: TransformerCFMFourmomenta
 gatr_wrapper: GATrCFMFourmomenta

@@ -57,7 +57,7 @@ class EventGenerationExperiment(BaseExperiment):
                     self.cfg.model.net.in_mv_channels += (
                         2 if self.cfg.model.beam_reference == "cgenn" else 1
                     )
-                if self.cfg.model.add_time_reference is not None:
+                if self.cfg.model.add_time_reference:
                     self.cfg.model.net.in_mv_channels += 1
 
             self.cfg.model.odeint_kwargs = self.cfg.odeint_kwargs
@@ -280,6 +280,9 @@ class EventGenerationExperiment(BaseExperiment):
 
             samples_raw = self.model.undo_preprocess(samples)
             self.data_raw[ijet]["gen"] = samples_raw
+
+            m2 = samples_raw[..., 0] ** 2 - (samples_raw[..., 1:] ** 2).sum(dim=-1)
+            LOGGER.info(f"Fraction of events with m2<0: {(m2<0).float().mean():.4f}")
 
         self.sample_loader = torch.utils.data.DataLoader(
             dataset=EventDataset([x["gen"] for x in self.data_prepd], dtype=self.dtype),
