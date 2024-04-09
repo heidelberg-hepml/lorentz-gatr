@@ -500,10 +500,12 @@ class BaseExperiment:
         self.optimizer.zero_grad()
         loss.backward()
         if self.cfg.training.clip_grad_value is not None:
+            # clip gradients at a certain value (this is dangerous!)
             torch.nn.utils.clip_grad_value_(
                 self.model.parameters(),
                 self.cfg.training.clip_grad_value,
             )
+        # rescale gradients such that their norm matches a given number
         grad_norm = (
             torch.nn.utils.clip_grad_norm_(
                 self.model.parameters(),
