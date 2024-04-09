@@ -10,6 +10,7 @@ save: true
 use_mlflow: true
 save_source: true
 ema: false
+gatr_mix_duals: true
 
 train: true
 training:

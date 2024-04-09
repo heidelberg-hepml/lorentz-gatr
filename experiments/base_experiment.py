@@ -13,6 +13,7 @@ from torch_ema import ExponentialMovingAverage
 from tqdm import trange
 
 import gatr.primitives.attention
+import gatr.layers.linear
 from experiments.misc import get_device, flatten_dict
 import experiments.logger
 from experiments.logger import LOGGER, MEMORY_HANDLER, FORMATTER
@@ -98,6 +99,8 @@ class BaseExperiment:
         )
 
     def init_model(self):
+        gatr.layers.linear.MIX_DUALS = True if self.cfg.gatr_mix_duals else False
+
         # initialize model
         self.model = instantiate(self.cfg.model)  # hydra magic
         num_parameters = sum(
