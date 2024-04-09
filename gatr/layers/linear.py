@@ -11,6 +11,8 @@ from torch import nn
 from gatr.interface import embed_scalar
 from gatr.primitives.linear import NUM_PIN_LINEAR_BASIS_ELEMENTS, equi_linear
 
+MIX_DUALS = False
+
 
 class EquiLinear(nn.Module):
     """Pin-equivariant linear layer.
@@ -99,14 +101,19 @@ class EquiLinear(nn.Module):
 
         # Scalars -> MV scalars
         self.s2mvs: Optional[nn.Linear]
+        mix_factor = 2 if MIX_DUALS else 1
         if in_s_channels:
-            self.s2mvs = nn.Linear(in_s_channels, 2*out_mv_channels, bias=bias)
+            self.s2mvs = nn.Linear(
+                in_s_channels, mix_factor * out_mv_channels, bias=bias
+            )
         else:
             self.s2mvs = None
 
         # MV scalars -> scalars
         if out_s_channels:
-            self.mvs2s = nn.Linear(2*in_mv_channels, out_s_channels, bias=bias)
+            self.mvs2s = nn.Linear(
+                mix_factor * in_mv_channels, out_s_channels, bias=bias
+            )
         else:
             self.mvs2s = None
 
@@ -159,10 +166,18 @@ class EquiLinear(nn.Module):
             outputs_mv = outputs_mv + bias
 
         if self.s2mvs is not None and scalars is not None:
-            outputs_mv[..., [0, -1]] += self.s2mvs(scalars).view(*outputs_mv.shape[:-2], outputs_mv.shape[-2], 2)
+            if MIX_DUALS:
+                outputs_mv[..., [0, -1]] += self.s2mvs(scalars).view(
+                    *outputs_mv.shape[:-2], outputs_mv.shape[-2], 2
+                )
+            else:
+                outputs_mv[..., 0] += self.s2mvs(scalars)
 
         if self.mvs2s is not None:
-            outputs_s = self.mvs2s(multivectors[..., [0, -1]].flatten(start_dim=-2))
+            if MIX_DUALS:
+                outputs_s = self.mvs2s(multivectors[..., [0, -1]].flatten(start_dim=-2))
+            else:
+                outputs_s = self.mvs2s(multivectors[..., 0])
             if self.s2s is not None and scalars is not None:
                 outputs_s = outputs_s + self.s2s(scalars)
         else:
@@ -319,9 +334,12 @@ class EquiLinear(nn.Module):
             # contribution from scalar -> mv scalar
             bound = mv_component_factors[0] * mv_factor / np.sqrt(fan_in) / np.sqrt(2)
             nn.init.uniform_(self.weight[..., [0]], a=-bound, b=bound)
-            # contribution from scalar -> mv pseudoscalar
-            bound = mv_component_factors[-1] * mv_factor / np.sqrt(fan_in) / np.sqrt(2)
-            nn.init.uniform_(self.weight[..., [-1]], a=-bound, b=bound)
+            if MIX_DUALS:
+                # contribution from scalar -> mv pseudoscalar
+                bound = (
+                    mv_component_factors[-1] * mv_factor / np.sqrt(fan_in) / np.sqrt(2)
+                )
+                nn.init.uniform_(self.weight[..., [-1]], a=-bound, b=bound)
 
         # The same holds for the scalar-to-MV map, where we also just want a variance of 0.5.
         # Note: This is not properly extended to scalar and pseudoscalar outputs yet
@@ -346,7 +364,6 @@ class EquiLinear(nn.Module):
                 nn.init.uniform_(
                     self.s2mvs.bias, mvs_bias_shift - bound, mvs_bias_shift + bound
                 )
-            
 
     def _init_scalars(self, s_factor):
         """Weight initialization for maps to multivector outputs."""

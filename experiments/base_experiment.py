@@ -10,8 +10,10 @@ from hydra.core.config_store import ConfigStore
 from hydra.utils import instantiate
 import mlflow
 from torch_ema import ExponentialMovingAverage
+from tqdm import trange
 
 import gatr.primitives.attention
+import gatr.layers.linear
 from experiments.misc import get_device, flatten_dict
 import experiments.logger
 from experiments.logger import LOGGER, MEMORY_HANDLER, FORMATTER
@@ -71,11 +73,11 @@ class BaseExperiment:
         self.init_model()
         self.init_data()
         self._init_dataloader()
+        self._init_loss()
 
         if self.cfg.train:
             self._init_optimizer()
             self._init_scheduler()
-            self._init_loss()
             self.train()
             self._save_model()
 
@@ -97,6 +99,8 @@ class BaseExperiment:
         )
 
     def init_model(self):
+        gatr.layers.linear.MIX_DUALS = True if self.cfg.gatr_mix_duals else False
+
         # initialize model
         self.model = instantiate(self.cfg.model)  # hydra magic
         num_parameters = sum(
@@ -422,7 +426,7 @@ class BaseExperiment:
                     yield x
 
         iterator = iter(cycle(self.train_loader))
-        for step in range(self.cfg.training.iterations):
+        for step in trange(self.cfg.training.iterations):
 
             # training
             self.model.train()
@@ -495,6 +499,13 @@ class BaseExperiment:
         loss, metrics = self._batch_loss(data)
         self.optimizer.zero_grad()
         loss.backward()
+        if self.cfg.training.clip_grad_value is not None:
+            # clip gradients at a certain value (this is dangerous!)
+            torch.nn.utils.clip_grad_value_(
+                self.model.parameters(),
+                self.cfg.training.clip_grad_value,
+            )
+        # rescale gradients such that their norm matches a given number
         grad_norm = (
             torch.nn.utils.clip_grad_norm_(
                 self.model.parameters(),

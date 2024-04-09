@@ -10,6 +10,7 @@ save: true
 use_mlflow: true
 save_source: true
 ema: false
+gatr_mix_duals: true
 
 train: true
 training:
@@ -20,7 +21,8 @@ training:
  es_load_best_model: true
  validate_every_n_steps: 10
 
- clip_grad_norm: 1e1
+ clip_grad_norm: 5
+ clip_grad_value: null
  log_every_n_steps: 100
 
  optimizer : Adam
