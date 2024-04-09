@@ -6,7 +6,7 @@ import torch
 EPS1 = 1e-3
 
 # generic numerical stability cutoff
-EPS2 = 1e-5
+EPS2 = 1e-10
 
 # exp(x) -> exp(x.clamp(max=CUTOFF))
 CUTOFF = 10
