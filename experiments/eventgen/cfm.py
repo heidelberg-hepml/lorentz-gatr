@@ -11,6 +11,7 @@ from experiments.eventgen.distributions import (
     FourmomentaDistribution,
     JetmomentaDistribution,
     NaiveDistribution,
+    NaiveLogDistribution,
 )
 from experiments.eventgen.coordinates import BaseCoordinates
 
@@ -337,39 +338,17 @@ class EventCFM(CFM):
         self.prep_params = {}
 
     def init_distribution(self):
+        args = [self.onshell_list, self.onshell_mass, self.units,
+                self.base_kwargs, self.delta_r_min, self.pt_min,
+                self.use_delta_r_min, self.use_pt_min]
         if self.base_type == 1:
-            self.distribution = FourmomentaDistribution(
-                self.onshell_list,
-                self.onshell_mass,
-                self.units,
-                self.base_kwargs,
-                self.delta_r_min,
-                self.pt_min,
-                self.use_delta_r_min,
-                self.use_pt_min,
-            )
+            self.distribution = FourmomentaDistribution(*args)
         elif self.base_type == 2:
-            self.distribution = JetmomentaDistribution(
-                self.onshell_list,
-                self.onshell_mass,
-                self.units,
-                self.base_kwargs,
-                self.delta_r_min,
-                self.pt_min,
-                self.use_delta_r_min,
-                self.use_pt_min,
-            )
+            self.distribution = JetmomentaDistribution(*args)
         elif self.base_type == 3:
-            self.distribution = NaiveDistribution(
-                self.onshell_list,
-                self.onshell_mass,
-                self.units,
-                self.base_kwargs,
-                self.delta_r_min,
-                self.pt_min,
-                self.use_delta_r_min,
-                self.use_pt_min,
-            )
+            self.distribution = NaiveDistribution(*args)            
+        elif self.base_type == 4:
+            self.distribution = NaiveLogDistribution(*args)
         else:
             raise ValueError(f"base_type={self.base_type} not implemented")
 

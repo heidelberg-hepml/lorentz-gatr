@@ -168,6 +168,53 @@ class NaiveDistribution(Distribution):
         assert torch.isfinite(log_prob).all()
         return log_prob
 
+class NaiveLogDistribution(Distribution):
+    """Base distribution 1: 3-momentum from standard normal, mass from standard lognormal"""
+
+    def __init__(
+        self,
+        onshell_list,
+        onshell_mass,
+        units,
+        base_kwargs,
+        delta_r_min,
+        pt_min,
+        use_delta_r_min,
+        use_pt_min,
+    ):
+        super().__init__(
+            onshell_list,
+            onshell_mass,
+            units,
+            delta_r_min,
+            pt_min,
+            use_delta_r_min,
+            use_pt_min,
+        )
+        self.mass_std = 1.0
+
+    def propose(self, shape, device, dtype, generator=None):
+        """Base distribution for 4-momenta: 3-momentum from standard gaussian, mass from half-gaussian"""
+        eps = torch.randn(shape, device=device, dtype=dtype, generator=generator)
+        logmass = eps[..., 0].abs() * self.mass_std
+        E = torch.sqrt(logmass.exp()**2 + torch.sum(eps[..., 1:] ** 2, dim=-1))
+        fourmomenta = torch.cat((E.unsqueeze(-1), eps[..., 1:]), dim=-1)
+        assert torch.isfinite(fourmomenta).all()
+        return fourmomenta
+
+    def log_prob_raw(self, fourmomenta):
+        logmass = (
+            torch.sqrt(
+                fourmomenta[..., 0] ** 2 + torch.sum(fourmomenta[..., 1:] ** 2, dim=-1)
+            ).unsqueeze(-1)
+            / self.mass_std
+        ).log()
+        eps = torch.cat((logmass, fourmomenta[..., 1:]), dim=-1)
+
+        log_prob = log_prob_normal(eps)
+        log_prob = log_prob.sum(dim=[-1, -2])
+        assert torch.isfinite(log_prob).all()
+        return log_prob
 
 class FourmomentaDistribution(Distribution):
     """Base distribution 1: 3-momentum from fitted normal, mass from fitted log-normal"""
