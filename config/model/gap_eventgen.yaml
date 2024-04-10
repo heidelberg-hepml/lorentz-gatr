@@ -3,6 +3,7 @@ embed_t_dim: 8
 embed_t_scale: 30.
 clamp_mse: null
 beam_reference: spacelike
+two_beams: false
 add_time_reference: true
 
 net:

@@ -2,6 +2,7 @@ _target_: experiments.eventgen.wrappers.${gatr_wrapper}
 embed_t_dim: 8
 embed_t_scale: 30.
 beam_reference: spacelike
+two_beams: false
 add_time_reference: true
 
 net:

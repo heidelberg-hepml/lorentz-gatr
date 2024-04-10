@@ -47,6 +47,7 @@ def trajectory_phi(x0, x1, t):
     v_t = distance
     return x_t, v_t
 
+
 ### CFM on 4momenta
 
 
@@ -87,6 +88,7 @@ class GAPCFMFourmomenta(EventCFM):
         embed_t_dim,
         embed_t_scale,
         beam_reference,
+        two_beams,
         add_time_reference,
         odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
         hutchinson=True,
@@ -99,6 +101,7 @@ class GAPCFMFourmomenta(EventCFM):
         )
         self.net = net
         self.beam_reference = beam_reference
+        self.two_beams = two_beams
         self.add_time_reference = add_time_reference
 
     def init_coordinates(self):
@@ -120,7 +123,9 @@ class GAPCFMFourmomenta(EventCFM):
 
         # mv embedding
         mv = embed_vector(x.reshape(x.shape[0], -1, 4))
-        beam = embed_beam_reference(mv, self.beam_reference, self.add_time_reference)
+        beam = embed_beam_reference(
+            mv, self.beam_reference, self.add_time_reference, self.two_beams
+        )
         if beam is not None:
             mv = torch.cat([mv, beam], dim=-2)
 
@@ -177,6 +182,7 @@ class GATrCFM(EventCFM):
         type_token_channels,
         process_token_channels,
         beam_reference,
+        two_beams,
         add_time_reference,
         odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
         hutchinson=True,
@@ -191,6 +197,7 @@ class GATrCFM(EventCFM):
         self.type_token_channels = type_token_channels
         self.process_token_channels = process_token_channels
         self.beam_reference = beam_reference
+        self.two_beams = two_beams
         self.add_time_reference = add_time_reference
 
     def get_velocity(self, x, t, ijet):
@@ -216,7 +223,9 @@ class GATrCFM(EventCFM):
 
         # mv embedding
         mv = embed_vector(x).unsqueeze(-2)
-        beam = embed_beam_reference(mv, self.beam_reference, self.add_time_reference)
+        beam = embed_beam_reference(
+            mv, self.beam_reference, self.add_time_reference, self.two_beams
+        )
         if beam is not None:
             beam = beam.unsqueeze(1).expand(*mv.shape[:-2], beam.shape[-2], 16)
             mv = torch.cat([mv, beam], dim=-2)

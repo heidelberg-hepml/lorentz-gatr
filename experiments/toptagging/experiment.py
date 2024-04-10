@@ -54,12 +54,13 @@ class TaggingExperiment(BaseExperiment):
                     self.cfg.model.net.in_s_channels += 1
 
                 # extra mv channels for beam_reference and time_reference
-                if self.cfg.data.beam_reference is not None:
-                    self.cfg.model.net.in_mv_channels += (
-                        2 if self.cfg.data.beam_reference == "cgenn" else 1
-                    )
-                if self.cfg.data.add_time_reference:
-                    self.cfg.model.net.in_mv_channels += 1
+                if not self.cfg.data.beam_token:
+                    if self.cfg.data.beam_reference is not None:
+                        self.cfg.model.net.in_mv_channels += (
+                            2 if self.cfg.data.two_beams else 1
+                        )
+                    if self.cfg.data.add_time_reference:
+                        self.cfg.model.net.in_mv_channels += 1
 
                 # extra mv and s channels for pairs
                 if self.cfg.data.pairs.use:

@@ -55,7 +55,7 @@ class EventGenerationExperiment(BaseExperiment):
             if self.modelname in ["GATr", "GAP"]:
                 if self.cfg.model.beam_reference is not None:
                     self.cfg.model.net.in_mv_channels += (
-                        2 if self.cfg.model.beam_reference == "cgenn" else 1
+                        2 if self.cfg.model.two_beams else 1
                     )
                 if self.cfg.model.add_time_reference:
                     self.cfg.model.net.in_mv_channels += 1
