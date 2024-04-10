@@ -92,7 +92,7 @@ def test_invertibility(transforms, nevents, nparticles):
 )
 @pytest.mark.parametrize("nevents", [100000])
 @pytest.mark.parametrize("nparticles", [10])
-def test_autograd(transforms, nevents, nparticles):
+def test_jacobians(transforms, nevents, nparticles):
     """
     test the _jac_forward and _jac_inverse methods with a call to autograd
     only the last transform in transforms is tested
@@ -124,6 +124,13 @@ def test_autograd(transforms, nevents, nparticles):
     jac_fw = ts[-1]._jac_forward(x, y)
     jac_inv = ts[-1]._jac_inverse(y, z)
 
+    # test jacobian invertibility
+    diag_left = torch.einsum("...ij,...jk->...ik", jac_fw, jac_inv)
+    diag_right = torch.einsum("...ij,...jk->...ik", jac_inv, jac_fw)
+    diag = torch.eye(4)[None,None,...].expand(diag_left.shape)
+    torch.testing.assert_close(diag_right, diag, **TOLERANCES)
+    torch.testing.assert_close(diag_left, diag, **TOLERANCES)
+
     # jacobians from autograd
     grad_outputs = torch.ones_like(x)
     jac_fw_autograd = torch.autograd.grad(y, x, grad_outputs=grad_outputs)[0]
@@ -150,5 +157,6 @@ def test_autograd(transforms, nevents, nparticles):
     jac_inv_autograd = torch.stack(jac_inv_autograd, dim=-2)
     """
 
+    # compare jacobian to autograd
     torch.testing.assert_close(jac_fw, jac_fw_autograd, **TOLERANCES)
     torch.testing.assert_close(jac_inv, jac_inv_autograd, **TOLERANCES)

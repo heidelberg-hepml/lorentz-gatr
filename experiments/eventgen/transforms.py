@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from experiments.eventgen.helpers import unpack_last, EPS1, EPS2, CUTOFF, stable_arctanh
+from experiments.eventgen.helpers import unpack_last, EPS1, EPS2, CUTOFF, stable_arctanh, stay_positive
 
 
 class BaseTransform(nn.Module):
@@ -16,13 +16,13 @@ class BaseTransform(nn.Module):
 
     def velocity_forward(self, v_x, x, y):
         jac = self._jac_forward(x, y)
-        v_y = torch.mathmul(jac, v_x)
+        v_y = torch.einsum("...ij,...j->...i", jac, v_x)
         assert torch.isfinite(v_y).all()
         return v_y
 
     def velocity_inverse(self, v_y, y, x):
         jac = self._jac_inverse(y, x)
-        v_x = torch.matmul(jac, v_y)
+        v_x = torch.einsum("...ij,...j->...i", jac, v_y)
         assert torch.isfinite(v_x).all()
         return v_x
 
@@ -62,6 +62,8 @@ class EPPP_to_PPPM2(BaseTransform):
 
     def _inverse(self, pppm2):
         px, py, pz, m2 = unpack_last(pppm2)
+        m2 = stay_positive(m2)
+        
         E = torch.sqrt(m2 + (px**2 + py**2 + pz**2))
         return torch.stack((E, px, py, pz), dim=-1)
 
@@ -70,7 +72,6 @@ class EPPP_to_PPPM2(BaseTransform):
         px, py, pz, m2 = unpack_last(pppm2)
 
         # jac_ij = dpppm2_i / deppp_j
-        p_abs = torch.sqrt(px**2 + py**2 + pz**2)
         zero, one = torch.zeros_like(E), torch.ones_like(E)
         jac_E = torch.stack((zero, zero, zero, 2 * E), dim=-1)
         jac_px = torch.stack((one, zero, zero, -2 * px), dim=-1)
@@ -83,12 +84,11 @@ class EPPP_to_PPPM2(BaseTransform):
         px, py, pz, m2 = unpack_last(pppm2)
 
         # jac_ij = deppp_i / dpppm2_j
-        p_abs = torch.sqrt(px**2 + py**2 + pz**2)
         zero, one = torch.zeros_like(E), torch.ones_like(E)
         jac_px = torch.stack((px / E, one, zero, zero), dim=-1)
         jac_py = torch.stack((py / E, zero, one, zero), dim=-1)
         jac_pz = torch.stack((pz / E, zero, zero, one), dim=-1)
-        jac_m2 = torch.stack((zero, zero, zero, 1 / (2 * E)), dim=-1)
+        jac_m2 = torch.stack((1 / (2 * E), zero, zero, zero), dim=-1)
         return torch.stack((jac_px, jac_py, jac_pz, jac_m2), dim=-1)
 
     def _detjac_forward(self, eppp, pppm2):
@@ -104,7 +104,7 @@ class EPPP_to_PtPhiEtaE(BaseTransform):
         pt = torch.sqrt(px**2 + py**2)
         phi = torch.arctan2(py, px)
         p_abs = torch.sqrt(pt**2 + pz**2)
-        eta = stable_arctanh(pz / p_abs)  # torch.arctanh(pz / p_abs) #
+        eta = stable_arctanh(pz / p_abs)  # torch.arctanh(pz / p_abs)
         assert torch.isfinite(eta).all()
 
         return torch.stack((pt, phi, eta, E), dim=-1)
@@ -175,6 +175,7 @@ class PtPhiEtaE_to_PtPhiEtaM2(BaseTransform):
     def _inverse(self, ptphietam2):
         pt, phi, eta, m2 = unpack_last(ptphietam2)
 
+        m2 = stay_positive(m2)
         p_abs = pt * torch.cosh(eta)
         E = torch.sqrt(m2 + p_abs**2)
 
