@@ -144,7 +144,6 @@ class NaiveDistribution(Distribution):
         self.coordinates = PPPM2()
 
     def propose(self, shape, device, dtype, generator=None):
-        """Base distribution for 4-momenta: 3-momentum from standard gaussian, mass from half-gaussian"""
         eps = torch.randn(shape, device=device, dtype=dtype, generator=generator)
         m2 = eps[..., 0].abs() * self.m2_std
         onshell_mass = self.onshell_mass.to(device, dtype=dtype).unsqueeze(0)
@@ -167,7 +166,7 @@ class NaiveDistribution(Distribution):
 
 
 class NaiveLogDistribution(Distribution):
-    """Base distribution 1: 3-momentum from standard normal, mass from standard lognormal"""
+    """Base distribution 2: 3-momentum from standard normal, log(mass) from standard normal"""
 
     def __init__(
         self,
@@ -213,7 +212,7 @@ class NaiveLogDistribution(Distribution):
 
 
 class FourmomentaDistribution(Distribution):
-    """Base distribution 1: 3-momentum from fitted normal, mass from fitted log-normal"""
+    """Base distribution 3: 3-momentum and mass from fitted normal"""
 
     def __init__(
         self,
@@ -238,8 +237,8 @@ class FourmomentaDistribution(Distribution):
 
         self.pxy_std = base_kwargs["pxy_std"]
         self.pz_std = base_kwargs["pz_std"]
-        self.logmass_mean = base_kwargs["logmass_mean"]
-        self.logmass_std = base_kwargs["logmass_std"]
+        self.logm2_mean = 2 * base_kwargs["logmass_mean"]
+        self.logm2_std = 2 * base_kwargs["logmass_std"]
         self.coordinates = PPPLogM2()
 
     def propose(self, shape, device, dtype, generator=None):
@@ -250,9 +249,8 @@ class FourmomentaDistribution(Distribution):
         px = eps[..., 1] * self.pxy_std
         py = eps[..., 2] * self.pxy_std
         pz = eps[..., 3] * self.pz_std
-        logmass = eps[..., 0] * self.logmass_std + self.logmass_mean
+        logm2 = eps[..., 0] * self.logm2_std + self.logm2_mean
         onshell_mass = self.onshell_mass.to(device, dtype=dtype).unsqueeze(0)
-        logm2 = 2 * logmass
         logm2[..., self.onshell_list] = torch.log(onshell_mass**2 + EPS1)
 
         ppplogm2 = torch.stack((px, py, pz, logm2), dim=-1)
@@ -265,8 +263,8 @@ class FourmomentaDistribution(Distribution):
         log_prob_px = log_prob_normal(px, std=self.pxy_std)
         log_prob_py = log_prob_normal(py, std=self.pxy_std)
         log_prob_pz = log_prob_normal(pz, std=self.pz_std)
-        log_prob_logm2 = (
-            log_prob_normal(logm2 / 2, mean=self.logmass_mean, std=self.logmass_std) / 2
+        log_prob_logm2 = log_prob_normal(
+            logm2, mean=self.logm2_mean, std=self.logm2_std
         )
         log_prob_logm2[..., self.onshell_list] = 0.0
         log_prob = torch.stack(
@@ -278,7 +276,7 @@ class FourmomentaDistribution(Distribution):
 
 
 class JetmomentaDistribution(Distribution):
-    """Base distribution 1: phi uniform; eta, log(pt), log(mass) from fitted normal"""
+    """Base distribution 4: phi uniform; eta, log(pt) and log(mass) from fitted normal"""
 
     def __init__(
         self,
@@ -314,8 +312,8 @@ class JetmomentaDistribution(Distribution):
             / (torch.exp(logpt_mean) - self.pt_min - EPS1)
         )
 
-        self.logmass_mean = base_kwargs["logmass_mean"]
-        self.logmass_std = base_kwargs["logmass_std"]
+        self.logm2_mean = 2 * base_kwargs["logmass_mean"]
+        self.logm2_std = 2 * base_kwargs["logmass_std"]
         self.eta_std = base_kwargs["eta_std"]
 
     def propose(self, shape, device, dtype, generator=None):
@@ -326,8 +324,7 @@ class JetmomentaDistribution(Distribution):
         eps = torch.randn(shape, device=device, dtype=dtype, generator=generator)
 
         eta = eps[..., 2] * self.eta_std
-        logmass = eps[..., 3] * self.logmass_std + self.logmass_mean
-        logm2 = 2 * logmass
+        logm2 = eps[..., 3] * self.logm2_std + self.logm2_mean
         onshell_mass = self.onshell_mass.to(device, dtype=dtype).unsqueeze(0)
         logm2[..., self.onshell_list] = torch.log(onshell_mass**2 + EPS1)
         logpt = eps[..., 0] * self.logpt_std[: shape[-2]].to(
@@ -346,9 +343,9 @@ class JetmomentaDistribution(Distribution):
         logpt, phi, eta, logm2 = unpack_last(logptphietalogm2)
         log_prob_eta = log_prob_normal(eta, std=self.eta_std)
         log_prob_phi = -math.log(2 * math.pi) * torch.ones_like(log_prob_eta)
-        log_prob_logm2 = (
-            log_prob_normal(logm2 / 2, mean=self.logmass_mean, std=self.logmass_std) / 2
-        )  # careful with logm2 vs logm
+        log_prob_logm2 = log_prob_normal(
+            logm2, mean=self.logm2_mean, std=self.logm2_std
+        )
         log_prob_logm2[..., self.onshell_list] = 0.0
         log_prob_logpt = log_prob_normal(
             (pt - self.pt_min[: fourmomenta.shape[1]] + EPS1).log(),

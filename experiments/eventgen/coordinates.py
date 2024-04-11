@@ -5,6 +5,12 @@ from experiments.eventgen.helpers import ensure_angle
 
 
 class BaseCoordinates:
+    """
+    Class that implements transformations
+    from fourmomenta to an abstract set of variables
+    Heavily uses functionality from Transforms classes
+    """
+
     def __init__(self):
         self.transforms = []
 
@@ -59,7 +65,9 @@ class BaseCoordinates:
 
 
 class Fourmomenta(BaseCoordinates):
-    # this class effectively does nothing
+    # (E, px, py, pz)
+    # this class effectively does nothing,
+    # because fourmomenta are already the baseline representation
     def __init__(self):
         self.transforms = []
 
@@ -80,6 +88,7 @@ class PhiCoordinates(BaseCoordinates):
 
 
 class PtPhiEtaE(PhiCoordinates):
+    # (pt, phi, eta, E)
     def __init__(self):
         self.transforms = [tr.EPPP_to_PtPhiEtaE()]
 
@@ -94,6 +103,7 @@ class PtPhiEtaM2(PhiCoordinates):
 
 
 class PPPLogM2(BaseCoordinates):
+    # (px, py, pz, E)
     def __init__(self, mass_scale=1.0):
         self.transforms = [
             tr.EPPP_to_PPPM2(),
@@ -103,11 +113,13 @@ class PPPLogM2(BaseCoordinates):
 
 
 class LogPtPhiEtaE(PhiCoordinates):
+    # (log(pt), phi, eta, E)
     def __init__(self, pt_min, units):
         self.transforms = [tr.EPPP_to_PtPhiEtaE(), tr.Pt_to_LogPt(pt_min, units)]
 
 
 class PtPhiEtaLogM2(PhiCoordinates):
+    # (pt, phi, eta, log(m^2))
     def __init__(self, mass_scale=1.0):
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
@@ -118,6 +130,7 @@ class PtPhiEtaLogM2(PhiCoordinates):
 
 
 class LogPtPhiEtaM2(PhiCoordinates):
+    # (log(pt), phi, eta, m^2)
     def __init__(self, pt_min, units, mass_scale=1.0):
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
@@ -128,6 +141,7 @@ class LogPtPhiEtaM2(PhiCoordinates):
 
 
 class LogPtPhiEtaLogM2(PhiCoordinates):
+    # (log(pt), phi, eta, log(m^2)
     def __init__(self, pt_min, units, mass_scale=1.0):
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),

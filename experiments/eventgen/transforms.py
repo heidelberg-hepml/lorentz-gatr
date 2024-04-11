@@ -11,6 +11,13 @@ from experiments.eventgen.helpers import (
 
 
 class BaseTransform(nn.Module):
+    """
+    Abstract class for transformations between two coordinate systems
+    For CFM, we need forward and inverse transformations,
+    the corresponding jacobians for the RCFM aspect
+    and log(det(jacobian)) when we want to extract probabilities from the CFM
+    """
+
     def forward(self, x):
         y = self._forward(x)
         assert torch.isfinite(y).all()
@@ -22,12 +29,14 @@ class BaseTransform(nn.Module):
         return y
 
     def velocity_forward(self, v_x, x, y):
+        # v_y = dy/dx * v_x
         jac = self._jac_forward(x, y)
         v_y = torch.einsum("...ij,...j->...i", jac, v_x)
         assert torch.isfinite(v_y).all()
         return v_y
 
     def velocity_inverse(self, v_y, y, x):
+        # v_x = dx/dy * v_y
         jac = self._jac_inverse(y, x)
         v_x = torch.einsum("...ij,...j->...i", jac, v_y)
         assert torch.isfinite(v_x).all()
@@ -39,6 +48,7 @@ class BaseTransform(nn.Module):
         return logdetjac
 
     def logdetjac_inverse(self, y, x):
+        # log(det(J^-1)) = log(1/det(J)) = -log(det(J))
         logdetjac = -self._detjac_forward(x, y).log()
         assert torch.isfinite(logdetjac)
         return logdetjac

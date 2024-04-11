@@ -5,7 +5,6 @@ from torch import nn
 from torch.autograd import grad
 
 from torchdiffeq import odeint
-from experiments.eventgen.helpers import ensure_angle
 from experiments.eventgen.distributions import (
     BaseDistribution,
     FourmomentaDistribution,
