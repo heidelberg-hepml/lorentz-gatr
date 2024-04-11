@@ -65,8 +65,8 @@ class Fourmomenta(BaseCoordinates):
 
 
 class PPPM2(BaseCoordinates):
-    def __init__(self):
-        self.transforms = [tr.EPPP_to_PPPM2()]
+    def __init__(self, mass_scale=1.0):
+        self.transforms = [tr.EPPP_to_PPPM2(), tr.M2rescale(mass_scale)]
 
 
 class PhiCoordinates(BaseCoordinates):
@@ -85,13 +85,21 @@ class PtPhiEtaE(PhiCoordinates):
 
 
 class PtPhiEtaM2(PhiCoordinates):
-    def __init__(self):
-        self.transforms = [tr.EPPP_to_PtPhiEtaE(), tr.PtPhiEtaE_to_PtPhiEtaM2()]
+    def __init__(self, mass_scale=1.0):
+        self.transforms = [
+            tr.EPPP_to_PtPhiEtaE(),
+            tr.PtPhiEtaE_to_PtPhiEtaM2(),
+            tr.M2rescale(mass_scale),
+        ]
 
 
 class PPPLogM2(BaseCoordinates):
-    def __init__(self):
-        self.transforms = [tr.EPPP_to_PPPM2(), tr.M2_to_LogM2()]
+    def __init__(self, mass_scale=1.0):
+        self.transforms = [
+            tr.EPPP_to_PPPM2(),
+            tr.M2rescale(mass_scale),
+            tr.M2_to_LogM2(),
+        ]
 
 
 class LogPtPhiEtaE(PhiCoordinates):
@@ -100,28 +108,31 @@ class LogPtPhiEtaE(PhiCoordinates):
 
 
 class PtPhiEtaLogM2(PhiCoordinates):
-    def __init__(self):
+    def __init__(self, mass_scale=1.0):
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
+            tr.M2rescale(mass_scale),
             tr.M2_to_LogM2(),
         ]
 
 
 class LogPtPhiEtaM2(PhiCoordinates):
-    def __init__(self, pt_min, units):
+    def __init__(self, pt_min, units, mass_scale=1.0):
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
+            tr.M2rescale(mass_scale),
             tr.Pt_to_LogPt(pt_min, units),
         ]
 
 
 class LogPtPhiEtaLogM2(PhiCoordinates):
-    def __init__(self, pt_min, units):
+    def __init__(self, pt_min, units, mass_scale=1.0):
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
+            tr.M2rescale(mass_scale),
             tr.Pt_to_LogPt(pt_min, units),
             tr.M2_to_LogM2(),
         ]

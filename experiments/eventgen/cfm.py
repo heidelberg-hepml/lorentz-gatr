@@ -338,13 +338,13 @@ class EventCFM(CFM):
             self.use_pt_min,
         ]
         if self.base_type == 1:
-            self.distribution = FourmomentaDistribution(*args)
-        elif self.base_type == 2:
-            self.distribution = JetmomentaDistribution(*args)
-        elif self.base_type == 3:
             self.distribution = NaiveDistribution(*args)
-        elif self.base_type == 4:
+        elif self.base_type == 2:
             self.distribution = NaiveLogDistribution(*args)
+        elif self.base_type == 3:
+            self.distribution = FourmomentaDistribution(*args)
+        elif self.base_type == 4:
+            self.distribution = JetmomentaDistribution(*args)
         else:
             raise ValueError(f"base_type={self.base_type} not implemented")
 

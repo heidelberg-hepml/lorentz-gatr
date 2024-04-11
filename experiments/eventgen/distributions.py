@@ -246,6 +246,7 @@ class FourmomentaDistribution(Distribution):
         shape = list(shape)
         shape[0] = int(shape[0] * SAMPLING_FACTOR)
         eps = torch.randn(shape, device=device, dtype=dtype, generator=generator)
+
         px = eps[..., 1] * self.pxy_std
         py = eps[..., 2] * self.pxy_std
         pz = eps[..., 3] * self.pz_std
@@ -323,18 +324,17 @@ class JetmomentaDistribution(Distribution):
         shape = list(shape)
         shape[0] = int(shape[0] * SAMPLING_FACTOR)
         eps = torch.randn(shape, device=device, dtype=dtype, generator=generator)
+
         eta = eps[..., 2] * self.eta_std
         logmass = eps[..., 3] * self.logmass_std + self.logmass_mean
         logm2 = 2 * logmass
         onshell_mass = self.onshell_mass.to(device, dtype=dtype).unsqueeze(0)
         logm2[..., self.onshell_list] = torch.log(onshell_mass**2 + EPS1)
-        u = torch.rand(shape[:-1], device=device, dtype=dtype, generator=generator)
-        phi = math.pi * (2 * u - 1)
-
-        # construct pt
         logpt = eps[..., 0] * self.logpt_std[: shape[-2]].to(
             device, dtype=dtype
         ) + self.logpt_mean[: shape[1]].to(device, dtype=dtype)
+        u = torch.rand(shape[:-1], device=device, dtype=dtype, generator=generator)
+        phi = math.pi * (2 * u - 1)
 
         # convert to fourmomenta
         logptphietalogm2 = torch.stack((logpt, phi, eta, logm2), dim=-1)

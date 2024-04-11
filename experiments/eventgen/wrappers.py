@@ -165,12 +165,14 @@ class TransformerCFMFourmomenta(TransformerCFM):
 
 class TransformerCFMPtPhiEtaM2(TransformerCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.PtPhiEtaM2()
+        self.coordinates = coordinates.PtPhiEtaM2(self.mass_scale)
 
 
 class TransformerCFMLogPtPhiEtaLogM2(TransformerCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.LogPtPhiEtaLogM2(self.pt_min, self.units)
+        self.coordinates = coordinates.LogPtPhiEtaLogM2(
+            self.pt_min, self.units, self.mass_scale
+        )
 
 
 class GATrCFM(EventCFM):
@@ -256,12 +258,12 @@ class GATrCFMFourmomenta(GATrCFM):
 
 class GATrCFMPPPM2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.PPPM2()
+        self.coordinates = coordinates.PPPM2(self.mass_scale)
 
 
 class GATrCFMPPPLogM2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.PPPLogM2()
+        self.coordinates = coordinates.PPPLogM2(self.mass_scale)
 
 
 class GATrCFMPtPhiEtaE(GATrCFM):
@@ -271,22 +273,28 @@ class GATrCFMPtPhiEtaE(GATrCFM):
 
 class GATrCFMPtPhiEtaM2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.PtPhiEtaM2()
+        self.coordinates = coordinates.PtPhiEtaM2(self.mass_scale)
 
 
 class GATrCFMPtPhiEtaLogM2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.PtPhiEtaLogM2(self.pt_min, self.units)
+        self.coordinates = coordinates.PtPhiEtaLogM2(
+            self.pt_min, self.units, self.mass_scale
+        )
 
 
 class GATrCFMLogPtPhiEtaM2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.LogPtPhiEtaM2(self.pt_min, self.units)
+        self.coordinates = coordinates.LogPtPhiEtaM2(
+            self.pt_min, self.units, self.mass_scale
+        )
 
 
 class GATrCFMLogPtPhiEtaLogM2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.LogPtPhiEtaLogM2(self.pt_min, self.units)
+        self.coordinates = coordinates.LogPtPhiEtaLogM2(
+            self.pt_min, self.units, self.mass_scale
+        )
 
 
 """
