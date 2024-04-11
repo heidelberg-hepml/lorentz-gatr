@@ -34,6 +34,17 @@ def plot_losses(exp, filename, model_label):
                 labels=[f"train mse {n_jets}j", f"val mse {n_jets}j"],
                 logy=True,
             )
+            for k in range(4):
+                plot_loss(
+                    file,
+                    [
+                        exp.train_metrics[f"{n_jets}j.mse_{k}"],
+                        exp.val_metrics[f"{n_jets}j.mse_{k}"],
+                    ],
+                    lr=exp.train_lr,
+                    labels=[f"train mse_{k} {n_jets}j", f"val mse_{k} {n_jets}j"],
+                    logy=True,
+                )
 
 
 def plot_fourmomenta(exp, filename, model_label):

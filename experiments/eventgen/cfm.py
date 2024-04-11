@@ -116,7 +116,7 @@ class CFM(nn.Module):
         v_pred = self.get_velocity(x_t, t, ijet=ijet)
 
         loss = self.loss(v_pred, v_t)
-        return loss
+        return loss, [self.loss(v_pred[..., i], v_t[..., i]) for i in range(4)]
 
     def sample(
         self, ijet, shape, device, dtype, trajectory_path=None, n_trajectories=100

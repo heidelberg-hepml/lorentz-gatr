@@ -197,7 +197,7 @@ class EventGenerationExperiment(BaseExperiment):
             loss = 0.0
             for ijet, data_single in enumerate(data):
                 x0 = data_single.to(self.device)
-                loss_single = self.model.batch_loss(x0, ijet)
+                loss_single = self.model.batch_loss(x0, ijet)[0]
                 loss += loss_single / len(self.cfg.data.n_jets)
                 mses[f"{self.cfg.data.n_jets[ijet]}j"].append(loss_single.cpu().item())
             losses.append(loss.cpu().item())
@@ -333,7 +333,7 @@ class EventGenerationExperiment(BaseExperiment):
             plotter.plot_deta_dphi(filename=filename, **kwargs)
 
     def _init_loss(self):
-        # loss defined manually for each model
+        # loss defined manually within the model
         pass
 
     def _batch_loss(self, data):
@@ -341,22 +341,45 @@ class EventGenerationExperiment(BaseExperiment):
         # average over contributions from different datasets
         loss = 0.0
         mse = []
+        component_mse = []
         for ijet, x0 in enumerate(data):
             x0 = x0.to(self.device)
-            loss_single = self.model.batch_loss(x0, ijet)
-            loss += loss_single / len(self.cfg.data.n_jets)
-            mse.append(loss_single.cpu().item())
+            mse_single, component_mse_single = self.model.batch_loss(x0, ijet)
+            loss += mse_single / len(self.cfg.data.n_jets)
+            mse.append(mse_single.cpu().item())
+            component_mse.append([x.cpu().item() for x in component_mse_single])
         assert torch.isfinite(loss).all()
 
         metrics = {
             f"{n_jets}j.mse": mse[ijet]
             for (ijet, n_jets) in enumerate(self.cfg.data.n_jets)
         }
+        for k in range(4):
+            for ijet, n_jets in enumerate(self.cfg.data.n_jets):
+                metrics[f"{n_jets}j.mse_{k}"] = component_mse[ijet][k]
         return loss, metrics
 
     def _init_metrics(self):
         metrics = {f"{n_jets}j.mse": [] for n_jets in self.cfg.data.n_jets}
+        for k in range(4):
+            for n_jets in self.cfg.data.n_jets:
+                metrics[f"{n_jets}j.mse_{k}"] = []
         return metrics
 
     def define_process_specifics(self):
+        self.plot_title = None
+        self.n_hard_particles = None
+        self.n_jets_max = None
+        self.onshell_list = None
+        self.onshell_mass = None
+        self.units = None
+        self.base_kwargs = None
+        self.pt_min = None
+        self.delta_r_min = None
+        self.obs_names_index = None
+        self.fourmomentum_ranges = None
+        self.jetmomentum_ranges = None
+        self.virtual_components = None
+        self.virtual_names = None
+        self.virtual_ranges = None
         raise NotImplementedError
