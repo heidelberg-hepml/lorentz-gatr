@@ -173,7 +173,10 @@ class TopTaggingDataset(torch.utils.data.Dataset):
                     (
                         is_global,
                         torch.zeros(
-                            beam.shape[0], 1, device=beam.device, dtype=beam.dtype
+                            beam.shape[0],
+                            1,
+                            device=beam.device,
+                            dtype=torch.bool,
                         ),
                     ),
                     dim=-2,
