@@ -32,16 +32,16 @@ def test_simple():
     [
         [tr.EPPP_to_PPPM2],
         [tr.EPPP_to_PtPhiEtaE],
-        [tr.EPPP_to_PPPM2, tr.M2_to_logM2],
-        [tr.EPPP_to_PtPhiEtaE, tr.Pt_to_logPt],
+        [tr.EPPP_to_PPPM2, tr.M2_to_LogM2],
+        [tr.EPPP_to_PtPhiEtaE, tr.Pt_to_LogPt],
         [tr.EPPP_to_PtPhiEtaE, tr.PtPhiEtaE_to_PtPhiEtaM2],
-        [tr.EPPP_to_PtPhiEtaE, tr.PtPhiEtaE_to_PtPhiEtaM2, tr.M2_to_logM2],
-        [tr.EPPP_to_PtPhiEtaE, tr.PtPhiEtaE_to_PtPhiEtaM2, tr.Pt_to_logPt],
+        [tr.EPPP_to_PtPhiEtaE, tr.PtPhiEtaE_to_PtPhiEtaM2, tr.M2_to_LogM2],
+        [tr.EPPP_to_PtPhiEtaE, tr.PtPhiEtaE_to_PtPhiEtaM2, tr.Pt_to_LogPt],
         [
             tr.EPPP_to_PtPhiEtaE,
             tr.PtPhiEtaE_to_PtPhiEtaM2,
-            tr.M2_to_logM2,
-            tr.Pt_to_logPt,
+            tr.M2_to_LogM2,
+            tr.Pt_to_LogPt,
         ],
     ],
 )
@@ -75,7 +75,7 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
     dtype = torch.float64  # sometimes fails with float32
     ts = []
     for tra in transforms:
-        if tra == tr.Pt_to_logPt:
+        if tra == tr.Pt_to_LogPt:
             ts.append(tra(exp.pt_min, exp.units))
         else:
             ts.append(tra())
@@ -104,16 +104,16 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
     [
         [tr.EPPP_to_PPPM2],
         [tr.EPPP_to_PtPhiEtaE],
-        [tr.EPPP_to_PPPM2, tr.M2_to_logM2],
-        [tr.EPPP_to_PtPhiEtaE, tr.Pt_to_logPt],
+        [tr.EPPP_to_PPPM2, tr.M2_to_LogM2],
+        [tr.EPPP_to_PtPhiEtaE, tr.Pt_to_LogPt],
         [tr.EPPP_to_PtPhiEtaE, tr.PtPhiEtaE_to_PtPhiEtaM2],
-        [tr.EPPP_to_PtPhiEtaE, tr.PtPhiEtaE_to_PtPhiEtaM2, tr.M2_to_logM2],
-        [tr.EPPP_to_PtPhiEtaE, tr.PtPhiEtaE_to_PtPhiEtaM2, tr.Pt_to_logPt],
+        [tr.EPPP_to_PtPhiEtaE, tr.PtPhiEtaE_to_PtPhiEtaM2, tr.M2_to_LogM2],
+        [tr.EPPP_to_PtPhiEtaE, tr.PtPhiEtaE_to_PtPhiEtaM2, tr.Pt_to_LogPt],
         [
             tr.EPPP_to_PtPhiEtaE,
             tr.PtPhiEtaE_to_PtPhiEtaM2,
-            tr.M2_to_logM2,
-            tr.Pt_to_logPt,
+            tr.M2_to_LogM2,
+            tr.Pt_to_LogPt,
         ],
     ],
 )
@@ -147,7 +147,7 @@ def test_jacobians(transforms, distribution, experiment_np, nevents):
     dtype = torch.float64  # sometimes fails with torch32
     ts = []
     for tra in transforms:
-        if tra == tr.Pt_to_logPt:
+        if tra == tr.Pt_to_LogPt:
             ts.append(tra(exp.pt_min, exp.units))
         else:
             ts.append(tra())

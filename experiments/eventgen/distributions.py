@@ -3,15 +3,12 @@ import math
 
 from experiments.eventgen.helpers import (
     EPS1,
-    EPS2,
-    CUTOFF,
-    get_mass,
     get_pt,
     delta_r_fast,
+    unpack_last,
     fourmomenta_to_jetmomenta,
-    jetmomenta_to_fourmomenta,
 )
-from experiments.eventgen.coordinates import PPPM2, PPPlogM2, logPtPhiEtalogM2
+from experiments.eventgen.coordinates import PPPM2, PPPLogM2, LogPtPhiEtaLogM2
 
 # sample a few extra events to speed up rejection sampling
 SAMPLING_FACTOR = 10  # typically acceptance_rate > 0.5
@@ -157,19 +154,15 @@ class NaiveDistribution(Distribution):
         return fourmomenta
 
     def log_prob_raw(self, fourmomenta):
-        raise NotImplementedError
-        mass = (
-            torch.sqrt(
-                fourmomenta[..., 0] ** 2 + torch.sum(fourmomenta[..., 1:] ** 2, dim=-1)
-            ).unsqueeze(-1)
-            / self.mass_std
-        )
-        eps = torch.cat((mass, fourmomenta[..., 1:]), dim=-1)
-
-        log_prob = log_prob_normal(eps)
-        log_prob[..., 0] += math.log(2)  # mass from half-normal, hence prob -> 2*prob
+        pppm2 = self.coordinates.fourmomenta_to_x(fourmomenta)
+        p3, m2 = pppm2[..., :3], pppm2[..., 3]
+        log_prob_p3 = log_prob_normal(p3)
+        log_prob_m2 = log_prob_normal(m2, std=self.m2_std)
+        log_prob_m2 += math.log(2)  # normalization factor because half-gaussian
+        log_prob_m2[..., self.onshell_list] = 0.0  # fixed components do not contribute
+        log_prob = torch.cat((log_prob_p3, log_prob_m2.unsqueeze(-1)), dim=-1)
         log_prob = log_prob.sum(dim=[-1, -2])
-        assert torch.isfinite(log_prob).all()
+        log_prob = self.coordinates.log_prob_x_to_fourmomenta(log_prob, ppplogm2)
         return log_prob
 
 
@@ -196,34 +189,26 @@ class NaiveLogDistribution(Distribution):
             use_delta_r_min,
             use_pt_min,
         )
-        self.mass_std = 1.0
-        self.coordinates = PPPlogM2()
+        self.coordinates = PPPLogM2()
 
     def propose(self, shape, device, dtype, generator=None):
         """Base distribution for 4-momenta: 3-momentum from standard gaussian, mass from half-gaussian"""
         eps = torch.randn(shape, device=device, dtype=dtype, generator=generator)
-        logm2 = eps[..., 0].abs() * self.mass_std
+        logm2 = eps[..., 3]
         onshell_mass = self.onshell_mass.to(device, dtype=dtype).unsqueeze(0)
         logm2[..., self.onshell_list] = torch.log(
             (onshell_mass / self.units) ** 2 + EPS1
         )
-        ppplogm2 = torch.cat((eps[..., 1:], logm2.unsqueeze(-1)), dim=-1)
+        ppplogm2 = torch.cat((eps[..., :3], logm2.unsqueeze(-1)), dim=-1)
         fourmomenta = self.coordinates.x_to_fourmomenta(ppplogm2)
         return fourmomenta
 
     def log_prob_raw(self, fourmomenta):
-        raise NotImplementedError
-        logmass = (
-            torch.sqrt(
-                fourmomenta[..., 0] ** 2 + torch.sum(fourmomenta[..., 1:] ** 2, dim=-1)
-            ).unsqueeze(-1)
-            / self.mass_std
-        ).log()
-        eps = torch.cat((logmass, fourmomenta[..., 1:]), dim=-1)
-
-        log_prob = log_prob_normal(eps)
+        ppplogm2 = self.coordinates.fourmomenta_to_x(fourmomenta)
+        log_prob = log_prob_normal(ppplogm2)
+        log_prob[..., self.onshell_list, 3] = 0.0
         log_prob = log_prob.sum(dim=[-1, -2])
-        assert torch.isfinite(log_prob).all()
+        log_prob = self.coordinates.log_prob_x_to_fourmomenta(log_prob, ppplogm2)
         return log_prob
 
 
@@ -255,10 +240,9 @@ class FourmomentaDistribution(Distribution):
         self.pz_std = base_kwargs["pz_std"]
         self.logmass_mean = base_kwargs["logmass_mean"]
         self.logmass_std = base_kwargs["logmass_std"]
-        self.coordinates = PPPlogM2()
+        self.coordinates = PPPLogM2()
 
     def propose(self, shape, device, dtype, generator=None):
-        # sample (logmass, px, py, pz)
         shape = list(shape)
         shape[0] = int(shape[0] * SAMPLING_FACTOR)
         eps = torch.randn(shape, device=device, dtype=dtype, generator=generator)
@@ -275,29 +259,21 @@ class FourmomentaDistribution(Distribution):
         return fourmomenta
 
     def log_prob_raw(self, fourmomenta):
-        raise NotImplementedError
-        fourmomenta *= self.units
-        log_prob = torch.zeros_like(fourmomenta)
-        log_prob[..., [1, 2]] = log_prob_normal(
-            fourmomenta[..., [1, 2]], std=self.pxy_std
+        ppplogm2 = self.coordinates.fourmomenta_to_x(fourmomenta * self.units)
+        px, py, pz, logm2 = unpack_last(ppplogm2)
+        log_prob_px = log_prob_normal(px, std=self.pxy_std)
+        log_prob_py = log_prob_normal(py, std=self.pxy_std)
+        log_prob_pz = log_prob_normal(pz, std=self.pz_std)
+        log_prob_logm2 = (
+            log_prob_normal(logm2 / 2, mean=self.logmass_mean, std=self.logmass_std) / 2
         )
-        log_prob[..., 3] = log_prob_normal(fourmomenta[..., 3], std=self.pz_std)
-
-        # special treatment for the mass
-        mass = get_mass(fourmomenta)
-        log_prob_logmass = log_prob_normal(
-            (mass + EPS1).log(), mean=self.logmass_mean, std=self.logmass_std
-        )
-        log_prob_logmass[
-            ..., self.onshell_list
-        ] = 0.0  # no contribution from fixed masses
-        log_prob_mass = log_prob_logmass - mass.clamp(min=EPS2).log()
-        log_prob[..., 0] = log_prob_mass + torch.log(
-            fourmomenta[..., 0] / mass.clamp(min=EPS2)
+        log_prob_logm2[..., self.onshell_list] = 0.0
+        log_prob = torch.stack(
+            (log_prob_px, log_prob_py, log_prob_pz, log_prob_logm2), dim=-1
         )
         log_prob = log_prob.sum(dim=[-1, -2])
-        assert torch.isfinite(log_prob).all()
-        return log_prob
+        log_prob = self.coordinates.log_prob_x_to_fourmomenta(log_prob, ppplogm2)
+        return
 
 
 class JetmomentaDistribution(Distribution):
@@ -326,7 +302,7 @@ class JetmomentaDistribution(Distribution):
         assert (
             use_pt_min
         ), f"use_pt_min=False not implemented for JetmomentaDistribution"
-        self.coordinates = logPtPhiEtalogM2(pt_min, units)
+        self.coordinates = LogPtPhiEtaLogM2(pt_min, units)
 
         # construct mean and std on log(pt-pt_min) from mean and std on log(pt)
         logpt_mean = torch.tensor([base_kwargs["logpt_mean"]])
@@ -356,7 +332,7 @@ class JetmomentaDistribution(Distribution):
         phi = math.pi * (2 * u - 1)
 
         # construct pt
-        logpt = eps[..., 0] * self.logpt_std[: shape[1]].to(
+        logpt = eps[..., 0] * self.logpt_std[: shape[-2]].to(
             device, dtype=dtype
         ) + self.logpt_mean[: shape[1]].to(device, dtype=dtype)
 
@@ -366,44 +342,26 @@ class JetmomentaDistribution(Distribution):
         return fourmomenta
 
     def log_prob_raw(self, fourmomenta):
-        raise NotImplementedError
-        fourmomenta *= self.units
-        log_prob = torch.zeros_like(fourmomenta)
-
-        # compute raw log_prob's
-        jetmomenta = fourmomenta_to_jetmomenta(fourmomenta)
-        E, px, py, pz = torch.permute(fourmomenta, (2, 0, 1))
-        pt, phi, eta, mass = torch.permute(jetmomenta, (2, 0, 1))
+        logptphietalogm2 = self.coordinates.fourmomenta_to_x(fourmomenta * self.units)
+        logpt, phi, eta, logm2 = unpack_last(logptphietalogm2)
+        log_prob_eta = log_prob_normal(eta, std=self.eta_std)
+        log_prob_phi = -math.log(2 * math.pi) * torch.ones_like(log_prob_eta)
+        log_prob_logm2 = (
+            log_prob_normal(logm2 / 2, mean=self.logmass_mean, std=self.logmass_std) / 2
+        )  # careful with logm2 vs logm
+        log_prob_logm2[..., self.onshell_list] = 0.0
         log_prob_logpt = log_prob_normal(
             (pt - self.pt_min[: fourmomenta.shape[1]] + EPS1).log(),
             mean=self.logpt_mean[: fourmomenta.shape[1]],
             std=self.logpt_std[: fourmomenta.shape[1]],
         )
-        log_prob_phi = -math.log(2 * math.pi) * torch.ones_like(log_prob_logpt)
-        log_prob_eta = log_prob_normal(eta, std=self.eta_std)
-        log_prob_logmass = log_prob_normal(
-            (mass + EPS1).log(), mean=self.logmass_mean, std=self.logmass_std
+        log_prob = torch.stack(
+            (log_prob_logpt, log_prob_phi, log_prob_eta, log_prob_logm2), dim=-1
         )
-        log_prob_logmass[..., self.onshell_list] = 0.0
-
-        # collect log_prob in jetmomenta space
-        log_prob_mass = log_prob_logmass - (mass + EPS1).clamp(min=EPS2).log()
-        log_prob_pt = (
-            log_prob_logpt
-            - (pt - self.pt_min[: fourmomenta.shape[1]] + EPS1).clamp(min=EPS2).log()
+        log_prob = log_prob.sum(dim=[-1, -2])
+        log_prob = self.coordinates.log_prob_x_to_fourmomenta(
+            log_prob, logptphietalogm2
         )
-        log_prob_jet = torch.stack(
-            (log_prob_pt, log_prob_phi, log_prob_eta, log_prob_mass), dim=-1
-        )
-
-        log_prob_jet = log_prob_jet.sum(dim=[-1, -2])
-        assert torch.isfinite(log_prob_jet).all()
-        # transform log_prob's to fourmomenta
-        jac = (
-            mass * pt**2 * torch.cosh(eta.clamp(min=-CUTOFF, max=CUTOFF)) / E
-        )  # dfourmomenta/djetmomenta
-        log_prob = log_prob_jet - jac.log().sum(dim=-1)
-        assert torch.isfinite(log_prob).all()
         return log_prob
 
 

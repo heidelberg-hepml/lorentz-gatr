@@ -259,9 +259,9 @@ class GATrCFMPPPM2(GATrCFM):
         self.coordinates = coordinates.PPPM2()
 
 
-class GATrCFMPPPlogM2(GATrCFM):
+class GATrCFMPPPLogM2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.PPPlogM2()
+        self.coordinates = coordinates.PPPLogM2()
 
 
 class GATrCFMPtPhiEtaE(GATrCFM):

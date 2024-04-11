@@ -204,8 +204,6 @@ class CFM(nn.Module):
                 ts=ts.cpu(),
             )
 
-        # coordinate-specific checks
-        # x0 = self.coordinates.final_checks(x0)
         return x0
 
     def get_velocity(self, x, t, ijet):
@@ -359,3 +357,15 @@ class EventCFM(CFM):
         fourmomenta = self.coordinates.x_to_fourmomenta(x)
         fourmomenta = fourmomenta * self.units
         return fourmomenta
+
+    def sample(self, *args, **kwargs):
+        x = super().sample(*args, **kwargs)
+
+        # enforce onshell-ness
+        fourmomenta = self.coordinates.x_to_fourmomenta(x)
+        mass = torch.tensor(self.onshell_mass).unsqueeze(0).to(x.device, dtype=x.dtype)
+        fourmomenta[..., self.onshell_list, 0] = torch.sqrt(
+            mass**2 + torch.sum(fourmomenta[..., self.onshell_list, 1:] ** 2, dim=-1)
+        )
+        x = self.coordinates.fourmomenta_to_x(fourmomenta)
+        return x

@@ -89,39 +89,39 @@ class PtPhiEtaM2(PhiCoordinates):
         self.transforms = [tr.EPPP_to_PtPhiEtaE(), tr.PtPhiEtaE_to_PtPhiEtaM2()]
 
 
-class PPPlogM2(BaseCoordinates):
+class PPPLogM2(BaseCoordinates):
     def __init__(self):
-        self.transforms = [tr.EPPP_to_PPPM2(), tr.M2_to_logM2()]
+        self.transforms = [tr.EPPP_to_PPPM2(), tr.M2_to_LogM2()]
 
 
-class logPtPhiEtaE(PhiCoordinates):
+class LogPtPhiEtaE(PhiCoordinates):
     def __init__(self, pt_min, units):
-        self.transforms = [tr.EPPP_to_PtPhiEtaE(), tr.Pt_to_logPt(pt_min, units)]
+        self.transforms = [tr.EPPP_to_PtPhiEtaE(), tr.Pt_to_LogPt(pt_min, units)]
 
 
-class PtPhiEtalogM2(PhiCoordinates):
+class PtPhiEtaLogM2(PhiCoordinates):
     def __init__(self):
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
-            tr.M2_to_logM2(),
+            tr.M2_to_LogM2(),
         ]
 
 
-class logPtPhiEtaM2(PhiCoordinates):
+class LogPtPhiEtaM2(PhiCoordinates):
     def __init__(self, pt_min, units):
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
-            tr.Pt_to_logPt(pt_min, units),
+            tr.Pt_to_LogPt(pt_min, units),
         ]
 
 
-class logPtPhiEtalogM2(PhiCoordinates):
+class LogPtPhiEtaLogM2(PhiCoordinates):
     def __init__(self, pt_min, units):
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
-            tr.Pt_to_logPt(pt_min, units),
-            tr.M2_to_logM2(),
+            tr.Pt_to_LogPt(pt_min, units),
+            tr.M2_to_LogM2(),
         ]
