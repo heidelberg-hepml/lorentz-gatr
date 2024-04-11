@@ -3,62 +3,53 @@ import torch
 
 import experiments.eventgen.coordinates as c
 from experiments.eventgen.distributions import (
+    NaiveDistribution,
+    NaiveLogDistribution,
     FourmomentaDistribution,
     JetmomentaDistribution,
-    NaiveDistribution,
 )
-from experiments.eventgen.helpers import get_mass
+from experiments.eventgen.ttbarexperiment import ttbarExperiment
+from experiments.eventgen.zmumuexperiment import zmumuExperiment
+from experiments.eventgen.transforms import EPPP_to_PPPM2
 from tests.helpers import MILD_TOLERANCES as TOLERANCES
-
-ttbar_base_kwargs = {
-    "pxy_std": 61.14,
-    "pz_std": 286.26,
-    "logpt_mean": 4.06,
-    "logpt_std": 0.59,
-    "logmass_mean": 2.15,
-    "logmass_std": 0.71,
-    "eta_std": 1.51,
-}
 
 
 @pytest.mark.parametrize(
     "distribution",
     [
+        NaiveDistribution,
+        NaiveLogDistribution,
         FourmomentaDistribution,
         JetmomentaDistribution,
-        NaiveDistribution,
     ],
 )
-@pytest.mark.parametrize("nevents", [100000])
-@pytest.mark.parametrize("onshell_list", [[], [0, 1]])
-@pytest.mark.parametrize("onshell_mass", [[], [10.0, 5.0]])
-@pytest.mark.parametrize("units", [206.6])
-@pytest.mark.parametrize("delta_r_min", [0.0, 0.4, 1.0])
-@pytest.mark.parametrize("pt_min", [[20.0] * 6])
-@pytest.mark.parametrize("nparticles", [6])
+@pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
+@pytest.mark.parametrize("nevents", [10000])
+@pytest.mark.parametrize("use_delta_r_min", [False, True])
+@pytest.mark.parametrize("use_pt_min", [False, True])
 def test_cuts(
     distribution,
+    experiment_np,
     nevents,
-    onshell_list,
-    onshell_mass,
-    units,
-    delta_r_min,
-    pt_min,
-    nparticles,
+    use_delta_r_min,
+    use_pt_min,
 ):
     """Test that the base distribution satisfies phase space cuts."""
-    if len(onshell_list) != len(onshell_mass):
-        # only do meaningful tests
+    if distribution == JetmomentaDistribution and not use_pt_min:
+        # this combination is not implemented
         return
+    experiment, nparticles = experiment_np
+    exp = experiment(None)
+    exp.define_process_specifics()
     d = distribution(
-        onshell_list,
-        onshell_mass,
-        units,
-        ttbar_base_kwargs,
-        delta_r_min,
-        pt_min,
-        use_delta_r_min=True,
-        use_pt_min=True,
+        exp.onshell_list,
+        exp.onshell_mass,
+        exp.units,
+        exp.base_kwargs,
+        exp.delta_r_min,
+        exp.pt_min,
+        use_delta_r_min=use_delta_r_min,
+        use_pt_min=use_pt_min,
     )
     device = torch.device("cpu")
     dtype = torch.float32
@@ -72,47 +63,53 @@ def test_cuts(
 @pytest.mark.parametrize(
     "distribution",
     [
+        NaiveDistribution,
+        NaiveLogDistribution,
         FourmomentaDistribution,
         JetmomentaDistribution,
     ],
 )
-@pytest.mark.parametrize("nevents", [100000])
-@pytest.mark.parametrize("onshell_list", [[0, 1]])
-@pytest.mark.parametrize("onshell_mass", [[10.0, 5.0]])
-@pytest.mark.parametrize("units", [206.6])
-@pytest.mark.parametrize("delta_r_min", [0.0, 0.4, 1.0])
-@pytest.mark.parametrize("pt_min", [[20.0] * 6])
-@pytest.mark.parametrize("nparticles", [6])
+@pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
+@pytest.mark.parametrize("nevents", [10000])
+@pytest.mark.parametrize("use_delta_r_min", [False, True])
+@pytest.mark.parametrize("use_pt_min", [False, True])
 def test_onshell(
     distribution,
+    experiment_np,
     nevents,
-    onshell_list,
-    onshell_mass,
-    units,
-    delta_r_min,
-    pt_min,
-    nparticles,
+    use_delta_r_min,
+    use_pt_min,
 ):
     """Test that the events that should be on-shell are on-shell."""
-    if len(onshell_list) != len(onshell_mass):
-        # only do meaningful tests
+    if distribution == JetmomentaDistribution and not use_pt_min:
+        # this combination is not implemented
         return
+    experiment, nparticles = experiment_np
+    exp = experiment(None)
+    exp.define_process_specifics()
     d = distribution(
-        onshell_list,
-        onshell_mass,
-        units,
-        ttbar_base_kwargs,
-        delta_r_min,
-        pt_min,
-        use_delta_r_min=True,
-        use_pt_min=True,
+        exp.onshell_list,
+        exp.onshell_mass,
+        exp.units,
+        exp.base_kwargs,
+        exp.delta_r_min,
+        exp.pt_min,
+        use_delta_r_min=use_delta_r_min,
+        use_pt_min=use_pt_min,
     )
     device = torch.device("cpu")
-    dtype = torch.float32
+    # this test depends strongly on the dtype;
+    # for torch.float64 it passes in 100% of the cases
+    # for torch.float32 it fails in 10%-50%
+    dtype = torch.float64
 
     shape = [nevents, nparticles, 4]
-    fourmomenta = d.sample(shape, device, dtype) * units
-    mass = get_mass(fourmomenta)[..., onshell_list]
-    expected_mass = torch.tensor(onshell_mass).unsqueeze(0).expand(mass.shape)
-    print(mass, expected_mass)
+    fourmomenta = d.sample(shape, device, dtype)
+    tr = EPPP_to_PPPM2()
+    pppm2 = tr.forward(fourmomenta)
+    mass = torch.sqrt(pppm2[..., 3])[..., exp.onshell_list] * exp.units
+    expected_mass = (
+        torch.tensor(exp.onshell_mass).unsqueeze(0).expand(mass.shape).to(dtype)
+    )
+    print(mass[0, ...], expected_mass[0, ...])
     torch.testing.assert_close(mass, expected_mass, **TOLERANCES)

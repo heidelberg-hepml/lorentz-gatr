@@ -85,13 +85,6 @@ class CFM(nn.Module):
     def init_coordinates(self):
         raise NotImplementedError
 
-    def get_trajectory(self, x0, x1, t):
-        # default: linear trajectory
-        distance = x1 - x0
-        x_t = x0 + distance * t
-        v_t = distance
-        return x_t, v_t
-
     def sample_base(self, shape, device, dtype, generator=None):
         fourmomenta = self.distribution.sample(
             shape, device, dtype, generator=generator
@@ -118,7 +111,7 @@ class CFM(nn.Module):
         """
         t = torch.rand(x0.shape[0], 1, 1, dtype=x0.dtype, device=x0.device)
         x1 = self.sample_base(x0.shape, x0.device, x0.dtype)
-        x_t, v_t = self.get_trajectory(x0, x1, t)
+        x_t, v_t = self.coordinates.get_trajectory(x0, x1, t)
 
         v_pred = self.get_velocity(x_t, t, ijet=ijet)
 
@@ -183,7 +176,7 @@ class CFM(nn.Module):
             xts_learned = torch.stack(xts, dim=0)
             vts_learned = torch.stack(vts, dim=0)
             ts = torch.stack(ts, dim=0)
-            xts_true, vts_true = self.get_trajectory(
+            xts_true, vts_true = self.coordinates.get_trajectory(
                 xts_learned[-1, ...]
                 .reshape(1, *xts_learned.shape[1:])
                 .expand(xts_learned.shape),
@@ -196,12 +189,10 @@ class CFM(nn.Module):
             # transform to fourmomenta space
             xts_learned_fm = self.coordinates.x_to_fourmomenta(xts_learned)
             xts_true_fm = self.coordinates.x_to_fourmomenta(xts_true)
-            vts_learned_fm = self.coordinates.velocities_x_to_fourmomenta(
-                vts_learned, xts_learned, xts_learned_fm
+            vts_learned_fm = self.coordinates.velocity_x_to_fourmomenta(
+                vts_learned, xts_learned
             )
-            vts_true_fm = self.coordinates.velocities_x_to_fourmomenta(
-                vts_true, xts_true, xts_true_fm
-            )
+            vts_true_fm = self.coordinates.velocity_x_to_fourmomenta(vts_true, xts_true)
 
             # save
             np.savez_compressed(
@@ -338,15 +329,22 @@ class EventCFM(CFM):
         self.prep_params = {}
 
     def init_distribution(self):
-        args = [self.onshell_list, self.onshell_mass, self.units,
-                self.base_kwargs, self.delta_r_min, self.pt_min,
-                self.use_delta_r_min, self.use_pt_min]
+        args = [
+            self.onshell_list,
+            self.onshell_mass,
+            self.units,
+            self.base_kwargs,
+            self.delta_r_min,
+            self.pt_min,
+            self.use_delta_r_min,
+            self.use_pt_min,
+        ]
         if self.base_type == 1:
             self.distribution = FourmomentaDistribution(*args)
         elif self.base_type == 2:
             self.distribution = JetmomentaDistribution(*args)
         elif self.base_type == 3:
-            self.distribution = NaiveDistribution(*args)            
+            self.distribution = NaiveDistribution(*args)
         elif self.base_type == 4:
             self.distribution = NaiveLogDistribution(*args)
         else:

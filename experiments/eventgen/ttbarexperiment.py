@@ -20,8 +20,8 @@ class ttbarExperiment(EventGenerationExperiment):
             "logmass_std": 0.71,
             "eta_std": 1.51,
         }
-        self.pt_min = [21.49] * 10
-        self.delta_r_min = 0.45
+        self.pt_min = [22.0] * 10
+        self.delta_r_min = 0.5
         self.obs_names_index = ["b1", "q1", "q2", "b2", "q3", "q4"]
         for ijet in range(self.n_jets_max):
             self.obs_names_index.append(f"j{ijet+1}")

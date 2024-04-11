@@ -44,7 +44,7 @@ def jetmomenta_to_fourmomenta(jetmomenta):
 
 def stay_positive(x):
     # flip sign for entries with x<0 such that always x>0
-    x = torch.where(x>=0, x, -x)
+    x = torch.where(x >= 0, x, -x)
     return x
 
 

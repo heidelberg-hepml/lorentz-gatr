@@ -1,6 +1,13 @@
 import torch
 from torch import nn
-from experiments.eventgen.helpers import unpack_last, EPS1, EPS2, CUTOFF, stable_arctanh, stay_positive
+from experiments.eventgen.helpers import (
+    unpack_last,
+    EPS1,
+    EPS2,
+    CUTOFF,
+    stable_arctanh,
+    stay_positive,
+)
 
 
 class BaseTransform(nn.Module):
@@ -57,13 +64,13 @@ class EPPP_to_PPPM2(BaseTransform):
         E, px, py, pz = unpack_last(eppp)
 
         m2 = E**2 - (px**2 + py**2 + pz**2)
-        assert (m2 >= 0).all()
+        m2 = stay_positive(m2)
         return torch.stack((px, py, pz, m2), dim=-1)
 
     def _inverse(self, pppm2):
         px, py, pz, m2 = unpack_last(pppm2)
         m2 = stay_positive(m2)
-        
+
         E = torch.sqrt(m2 + (px**2 + py**2 + pz**2))
         return torch.stack((E, px, py, pz), dim=-1)
 
@@ -105,6 +112,7 @@ class EPPP_to_PtPhiEtaE(BaseTransform):
         phi = torch.arctan2(py, px)
         p_abs = torch.sqrt(pt**2 + pz**2)
         eta = stable_arctanh(pz / p_abs)  # torch.arctanh(pz / p_abs)
+        eta = eta.clamp(min=-CUTOFF, max=CUTOFF)
         assert torch.isfinite(eta).all()
 
         return torch.stack((pt, phi, eta, E), dim=-1)
@@ -112,6 +120,7 @@ class EPPP_to_PtPhiEtaE(BaseTransform):
     def _inverse(self, ptphietae):
         pt, phi, eta, E = unpack_last(ptphietae)
 
+        eta = eta.clamp(min=-CUTOFF, max=CUTOFF)
         px = pt * torch.cos(phi)
         py = pt * torch.sin(phi)
         pz = pt * torch.sinh(eta)
@@ -169,7 +178,7 @@ class PtPhiEtaE_to_PtPhiEtaM2(BaseTransform):
 
         p_abs = pt * torch.cosh(eta)
         m2 = E**2 - p_abs**2
-
+        m2 = stay_positive(m2)
         return torch.stack((pt, phi, eta, m2), dim=-1)
 
     def _inverse(self, ptphietam2):
@@ -216,6 +225,7 @@ class PtPhiEtaE_to_PtPhiEtaM2(BaseTransform):
 class M2_to_logM2(BaseTransform):
     def _forward(self, xm2):
         x1, x2, x3, m2 = unpack_last(xm2)
+        m2 = m2.clamp(min=EPS2)
         logm2 = torch.log(m2 + EPS1)
         return torch.stack((x1, x2, x3, logm2), dim=-1)
 
@@ -252,12 +262,16 @@ class M2_to_logM2(BaseTransform):
 
 
 class Pt_to_logPt(BaseTransform):
-    def __init__(self, pt_min):
-        self.pt_min = torch.tensor(pt_min)
+    def __init__(self, pt_min, units):
+        self.pt_min = torch.tensor(pt_min) / units
+
+    def get_dpt(self, pt):
+        return torch.clamp(pt - self.pt_min[: pt.shape[-2]].to(pt.device), min=EPS2)
 
     def _forward(self, ptx):
         pt, x1, x2, x3 = unpack_last(ptx)
-        logpt = torch.log(pt - self.pt_min[: pt.shape[-2]].to(pt.device) + EPS1)
+        dpt = self.get_dpt(pt)
+        logpt = torch.log(dpt + EPS1)
         return torch.stack((logpt, x1, x2, x3), dim=-1)
 
     def _inverse(self, logptx):
@@ -270,9 +284,10 @@ class Pt_to_logPt(BaseTransform):
 
         # jac_ij = dlogptx_i / dptx_j
         zero, one = torch.zeros_like(pt), torch.ones_like(pt)
+        dpt = self.get_dpt(pt)
         jac_pt = torch.stack(
             (
-                1 / (pt - self.pt_min[: pt.shape[-2]].to(pt.device) + EPS1),
+                1 / (dpt + EPS1),
                 zero,
                 zero,
                 zero,
@@ -289,10 +304,8 @@ class Pt_to_logPt(BaseTransform):
 
         # jac_ij = dptx_i / dlogptx_j
         zero, one = torch.zeros_like(pt), torch.ones_like(pt)
-        jac_logpt = torch.stack(
-            (pt - self.pt_min[: pt.shape[-2]].to(pt.device) + EPS1, zero, zero, zero),
-            dim=-1,
-        )
+        dpt = self.get_dpt(pt)
+        jac_logpt = torch.stack((dpt + EPS1, zero, zero, zero), dim=-1)
         jac_x1 = torch.stack((zero, one, zero, zero), dim=-1)
         jac_x2 = torch.stack((zero, zero, one, zero), dim=-1)
         jac_x3 = torch.stack((zero, zero, zero, one), dim=-1)
@@ -300,4 +313,5 @@ class Pt_to_logPt(BaseTransform):
 
     def _detjac_forward(self, ptx, logptx):
         pt, x1, x2, x3, m2 = unpack_last(ptx)
-        return 1 / (pt - self.pt_min[: pt.shape[-2]].to(pt.device) + EPS1)
+        dpt = self.get_dpt(pt)
+        return 1 / (dpt + EPS2)

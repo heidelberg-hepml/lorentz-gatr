@@ -38,16 +38,6 @@ def get_process_token(x_ref, ijet, process_token_channels):
     return process_token
 
 
-def trajectory_phi(x0, x1, t):
-    # take into account that phi is cyclic when computing shortest distance
-    distance = x1 - x0
-    distance[..., 1] = ensure_angle(distance[..., 1])
-    x_t = x0 + distance * t
-    x_t[..., 1] = ensure_angle(x_t[..., 1])
-    v_t = distance
-    return x_t, v_t
-
-
 ### CFM on 4momenta
 
 
@@ -168,6 +158,21 @@ class TransformerCFM(EventCFM):
         return v
 
 
+class TransformerCFMFourmomenta(TransformerCFM):
+    def init_coordinates(self):
+        self.coordinates = coordinates.Fourmomenta()
+
+
+class TransformerCFMPtPhiEtaM2(TransformerCFM):
+    def init_coordinates(self):
+        self.coordinates = coordinates.PtPhiEtaM2()
+
+
+class TransformerCFMLogPtPhiEtaLogM2(TransformerCFM):
+    def init_coordinates(self):
+        self.coordinates = coordinates.LogPtPhiEtaLogM2(self.pt_min, self.units)
+
+
 class GATrCFM(EventCFM):
     """
     Abstract base class for all GATrCFM's
@@ -201,7 +206,7 @@ class GATrCFM(EventCFM):
         self.add_time_reference = add_time_reference
 
     def get_velocity(self, x, t, ijet):
-        # x = self.coordinates.final_checks(x)
+        # transform from x space to fourmomenta
         fourmomenta = self.coordinates.x_to_fourmomenta(x)
 
         # GATr in fourmomenta space
@@ -209,9 +214,8 @@ class GATrCFM(EventCFM):
         mv_outputs, s_outputs = self.net(mv, s)
         v_fourmomenta = self.extract_from_ga(mv_outputs, s_outputs)
 
-        v_x = self.coordinates.velocities_fourmomenta_to_x(
-            v_fourmomenta, fourmomenta, x
-        )
+        # transform velocities back to x space
+        v_x = self.coordinates.velocity_fourmomenta_to_x(v_fourmomenta, fourmomenta)
         return v_x
 
     def embed_into_ga(self, x, t, ijet):
@@ -227,7 +231,11 @@ class GATrCFM(EventCFM):
             mv, self.beam_reference, self.add_time_reference, self.two_beams
         )
         if beam is not None:
-            beam = beam.unsqueeze(1).expand(*mv.shape[:-2], beam.shape[-2], 16)
+            beam = (
+                beam.unsqueeze(0)
+                .unsqueeze(0)
+                .expand(*mv.shape[:-2], beam.shape[-2], 16)
+            )
             mv = torch.cat([mv, beam], dim=-2)
 
         return mv, s
@@ -238,28 +246,7 @@ class GATrCFM(EventCFM):
 
 
 # Note: For now, have a seperate class for every coordinate set (to make it easier to hack things)
-# Later, either pick one coordinate set or have a switch for it
-
-
-class TransformerCFMFourmomenta(TransformerCFM):
-    def init_coordinates(self):
-        self.coordinates = coordinates.Fourmomenta()
-
-
-class TransformerCFMJetmomenta(TransformerCFM):
-    def init_coordinates(self):
-        self.coordinates = coordinates.Jetmomenta()
-
-    def get_trajectory(self, x0, x1, t):
-        return trajectory_phi(x0, x1, t)
-
-
-class TransformerCFMPrecisesiast(TransformerCFM):
-    def init_coordinates(self):
-        self.coordinates = coordinates.Precisesiast(self.pt_min, self.units)
-
-    def get_trajectory(self, x0, x1, t):
-        return trajectory_phi(x0, x1, t)
+# Later, either pick one coordinate set or have a switch for it in the GATrCFM class
 
 
 class GATrCFMFourmomenta(GATrCFM):
@@ -267,72 +254,43 @@ class GATrCFMFourmomenta(GATrCFM):
         self.coordinates = coordinates.Fourmomenta()
 
 
-class GATrCFMPtPhiEtaE(GATrCFM):
-    def init_coordinates(self):
-        self.coordinates = coordinates.PtPhiEtaE()
-
-    def get_trajectory(self, x0, x1, t):
-        return trajectory_phi(x0, x1, t)
-
-
-class GATrCFMPPPM(GATrCFM):
-    def init_coordinates(self):
-        self.coordinates = coordinates.PPPM(mass_scale=self.mass_scale)
-
-
 class GATrCFMPPPM2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.PPPM2(mass_scale=self.mass_scale)
-
-
-class GATrCFMPPPlogM(GATrCFM):
-    def init_coordinates(self):
-        self.coordinates = coordinates.PPPlogM(mass_scale=self.mass_scale)
+        self.coordinates = coordinates.PPPM2()
 
 
 class GATrCFMPPPlogM2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.PPPlogM2(mass_scale=self.mass_scale)
+        self.coordinates = coordinates.PPPlogM2()
 
 
-class GATrCFMJetmomenta(GATrCFM):
+class GATrCFMPtPhiEtaE(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.Jetmomenta(mass_scale=self.mass_scale)
-
-    def get_trajectory(self, x0, x1, t):
-        return trajectory_phi(x0, x1, t)
+        self.coordinates = coordinates.PtPhiEtaE()
 
 
-class GATrCFMJetmomenta2(GATrCFM):
+class GATrCFMPtPhiEtaM2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.Jetmomenta2(mass_scale=self.mass_scale)
-
-    def get_trajectory(self, x0, x1, t):
-        return trajectory_phi(x0, x1, t)
+        self.coordinates = coordinates.PtPhiEtaM2()
 
 
-class GATrCFMPrecisesiast(GATrCFM):
+class GATrCFMPtPhiEtaLogM2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.Precisesiast(
-            self.pt_min, self.units, mass_scale=self.mass_scale
-        )
-
-    def get_trajectory(self, x0, x1, t):
-        return trajectory_phi(x0, x1, t)
+        self.coordinates = coordinates.PtPhiEtaLogM2(self.pt_min, self.units)
 
 
-class GATrCFMPrecisesiast2(GATrCFM):
+class GATrCFMLogPtPhiEtaM2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.Precisesiast2(
-            self.pt_min, self.units, mass_scale=self.mass_scale
-        )
-
-    def get_trajectory(self, x0, x1, t):
-        return trajectory_phi(x0, x1, t)
+        self.coordinates = coordinates.LogPtPhiEtaM2(self.pt_min, self.units)
 
 
-# deltaR business
+class GATrCFMLogPtPhiEtaLogM2(GATrCFM):
+    def init_coordinates(self):
+        self.coordinates = coordinates.LogPtPhiEtaLogM2(self.pt_min, self.units)
 
+
+"""
+# deltaR business (on hold right now)
 
 class TransformerCFMPrecisesiastDeltaR(TransformerCFMPrecisesiast):
     def __init__(self, *args, **kwargs):
@@ -385,3 +343,4 @@ class TransformerCFMPrecisesiastDeltaR(TransformerCFMPrecisesiast):
         x_t = odeint(velocity, x1, torch.tensor([1.0, t]), **self.odeint_kwargs)[-1]
         v_t = get_velocity(None, x_t)
         return x_t, v_t
+"""

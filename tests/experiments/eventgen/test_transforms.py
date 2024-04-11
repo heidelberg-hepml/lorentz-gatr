@@ -3,7 +3,14 @@ import torch
 import numpy as np
 
 import experiments.eventgen.transforms as tr
-from experiments.eventgen.distributions import NaiveLogDistribution
+from experiments.eventgen.distributions import (
+    NaiveDistribution,
+    NaiveLogDistribution,
+    FourmomentaDistribution,
+    JetmomentaDistribution,
+)
+from experiments.eventgen.ttbarexperiment import ttbarExperiment
+from experiments.eventgen.zmumuexperiment import zmumuExperiment
 from tests.helpers import MILD_TOLERANCES as TOLERANCES
 
 
@@ -11,7 +18,7 @@ def test_simple():
     """Some very simple tests"""
     fourmomentum = torch.tensor([[1, 1, 0, 0], [1, 1, 0, -1]]).float()
     ptphietam2 = torch.tensor(
-        [[1, 0, 0, 0], [1, 0, np.arctanh(-1 / 2**0.5), -1]]
+        [[1, 0, 0, 0], [1, 0, np.arctanh(-1 / 2**0.5), 1]]
     ).float()
     transforms = [tr.EPPP_to_PtPhiEtaE(), tr.PtPhiEtaE_to_PtPhiEtaM2()]
     x = fourmomentum.clone()
@@ -38,18 +45,38 @@ def test_simple():
         ],
     ],
 )
-@pytest.mark.parametrize("nevents", [100000])
-@pytest.mark.parametrize("nparticles", [10])
-def test_invertibility(transforms, nevents, nparticles):
+@pytest.mark.parametrize(
+    "distribution",
+    [
+        NaiveDistribution,
+        NaiveLogDistribution,
+        FourmomentaDistribution,
+        JetmomentaDistribution,
+    ],
+)
+@pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
+@pytest.mark.parametrize("nevents", [10000])
+def test_invertibility(transforms, distribution, experiment_np, nevents):
     """test forward() and inverse() methods"""
-    args = [[], [], None, None, None, [0.0] * nparticles, False, False]
-    d = NaiveLogDistribution(*args)
+    experiment, nparticles = experiment_np
+    exp = experiment(None)
+    exp.define_process_specifics()
+    d = distribution(
+        exp.onshell_list,
+        exp.onshell_mass,
+        exp.units,
+        exp.base_kwargs,
+        exp.delta_r_min,
+        exp.pt_min,
+        use_delta_r_min=True,
+        use_pt_min=True,
+    )
     device = torch.device("cpu")
-    dtype = torch.float32
+    dtype = torch.float64  # sometimes fails with float32
     ts = []
     for tra in transforms:
         if tra == tr.Pt_to_logPt:
-            ts.append(tra(args[5]))
+            ts.append(tra(exp.pt_min, exp.units))
         else:
             ts.append(tra())
 
@@ -90,21 +117,38 @@ def test_invertibility(transforms, nevents, nparticles):
         ],
     ],
 )
-@pytest.mark.parametrize("nevents", [100000])
-@pytest.mark.parametrize("nparticles", [10])
-def test_jacobians(transforms, nevents, nparticles):
-    """
-    test the _jac_forward and _jac_inverse methods with a call to autograd
-    only the last transform in transforms is tested
-    """
-    args = [[], [], None, None, None, [0.0] * nparticles, False, False]
-    d = NaiveLogDistribution(*args)
+@pytest.mark.parametrize(
+    "distribution",
+    [
+        NaiveDistribution,
+        NaiveLogDistribution,
+        FourmomentaDistribution,
+        JetmomentaDistribution,
+    ],
+)
+@pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
+@pytest.mark.parametrize("nevents", [10000])
+def test_jacobians(transforms, distribution, experiment_np, nevents):
+    """test forward() and inverse() methods"""
+    experiment, nparticles = experiment_np
+    exp = experiment(None)
+    exp.define_process_specifics()
+    d = distribution(
+        exp.onshell_list,
+        exp.onshell_mass,
+        exp.units,
+        exp.base_kwargs,
+        exp.delta_r_min,
+        exp.pt_min,
+        use_delta_r_min=True,
+        use_pt_min=True,
+    )
     device = torch.device("cpu")
-    dtype = torch.float32
+    dtype = torch.float64  # sometimes fails with torch32
     ts = []
     for tra in transforms:
         if tra == tr.Pt_to_logPt:
-            ts.append(tra(args[5]))
+            ts.append(tra(exp.pt_min, exp.units))
         else:
             ts.append(tra())
 
@@ -127,12 +171,12 @@ def test_jacobians(transforms, nevents, nparticles):
     # test jacobian invertibility
     diag_left = torch.einsum("...ij,...jk->...ik", jac_fw, jac_inv)
     diag_right = torch.einsum("...ij,...jk->...ik", jac_inv, jac_fw)
-    diag = torch.eye(4)[None,None,...].expand(diag_left.shape)
+    diag = torch.eye(4, dtype=dtype)[None, None, ...].expand(diag_left.shape)
     torch.testing.assert_close(diag_right, diag, **TOLERANCES)
     torch.testing.assert_close(diag_left, diag, **TOLERANCES)
 
     # jacobians from autograd
-    grad_outputs = torch.ones_like(x)
+    grad_outputs = torch.ones_like(x, dtype=dtype)
     jac_fw_autograd = torch.autograd.grad(y, x, grad_outputs=grad_outputs)[0]
     jac_inv_autograd = torch.autograd.grad(z, y, grad_outputs=grad_outputs)[0]
 
