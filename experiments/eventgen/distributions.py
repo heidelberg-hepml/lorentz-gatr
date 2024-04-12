@@ -324,6 +324,9 @@ class JetmomentaDistribution(Distribution):
         eps = torch.randn(shape, device=device, dtype=dtype, generator=generator)
 
         eta = eps[..., 2] * self.eta_std
+        eta = eta.clamp(
+            min=-3, max=3
+        )  # for numerical stability; gives negligible error in log_prob computation
         logm2 = eps[..., 3] * self.logm2_std + self.logm2_mean
         onshell_mass = self.onshell_mass.to(device, dtype=dtype).unsqueeze(0)
         logm2[..., self.onshell_list] = torch.log(onshell_mass**2 + EPS1)

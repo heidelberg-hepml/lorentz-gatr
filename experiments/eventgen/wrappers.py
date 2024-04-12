@@ -45,16 +45,12 @@ class MLPCFMFourmomenta(EventCFM):
     def __init__(
         self,
         net,
-        embed_t_dim,
-        embed_t_scale,
+        cfm_kwargs,
         odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
-        hutchinson=True,
     ):
         super().__init__(
-            embed_t_dim,
-            embed_t_scale,
+            cfm_kwargs,
             odeint_kwargs=odeint_kwargs,
-            hutchinson=hutchinson,
         )
         self.net = net
 
@@ -75,19 +71,15 @@ class GAPCFMFourmomenta(EventCFM):
     def __init__(
         self,
         net,
-        embed_t_dim,
-        embed_t_scale,
+        cfm_kwargs,
         beam_reference,
         two_beams,
         add_time_reference,
         odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
-        hutchinson=True,
     ):
         super().__init__(
-            embed_t_dim,
-            embed_t_scale,
+            cfm_kwargs,
             odeint_kwargs=odeint_kwargs,
-            hutchinson=hutchinson,
         )
         self.net = net
         self.beam_reference = beam_reference
@@ -130,18 +122,14 @@ class TransformerCFM(EventCFM):
     def __init__(
         self,
         net,
-        embed_t_dim,
-        embed_t_scale,
+        cfm_kwargs,
         type_token_channels,
         process_token_channels,
         odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
-        hutchinson=True,
     ):
         super().__init__(
-            embed_t_dim,
-            embed_t_scale,
+            cfm_kwargs,
             odeint_kwargs=odeint_kwargs,
-            hutchinson=hutchinson,
         )
         self.net = net
         self.type_token_channels = type_token_channels
@@ -165,14 +153,12 @@ class TransformerCFMFourmomenta(TransformerCFM):
 
 class TransformerCFMPtPhiEtaM2(TransformerCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.PtPhiEtaM2(self.mass_scale)
+        self.coordinates = coordinates.PtPhiEtaM2()
 
 
 class TransformerCFMLogPtPhiEtaLogM2(TransformerCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.LogPtPhiEtaLogM2(
-            self.pt_min, self.units, self.mass_scale
-        )
+        self.coordinates = coordinates.LogPtPhiEtaLogM2(self.pt_min, self.units)
 
 
 class GATrCFM(EventCFM):
@@ -184,21 +170,17 @@ class GATrCFM(EventCFM):
     def __init__(
         self,
         net,
-        embed_t_dim,
-        embed_t_scale,
+        cfm_kwargs,
         type_token_channels,
         process_token_channels,
         beam_reference,
         two_beams,
         add_time_reference,
         odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
-        hutchinson=True,
     ):
         super().__init__(
-            embed_t_dim,
-            embed_t_scale,
+            cfm_kwargs,
             odeint_kwargs=odeint_kwargs,
-            hutchinson=hutchinson,
         )
         self.net = net
         self.type_token_channels = type_token_channels
@@ -258,12 +240,12 @@ class GATrCFMFourmomenta(GATrCFM):
 
 class GATrCFMPPPM2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.PPPM2(self.mass_scale)
+        self.coordinates = coordinates.PPPM2()
 
 
 class GATrCFMPPPLogM2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.PPPLogM2(self.mass_scale)
+        self.coordinates = coordinates.PPPLogM2()
 
 
 class GATrCFMPtPhiEtaE(GATrCFM):
@@ -273,28 +255,22 @@ class GATrCFMPtPhiEtaE(GATrCFM):
 
 class GATrCFMPtPhiEtaM2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.PtPhiEtaM2(self.mass_scale)
+        self.coordinates = coordinates.PtPhiEtaM2()
 
 
 class GATrCFMPtPhiEtaLogM2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.PtPhiEtaLogM2(
-            self.pt_min, self.units, self.mass_scale
-        )
+        self.coordinates = coordinates.PtPhiEtaLogM2(self.pt_min, self.units)
 
 
 class GATrCFMLogPtPhiEtaM2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.LogPtPhiEtaM2(
-            self.pt_min, self.units, self.mass_scale
-        )
+        self.coordinates = coordinates.LogPtPhiEtaM2(self.pt_min, self.units)
 
 
 class GATrCFMLogPtPhiEtaLogM2(GATrCFM):
     def init_coordinates(self):
-        self.coordinates = coordinates.LogPtPhiEtaLogM2(
-            self.pt_min, self.units, self.mass_scale
-        )
+        self.coordinates = coordinates.LogPtPhiEtaLogM2(self.pt_min, self.units)
 
 
 """

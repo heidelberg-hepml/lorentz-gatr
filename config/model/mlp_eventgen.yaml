@@ -1,7 +1,4 @@
 _target_: experiments.eventgen.wrappers.MLPCFM4Momenta
-embed_t_dim: 8
-embed_t_scale: 30.
-clamp_mse: null
 
 net:
  _target_: experiments.baselines.MLP

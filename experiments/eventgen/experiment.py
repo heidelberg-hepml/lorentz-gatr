@@ -35,19 +35,19 @@ class EventGenerationExperiment(BaseExperiment):
             # dynamically set channel dimensions
             if self.modelname == "GATr":
                 self.cfg.model.net.in_s_channels = (
-                    n_particles + n_datasets + self.cfg.model.embed_t_dim
+                    n_particles + n_datasets + self.cfg.cfm_kwargs.embed_t_dim
                 )
             elif self.modelname == "Transformer":
                 self.cfg.model.net.in_channels = (
-                    4 + n_datasets + n_particles + self.cfg.model.embed_t_dim
+                    4 + n_datasets + n_particles + self.cfg.cfm_kwargs.embed_t_dim
                 )
             elif self.modelname == "GAP":
                 self.cfg.model.net.in_mv_channels = n_particles
                 self.cfg.model.net.out_mv_channels = n_particles
-                self.cfg.model.net.in_s_channels = self.cfg.model.embed_t_dim
+                self.cfg.model.net.in_s_channels = self.cfg.cfm_kwargs.embed_t_dim
             elif self.modelname == "MLP":
                 self.cfg.model.net.in_shape = (
-                    4 * n_particles + self.cfg.model.embed_t_dim
+                    4 * n_particles + self.cfg.cfm_kwargs.embed_t_dim
                 )
                 self.cfg.model.net.out_shape = 4 * n_particles
 
@@ -60,7 +60,9 @@ class EventGenerationExperiment(BaseExperiment):
                 if self.cfg.model.add_time_reference:
                     self.cfg.model.net.in_mv_channels += 1
 
+            # copy model-specific parameters
             self.cfg.model.odeint_kwargs = self.cfg.odeint_kwargs
+            self.cfg.model.cfm_kwargs = self.cfg.cfm_kwargs
 
     def init_data(self):
         LOGGER.info(f"Working with {self.cfg.data.n_jets} extra jets")
@@ -98,7 +100,6 @@ class EventGenerationExperiment(BaseExperiment):
             self.cfg.data.base_type,
             self.cfg.data.use_pt_min,
             self.cfg.data.use_delta_r_min,
-            self.cfg.data.mass_scale,
         )
         self.model.init_distribution()
         self.model.init_coordinates()

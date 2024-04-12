@@ -14,7 +14,6 @@ data:
  base_type: 1
  use_delta_r_min: true
  use_pt_min: true
- mass_scale: 1.
 
 odeint_kwargs:
  method: dopri5
@@ -22,6 +21,13 @@ odeint_kwargs:
  atol: 1e-5
  options:
   step_size: 0.01
+
+cfm_kwargs:
+ embed_t_dim: 8
+ embed_t_scale: 30.
+ hutchinson: true
+ x_straight: true
+ x_mse: true
 
 tr_wrapper: TransformerCFMFourmomenta
 gatr_wrapper: GATrCFMFourmomenta

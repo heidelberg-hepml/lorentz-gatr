@@ -61,22 +61,25 @@ class CFM(nn.Module):
 
     def __init__(
         self,
-        embed_t_dim,
-        embed_t_scale,
+        cfm_kwargs,
         odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
-        hutchinson=True,
     ):
         super().__init__()
         self.t_embedding = nn.Sequential(
-            GaussianFourierProjection(embed_dim=embed_t_dim, scale=embed_t_scale),
-            nn.Linear(embed_t_dim, embed_t_dim),
+            GaussianFourierProjection(
+                embed_dim=cfm_kwargs.embed_t_dim, scale=cfm_kwargs.embed_t_scale
+            ),
+            nn.Linear(cfm_kwargs.embed_t_dim, cfm_kwargs.embed_t_dim),
         )
-        self.trace_fn = hutchinson_trace if hutchinson else autograd_trace
+        self.trace_fn = hutchinson_trace if cfm_kwargs.hutchinson else autograd_trace
         self.odeint_kwargs = odeint_kwargs
         self.loss = lambda v1, v2: nn.functional.mse_loss(v1, v2)
 
         self.distribution = BaseDistribution()
         self.coordinates = BaseCoordinates()
+
+        self.x_mse = cfm_kwargs.x_mse
+        self.x_straight = cfm_kwargs.x_straight
 
     def init_distribution(self):
         raise NotImplementedError
@@ -274,7 +277,6 @@ class EventCFM(CFM):
         base_type,
         use_pt_min,
         use_delta_r_min,
-        mass_scale,
     ):
         """
         Pass physics information to the CFM class
@@ -307,9 +309,6 @@ class EventCFM(CFM):
             Whether the base distribution should have delta_r cuts
         use_pt_min: bool
             Whether the base distribution should have pt cuts
-        mass_scale: float
-            Option for the coordinates class to manually rescale the mass
-            Only supported by coordinates that explicitly involve the mass (like Jetmomenta, PPPM)
         """
         self.units = units
         self.pt_min = pt_min
@@ -320,7 +319,6 @@ class EventCFM(CFM):
         self.base_type = base_type
         self.use_delta_r_min = use_delta_r_min
         self.use_pt_min = use_pt_min
-        self.mass_scale = mass_scale
 
         # same preprocessing for all multiplicities
         self.prep_params = {}
