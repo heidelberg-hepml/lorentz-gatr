@@ -65,7 +65,7 @@ def test_simple():
 @pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
 @pytest.mark.parametrize("nevents", [10000])
 def test_invertibility(transforms, distribution, experiment_np, nevents):
-    """test forward() and inverse() methods"""
+    """test invertibility of forward() and inverse() methods"""
     experiment, nparticles = experiment_np
     exp = experiment(None)
     exp.define_process_specifics()
@@ -157,7 +157,7 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
 @pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
 @pytest.mark.parametrize("nevents", [10000])
 def test_jacobians(transforms, distribution, experiment_np, nevents):
-    """test forward() and inverse() methods"""
+    """test correctness of jacobians from _jac_forward() and _jac_inverse() methods, and their invertibility"""
     experiment, nparticles = experiment_np
     exp = experiment(None)
     exp.define_process_specifics()
@@ -216,31 +216,153 @@ def test_jacobians(transforms, distribution, experiment_np, nevents):
     torch.testing.assert_close(diag_left, diag, **TOLERANCES)
 
     # jacobians from autograd
-    grad_outputs = torch.ones_like(x, dtype=dtype)
-    jac_fw_autograd = torch.autograd.grad(y, x, grad_outputs=grad_outputs)[0]
-    jac_inv_autograd = torch.autograd.grad(z, y, grad_outputs=grad_outputs)[0]
-
-    # multiply by unit vector (to be able to compare with autograd)
-    jac_fw = jac_fw.sum(dim=-2)
-    jac_inv = jac_inv.sum(dim=-2)
-
-    """
-    # alternative autograd implementation that computes the full jacobian matrix
-    # this does not work yet...
     jac_fw_autograd, jac_inv_autograd = [], []
     for i in range(4):
         grad_outputs = torch.zeros_like(x)
-        grad_outputs[...,i] = 1.
-        fw_autograd = torch.autograd.grad(y, x, grad_outputs=grad_outputs,
-                                          retain_graph=True, create_graph=False, allow_unused=True)[0]
-        inv_autograd = torch.autograd.grad(z, y, grad_outputs=grad_outputs,
-                                          retain_graph=True, create_graph=False, allow_unused=True)[0]
+        grad_outputs[..., i] = 1.0
+        fw_autograd = torch.autograd.grad(
+            y,
+            x,
+            grad_outputs=grad_outputs,
+            retain_graph=True,
+            create_graph=False,
+            allow_unused=True,
+        )[0]
+        inv_autograd = torch.autograd.grad(
+            z,
+            y,
+            grad_outputs=grad_outputs,
+            retain_graph=True,
+            create_graph=False,
+            allow_unused=True,
+        )[0]
         jac_fw_autograd.append(fw_autograd)
         jac_inv_autograd.append(inv_autograd)
     jac_fw_autograd = torch.stack(jac_fw_autograd, dim=-2)
     jac_inv_autograd = torch.stack(jac_inv_autograd, dim=-2)
-    """
 
     # compare jacobian to autograd
     torch.testing.assert_close(jac_fw, jac_fw_autograd, **TOLERANCES)
     torch.testing.assert_close(jac_inv, jac_inv_autograd, **TOLERANCES)
+
+
+@pytest.mark.parametrize(
+    "transforms",
+    [
+        [tr.FitNormal],
+        [tr.EPPP_to_PPPM2],
+        [tr.EPPP_to_PtPhiEtaE],
+        [tr.EPPP_to_PPPM2, tr.M2_to_LogM2],
+        [tr.EPPP_to_PtPhiEtaE, tr.Pt_to_LogPt],
+        [tr.EPPP_to_PtPhiEtaE, tr.PtPhiEtaE_to_PtPhiEtaM2],
+        [tr.EPPP_to_PtPhiEtaE, tr.PtPhiEtaE_to_PtPhiEtaM2, tr.M2_to_LogM2],
+        [tr.EPPP_to_PtPhiEtaE, tr.PtPhiEtaE_to_PtPhiEtaM2, tr.Pt_to_LogPt],
+        [
+            tr.EPPP_to_PtPhiEtaE,
+            tr.PtPhiEtaE_to_PtPhiEtaM2,
+            tr.M2_to_LogM2,
+            tr.Pt_to_LogPt,
+        ],
+        [
+            tr.EPPP_to_PtPhiEtaE,
+            tr.PtPhiEtaE_to_PtPhiEtaM2,
+            tr.M2_to_LogM2,
+            tr.Pt_to_LogPt,
+            tr.FitNormal,
+        ],
+    ],
+)
+@pytest.mark.parametrize(
+    "distribution",
+    [
+        NaiveDistribution,
+        NaiveLogDistribution,
+        FourmomentaDistribution,
+        JetmomentaDistribution,
+    ],
+)
+@pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
+@pytest.mark.parametrize("nevents", [10000])
+def test_logdetjac(transforms, distribution, experiment_np, nevents):
+    """compare logdetjac_forward and logdetjac_inverse methods to autograd"""
+    experiment, nparticles = experiment_np
+    exp = experiment(None)
+    exp.define_process_specifics()
+    d = distribution(
+        exp.onshell_list,
+        exp.onshell_mass,
+        exp.units,
+        exp.delta_r_min,
+        exp.pt_min,
+        use_delta_r_min=True,
+        use_pt_min=True,
+    )
+    d.coordinates.init_unit([nparticles])
+    device = torch.device("cpu")
+    dtype = torch.float64  # sometimes fails with torch32
+    ts = []
+    for tra in transforms:
+        if tra == tr.Pt_to_LogPt:
+            ts.append(tra(exp.pt_min, exp.units))
+        elif tra == tr.FitNormal:
+            local = tra([0, 1, 2, 3])
+            local.init_unit([nparticles])
+            ts.append(local)
+        else:
+            ts.append(tra())
+
+    shape = (nevents, nparticles, 4)
+    fourmomenta_original = d.sample(shape, device, dtype)
+    x = fourmomenta_original.clone()
+
+    # init_fit (has to be done manually in this case
+    # this does nothing, except for FitNormal
+    x_fit = x.clone()
+    for t in ts[:-1]:
+        x_fit = t.forward(x)
+    ts[-1].init_fit([x])
+
+    x.requires_grad_()
+    xs = [x.clone()]
+    for t in ts[:-1]:
+        x = t.forward(x)
+        xs.append(x.clone())
+    x = xs[-1]
+    y = ts[-1].forward(x)
+    z = ts[-1].inverse(y)
+
+    # logdetjac from code
+    logdetjac_fw = ts[-1].logdetjac_forward(x, y)
+    logdetjac_inv = ts[-1].logdetjac_inverse(y, z)
+
+    # logdetjac from autograd
+    jac_fw_autograd, jac_inv_autograd = [], []
+    for i in range(4):
+        grad_outputs = torch.zeros_like(x)
+        grad_outputs[..., i] = 1.0
+        fw_autograd = torch.autograd.grad(
+            y,
+            x,
+            grad_outputs=grad_outputs,
+            retain_graph=True,
+            create_graph=False,
+            allow_unused=True,
+        )[0]
+        inv_autograd = torch.autograd.grad(
+            z,
+            y,
+            grad_outputs=grad_outputs,
+            retain_graph=True,
+            create_graph=False,
+            allow_unused=True,
+        )[0]
+        jac_fw_autograd.append(fw_autograd)
+        jac_inv_autograd.append(inv_autograd)
+    jac_fw_autograd = torch.stack(jac_fw_autograd, dim=-2)
+    jac_inv_autograd = torch.stack(jac_inv_autograd, dim=-2)
+    logdetjac_fw_autograd = torch.linalg.det(jac_fw_autograd).abs().log().sum(dim=-1)
+    logdetjac_inv_autograd = torch.linalg.det(jac_inv_autograd).abs().log().sum(dim=-1)
+
+    # compare logdetjac to autograd
+    torch.testing.assert_close(logdetjac_fw, logdetjac_fw_autograd, **TOLERANCES)
+    torch.testing.assert_close(logdetjac_inv, logdetjac_inv_autograd, **TOLERANCES)

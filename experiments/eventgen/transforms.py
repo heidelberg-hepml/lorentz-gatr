@@ -43,14 +43,14 @@ class BaseTransform(nn.Module):
         return v_x
 
     def logdetjac_forward(self, x, y):
-        logdetjac = self._detjac_forward(x, y).log()
-        assert torch.isfinite(logdetjac)
+        logdetjac = self._detjac_forward(x, y).abs().log().sum(dim=-1)
+        assert torch.isfinite(logdetjac).all()
         return logdetjac
 
     def logdetjac_inverse(self, y, x):
         # log(det(J^-1)) = log(1/det(J)) = -log(det(J))
-        logdetjac = -self._detjac_forward(x, y).log()
-        assert torch.isfinite(logdetjac)
+        logdetjac = -self._detjac_forward(x, y).abs().log().sum(dim=-1)
+        assert torch.isfinite(logdetjac).all()
         return logdetjac
 
     def _forward(self, x):
@@ -209,8 +209,7 @@ class EPPP_to_PtPhiEtaE(BaseTransform):
         pt, phi, eta, E = unpack_last(ptphietae)
 
         # det (dptphietae / dfourmomenta)
-        p_abs = pt * torch.cosh(eta)
-        return 1 / p_abs
+        return 1 / (pt**2 * torch.cosh(eta))
 
 
 class PtPhiEtaE_to_PtPhiEtaM2(BaseTransform):
@@ -261,6 +260,10 @@ class PtPhiEtaE_to_PtPhiEtaM2(BaseTransform):
         jac_m2 = torch.stack((zero, zero, zero, 1 / (2 * E)), dim=-1)
 
         return torch.stack((jac_pt, jac_phi, jac_eta, jac_m2), dim=-1)
+
+    def _detjac_forward(self, ptphietae, ptphietam2):
+        pt, phi, eta, E = unpack_last(ptphietae)
+        return 2 * E
 
 
 class M2_to_LogM2(BaseTransform):
@@ -416,4 +419,6 @@ class FitNormal(BaseTransform):
 
     def _detjac_forward(self, x, xunit):
         std = self.get_mean_std(x)[1]
-        return 1 / torch.prod(std, dim=-1)
+        detjac = 1 / torch.prod(std, dim=-1)
+        detjac = detjac.unsqueeze(0).expand(x.shape[0], x.shape[1])
+        return detjac
