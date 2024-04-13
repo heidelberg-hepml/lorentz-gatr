@@ -1,4 +1,4 @@
-_target_: experiments.eventgen.wrappers.${gatr_wrapper}
+_target_: experiments.eventgen.wrappers.GATrCFM
 beam_reference: spacelike
 two_beams: false
 add_time_reference: true

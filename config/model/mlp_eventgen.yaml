@@ -1,4 +1,4 @@
-_target_: experiments.eventgen.wrappers.MLPCFM4Momenta
+_target_: experiments.eventgen.wrappers.MLPCFM
 
 net:
  _target_: experiments.baselines.MLP

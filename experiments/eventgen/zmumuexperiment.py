@@ -11,15 +11,6 @@ class zmumuExperiment(EventGenerationExperiment):
         self.onshell_list = [0, 1]
         self.onshell_mass = [0.1, 0.1]
         self.units = 258.1108
-        self.base_kwargs = {
-            "pxy_std": 36.6,
-            "pz_std": 368.7,
-            "logpt_mean": 3.61,
-            "logpt_std": 0.56,
-            "logmass_mean": 1.08,
-            "logmass_std": 1.24,
-            "eta_std": 1.98,
-        }
         self.delta_r_min = 0.39
         self.pt_min = [0.0, 0.0, 20.0, 20.0, 20.0]
         self.obs_names_index = ["l1", "l2"]

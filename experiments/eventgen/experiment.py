@@ -35,20 +35,18 @@ class EventGenerationExperiment(BaseExperiment):
             # dynamically set channel dimensions
             if self.modelname == "GATr":
                 self.cfg.model.net.in_s_channels = (
-                    n_particles + n_datasets + self.cfg.cfm_kwargs.embed_t_dim
+                    n_particles + n_datasets + self.cfg.cfm.embed_t_dim
                 )
             elif self.modelname == "Transformer":
                 self.cfg.model.net.in_channels = (
-                    4 + n_datasets + n_particles + self.cfg.cfm_kwargs.embed_t_dim
+                    4 + n_datasets + n_particles + self.cfg.cfm.embed_t_dim
                 )
             elif self.modelname == "GAP":
                 self.cfg.model.net.in_mv_channels = n_particles
                 self.cfg.model.net.out_mv_channels = n_particles
-                self.cfg.model.net.in_s_channels = self.cfg.cfm_kwargs.embed_t_dim
+                self.cfg.model.net.in_s_channels = self.cfg.cfm.embed_t_dim
             elif self.modelname == "MLP":
-                self.cfg.model.net.in_shape = (
-                    4 * n_particles + self.cfg.cfm_kwargs.embed_t_dim
-                )
+                self.cfg.model.net.in_shape = 4 * n_particles + self.cfg.cfm.embed_t_dim
                 self.cfg.model.net.out_shape = 4 * n_particles
 
             # extra treatment for lorentz-symmetry breaking inputs in equivariant models
@@ -61,8 +59,8 @@ class EventGenerationExperiment(BaseExperiment):
                     self.cfg.model.net.in_mv_channels += 1
 
             # copy model-specific parameters
-            self.cfg.model.odeint_kwargs = self.cfg.odeint_kwargs
-            self.cfg.model.cfm_kwargs = self.cfg.cfm_kwargs
+            self.cfg.model.odeint = self.cfg.odeint
+            self.cfg.model.cfm = self.cfg.cfm
 
     def init_data(self):
         LOGGER.info(f"Working with {self.cfg.data.n_jets} extra jets")
@@ -96,13 +94,15 @@ class EventGenerationExperiment(BaseExperiment):
             self.delta_r_min,
             self.onshell_list,
             self.onshell_mass,
-            self.base_kwargs,
             self.cfg.data.base_type,
             self.cfg.data.use_pt_min,
             self.cfg.data.use_delta_r_min,
         )
         self.model.init_distribution()
         self.model.init_coordinates()
+        fit_data = [x / self.units for x in self.events_raw]
+        self.model.coordinates.init_fit(fit_data)
+        self.model.distribution.coordinates.init_fit(fit_data)
 
         # preprocessing
         self.events_prepd = []
@@ -374,7 +374,6 @@ class EventGenerationExperiment(BaseExperiment):
         self.onshell_list = None
         self.onshell_mass = None
         self.units = None
-        self.base_kwargs = None
         self.pt_min = None
         self.delta_r_min = None
         self.obs_names_index = None

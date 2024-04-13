@@ -14,6 +14,17 @@ class BaseCoordinates:
     def __init__(self):
         self.transforms = []
 
+    def init_fit(self, fourmomenta_list):
+        # only does something for FitNormal()
+        # requires that FitNormal() comes last in self.transforms
+        x_list = [fourmomenta.clone() for fourmomenta in fourmomenta_list]
+        for transform in self.transforms[:-1]:
+            x_list = [transform.forward(x) for x in x_list]
+        self.transforms[-1].init_fit(x_list)
+
+    def init_unit(self, particles_list):
+        self.transforms[-1].init_unit(particles_list)
+
     def get_trajectory(self, x1, x2, t):
         v_t = x2 - x1
         x_t = x1 + t * v_t
@@ -69,7 +80,7 @@ class Fourmomenta(BaseCoordinates):
     # this class effectively does nothing,
     # because fourmomenta are already the baseline representation
     def __init__(self):
-        self.transforms = []
+        self.transforms = [tr.EmptyTransform()]
 
 
 class PPPM2(BaseCoordinates):
@@ -102,11 +113,21 @@ class PtPhiEtaM2(PhiCoordinates):
 
 
 class PPPLogM2(BaseCoordinates):
-    # (px, py, pz, E)
+    # (px, py, pz, log(m^2))
     def __init__(self):
         self.transforms = [
             tr.EPPP_to_PPPM2(),
             tr.M2_to_LogM2(),
+        ]
+
+
+class FittedPPPLogM2(BaseCoordinates):
+    # fitted (px, py, pz, log(m^2))
+    def __init__(self):
+        self.transforms = [
+            tr.EPPP_to_PPPM2(),
+            tr.M2_to_LogM2(),
+            tr.FitNormal([]),
         ]
 
 
@@ -144,4 +165,16 @@ class LogPtPhiEtaLogM2(PhiCoordinates):
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
             tr.Pt_to_LogPt(pt_min, units),
             tr.M2_to_LogM2(),
+        ]
+
+
+class FittedLogPtPhiEtaLogM2(PhiCoordinates):
+    # Fitted (log(pt), phi, eta, log(m^2)
+    def __init__(self, pt_min, units):
+        self.transforms = [
+            tr.EPPP_to_PtPhiEtaE(),
+            tr.PtPhiEtaE_to_PtPhiEtaM2(),
+            tr.Pt_to_LogPt(pt_min, units),
+            tr.M2_to_LogM2(),
+            tr.FitNormal([1]),
         ]

@@ -15,22 +15,21 @@ data:
  use_delta_r_min: true
  use_pt_min: true
 
-odeint_kwargs:
+odeint:
  method: dopri5
  rtol: 1e-5
  atol: 1e-5
  options:
   step_size: 0.01
 
-cfm_kwargs:
+cfm:
  embed_t_dim: 8
  embed_t_scale: 30.
  hutchinson: true
  x_straight: true
- x_mse: true
-
-tr_wrapper: TransformerCFMFourmomenta
-gatr_wrapper: GATrCFMFourmomenta
+ x_loss: true
+ x_velocity: false
+ coordinates: Fourmomenta
 
 training:
  iterations: 50

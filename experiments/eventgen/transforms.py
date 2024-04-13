@@ -68,6 +68,37 @@ class BaseTransform(nn.Module):
     def _detjac_forward(self, x, y):
         raise NotImplementedError
 
+    def init_fit(self, xs):
+        # currently only needed for FitNormal()
+        # default: do nothing
+        pass
+
+    def init_unit(self, xs):
+        # for debugging and tests
+        pass
+
+
+class EmptyTransform(BaseTransform):
+    # empty transform
+    # needed for formal reasons
+    def forward(self, x):
+        return x
+
+    def inverse(self, x):
+        return x
+
+    def velocity_forward(self, v, x, y):
+        return v
+
+    def velocity_inverse(self, v, y, x):
+        return v
+
+    def logdetjac_forward(self, x, y):
+        return 0.0
+
+    def logdetjac_inverse(self, x, y):
+        return 0.0
+
 
 class EPPP_to_PPPM2(BaseTransform):
     def _forward(self, eppp):
@@ -328,4 +359,61 @@ class Pt_to_LogPt(BaseTransform):
     def _detjac_forward(self, ptx, logptx):
         pt, x1, x2, x3 = unpack_last(ptx)
         dpt = self.get_dpt(pt)
-        return 1 / (dpt + EPS2)
+        return 1 / (dpt + EPS1)
+
+
+class FitNormal(BaseTransform):
+    # rescale to unit normal distribution
+    # particle- and process-wise mean and std are determined by initial_fit
+    # note: this transform will always come last in the self.transforms list of a coordinates class
+    def __init__(self, dims_fixed):
+        self.dims_fixed = dims_fixed
+
+    def init_fit(self, xs):
+        n_particles = [x.shape[-2] for x in xs]
+        self.params = {n_p: {"mean": None, "std": None} for n_p in n_particles}
+        for i, n_p in enumerate(n_particles):
+            self.params[n_p]["mean"] = xs[i].mean(dim=0)
+            self.params[n_p]["std"] = xs[i].std(dim=0)
+
+            # do not fit some distributions
+            self.params[n_p]["mean"][..., self.dims_fixed] = 0.0
+            self.params[n_p]["std"][..., self.dims_fixed] = 1.0
+
+    def init_unit(self, n_particles):
+        # initialize to zero mean and unit std
+        # only for debugging and tests
+        self.params = {n_p: {"mean": None, "std": None} for n_p in n_particles}
+        for i, n_p in enumerate(n_particles):
+            self.params[n_p]["mean"] = torch.zeros(n_p, 4)
+            self.params[n_p]["std"] = torch.ones(n_p, 4)
+
+    def get_mean_std(self, x):
+        params = self.params[x.shape[-2]]
+        return params["mean"], params["std"]
+
+    def _forward(self, x):
+        mean, std = self.get_mean_std(x)
+        xunit = (x - mean) / std
+        return xunit
+
+    def _inverse(self, xunit):
+        mean, std = self.get_mean_std(xunit)
+        x = xunit * std + mean
+        return x
+
+    def _jac_forward(self, x, xunit):
+        std = self.get_mean_std(x)[1]
+        jac = torch.zeros(*x.shape, 4, device=x.device, dtype=x.dtype)
+        jac[..., torch.arange(4), torch.arange(4)] = 1 / std.unsqueeze(0)
+        return jac
+
+    def _jac_inverse(self, xunit, x):
+        std = self.get_mean_std(x)[1]
+        jac = torch.zeros(*x.shape, 4, device=x.device, dtype=x.dtype)
+        jac[..., torch.arange(4), torch.arange(4)] = std.unsqueeze(0)
+        return jac
+
+    def _detjac_forward(self, x, xunit):
+        std = self.get_mean_std(x)[1]
+        return 1 / torch.prod(std, dim=-1)

@@ -45,12 +45,12 @@ def test_cuts(
         exp.onshell_list,
         exp.onshell_mass,
         exp.units,
-        exp.base_kwargs,
         exp.delta_r_min,
         exp.pt_min,
         use_delta_r_min=use_delta_r_min,
         use_pt_min=use_pt_min,
     )
+    d.coordinates.init_unit([nparticles])
     device = torch.device("cpu")
     dtype = torch.float32
 
@@ -91,12 +91,12 @@ def test_onshell(
         exp.onshell_list,
         exp.onshell_mass,
         exp.units,
-        exp.base_kwargs,
         exp.delta_r_min,
         exp.pt_min,
         use_delta_r_min=use_delta_r_min,
         use_pt_min=use_pt_min,
     )
+    d.coordinates.init_unit([nparticles])
     device = torch.device("cpu")
     # this test depends strongly on the dtype;
     # for torch.float64 it passes in 100% of the cases

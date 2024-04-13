@@ -30,6 +30,7 @@ def test_simple():
 @pytest.mark.parametrize(
     "transforms",
     [
+        [tr.FitNormal],
         [tr.EPPP_to_PPPM2],
         [tr.EPPP_to_PtPhiEtaE],
         [tr.EPPP_to_PPPM2, tr.M2_to_LogM2],
@@ -42,6 +43,13 @@ def test_simple():
             tr.PtPhiEtaE_to_PtPhiEtaM2,
             tr.M2_to_LogM2,
             tr.Pt_to_LogPt,
+        ],
+        [
+            tr.EPPP_to_PtPhiEtaE,
+            tr.PtPhiEtaE_to_PtPhiEtaM2,
+            tr.M2_to_LogM2,
+            tr.Pt_to_LogPt,
+            tr.FitNormal,
         ],
     ],
 )
@@ -65,24 +73,36 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
         exp.onshell_list,
         exp.onshell_mass,
         exp.units,
-        exp.base_kwargs,
         exp.delta_r_min,
         exp.pt_min,
         use_delta_r_min=True,
         use_pt_min=True,
     )
+    d.coordinates.init_unit([nparticles])
     device = torch.device("cpu")
     dtype = torch.float64  # sometimes fails with float32
     ts = []
     for tra in transforms:
         if tra == tr.Pt_to_LogPt:
             ts.append(tra(exp.pt_min, exp.units))
+        elif tra == tr.FitNormal:
+            local = tra([0, 1, 2, 3])
+            local.init_unit([nparticles])
+            ts.append(local)
         else:
             ts.append(tra())
 
     shape = (nevents, nparticles, 4)
     fourmomenta_original = d.sample(shape, device, dtype)
     x = fourmomenta_original.clone()
+
+    # init_fit (has to be done manually in this case
+    # this does nothing, except for FitNormal
+    x_fit = x.clone()
+    for t in ts[:-1]:
+        x_fit = t.forward(x)
+    ts[-1].init_fit([x])
+
     for t in ts:
         x = t.forward(x)
     x_original = x.clone()
@@ -102,6 +122,7 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
 @pytest.mark.parametrize(
     "transforms",
     [
+        [tr.FitNormal],
         [tr.EPPP_to_PPPM2],
         [tr.EPPP_to_PtPhiEtaE],
         [tr.EPPP_to_PPPM2, tr.M2_to_LogM2],
@@ -114,6 +135,13 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
             tr.PtPhiEtaE_to_PtPhiEtaM2,
             tr.M2_to_LogM2,
             tr.Pt_to_LogPt,
+        ],
+        [
+            tr.EPPP_to_PtPhiEtaE,
+            tr.PtPhiEtaE_to_PtPhiEtaM2,
+            tr.M2_to_LogM2,
+            tr.Pt_to_LogPt,
+            tr.FitNormal,
         ],
     ],
 )
@@ -137,24 +165,36 @@ def test_jacobians(transforms, distribution, experiment_np, nevents):
         exp.onshell_list,
         exp.onshell_mass,
         exp.units,
-        exp.base_kwargs,
         exp.delta_r_min,
         exp.pt_min,
         use_delta_r_min=True,
         use_pt_min=True,
     )
+    d.coordinates.init_unit([nparticles])
     device = torch.device("cpu")
     dtype = torch.float64  # sometimes fails with torch32
     ts = []
     for tra in transforms:
         if tra == tr.Pt_to_LogPt:
             ts.append(tra(exp.pt_min, exp.units))
+        elif tra == tr.FitNormal:
+            local = tra([0, 1, 2, 3])
+            local.init_unit([nparticles])
+            ts.append(local)
         else:
             ts.append(tra())
 
     shape = (nevents, nparticles, 4)
     fourmomenta_original = d.sample(shape, device, dtype)
     x = fourmomenta_original.clone()
+
+    # init_fit (has to be done manually in this case
+    # this does nothing, except for FitNormal
+    x_fit = x.clone()
+    for t in ts[:-1]:
+        x_fit = t.forward(x)
+    ts[-1].init_fit([x])
+
     x.requires_grad_()
     xs = [x.clone()]
     for t in ts[:-1]:

@@ -1,4 +1,4 @@
-_target_: experiments.eventgen.wrappers.${tr_wrapper}
+_target_: experiments.eventgen.wrappers.TransformerCFM
 
 net:
  _target_: experiments.baselines.Transformer

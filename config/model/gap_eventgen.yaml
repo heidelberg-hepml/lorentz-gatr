@@ -1,4 +1,4 @@
-_target_: experiments.eventgen.wrappers.GAPCFM4Momenta
+_target_: experiments.eventgen.wrappers.GAPCFM
 beam_reference: spacelike
 two_beams: false
 add_time_reference: true

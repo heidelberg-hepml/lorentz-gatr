@@ -12,7 +12,7 @@ from experiments.eventgen.distributions import (
     NaiveDistribution,
     NaiveLogDistribution,
 )
-from experiments.eventgen.coordinates import BaseCoordinates
+import experiments.eventgen.coordinates as c
 
 
 class GaussianFourierProjection(nn.Module):
@@ -61,25 +61,33 @@ class CFM(nn.Module):
 
     def __init__(
         self,
-        cfm_kwargs,
-        odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
+        cfm,
+        odeint={"method": "dopri5", "atol": 1e-5, "rtol": 1e-5, "options": None},
     ):
         super().__init__()
         self.t_embedding = nn.Sequential(
             GaussianFourierProjection(
-                embed_dim=cfm_kwargs.embed_t_dim, scale=cfm_kwargs.embed_t_scale
+                embed_dim=cfm.embed_t_dim, scale=cfm.embed_t_scale
             ),
-            nn.Linear(cfm_kwargs.embed_t_dim, cfm_kwargs.embed_t_dim),
+            nn.Linear(cfm.embed_t_dim, cfm.embed_t_dim),
         )
-        self.trace_fn = hutchinson_trace if cfm_kwargs.hutchinson else autograd_trace
-        self.odeint_kwargs = odeint_kwargs
+        self.trace_fn = hutchinson_trace if cfm.hutchinson else autograd_trace
+        self.odeint = odeint
+        self.cfm = cfm
         self.loss = lambda v1, v2: nn.functional.mse_loss(v1, v2)
 
         self.distribution = BaseDistribution()
-        self.coordinates = BaseCoordinates()
+        self.coordinates = c.BaseCoordinates()
 
-        self.x_mse = cfm_kwargs.x_mse
-        self.x_straight = cfm_kwargs.x_straight
+        # specify if things happen in x space or fourmomenta space
+        self.x_straight = cfm.x_straight  # space where straight trajectories happen
+        self.x_velocity = (
+            cfm.x_velocity
+        )  # space where velocities are evaluated (fourmomenta for GATr!)
+        self.x_loss = cfm.x_loss  # space where loss is evaluated
+        self.coordinates_straight = (
+            self.coordinates if self.x_straight else c.Fourmomenta()
+        )
 
     def init_distribution(self):
         raise NotImplementedError
@@ -113,12 +121,31 @@ class CFM(nn.Module):
         """
         t = torch.rand(x0.shape[0], 1, 1, dtype=x0.dtype, device=x0.device)
         x1 = self.sample_base(x0.shape, x0.device, x0.dtype)
-        x_t, v_t = self.coordinates.get_trajectory(x0, x1, t)
 
-        v_pred = self.get_velocity(x_t, t, ijet=ijet)
+        # construct trajectories in the space specified by x_straight
+        # start from x0, x1 in x space
+        if not self.x_straight:
+            x0 = self.coordinates.x_to_fourmomenta(x0)
+            x1 = self.coordinates.x_to_fourmomenta(x1)
+        x_t, v_t = self.coordinates_straight.get_trajectory(x0, x1, t)
 
-        loss = self.loss(v_pred, v_t)
-        return loss, [self.loss(v_pred[..., i], v_t[..., i]) for i in range(4)]
+        # predict velocity in the space specified by x_velocity
+        if self.x_straight and self.x_velocity:
+            x_t = self.coordinates.x_to_fourmomenta(x_t)
+        elif not self.x_straight and self.x_velocity:
+            x_t = self.coordinates.fourmomenta_to_x(x_t)
+        v_p = self.get_velocity(x_t, t, ijet=ijet)
+
+        # transform velocities to the space specified by x_loss
+        if self.x_loss and not self.x_velocity:
+            v_t = self.coordinates.velocity_fourmomenta_to_x(v_t, x_t)
+            v_p = self.coordinates.velocity_fourmomenta_to_x(v_p, x_t)
+        elif not self.x_loss and self.x_velocity:
+            v_t = self.coordinates.velocity_x_to_fourmomenta(v_t, x_t)
+            v_p = self.coordinates.velocity_x_to_fourmomenta(v_p, x_t)
+
+        loss = self.loss(v_p, v_t)
+        return loss, [self.loss(v_p[..., i], v_t[..., i]) for i in range(4)]
 
     def sample(
         self, ijet, shape, device, dtype, trajectory_path=None, n_trajectories=100
@@ -155,7 +182,11 @@ class CFM(nn.Module):
 
         def velocity(t, x_t):
             t = t * torch.ones(shape[0], 1, 1, dtype=x_t.dtype, device=x_t.device)
+            if not self.x_velocity:
+                x_t = self.coordinates.x_to_fourmomenta(x_t)
             v_t = self.get_velocity(x_t, t, ijet=ijet)
+            if not self.x_velocity:
+                v_t = self.coordinates.velocity_fourmomenta_to_x(v_t, x_t)
 
             # collect trajectories
             if save_trajectory:
@@ -169,7 +200,7 @@ class CFM(nn.Module):
             velocity,
             x1,
             torch.tensor([1.0, 0.0]),
-            **self.odeint_kwargs,
+            **self.odeint,
         )[-1]
 
         # save trajectories to file
@@ -248,7 +279,7 @@ class CFM(nn.Module):
             net_wrapper,
             state0,
             torch.tensor([0.0, 1.0], dtype=x0.dtype, device=x0.device),
-            **self.odeint_kwargs,
+            **self.odeint,
         )
         x1 = x_t[-1].detach()
         logp_diff1 = logp_diff_t[-1].detach()
@@ -273,7 +304,6 @@ class EventCFM(CFM):
         delta_r_min,
         onshell_list,
         onshell_mass,
-        base_kwargs,
         base_type,
         use_pt_min,
         use_delta_r_min,
@@ -300,9 +330,6 @@ class EventCFM(CFM):
         onshell_mass: List[float]
             Masses of the onshell particles in the same order as in onshell_list
             Hard-coded in EventGenerationExperiment
-        base_kwargs: Dict[float]
-            Properties of the base distribution
-            Hard-coded in EventGenerationExperiment
         base_type: int
             Which base distribution to use
         use_delta_r_min: bool
@@ -315,7 +342,6 @@ class EventCFM(CFM):
         self.delta_r_min = delta_r_min
         self.onshell_list = onshell_list
         self.onshell_mass = onshell_mass
-        self.base_kwargs = base_kwargs
         self.base_type = base_type
         self.use_delta_r_min = use_delta_r_min
         self.use_pt_min = use_pt_min
@@ -328,7 +354,6 @@ class EventCFM(CFM):
             self.onshell_list,
             self.onshell_mass,
             self.units,
-            self.base_kwargs,
             self.delta_r_min,
             self.pt_min,
             self.use_delta_r_min,
@@ -344,6 +369,34 @@ class EventCFM(CFM):
             self.distribution = JetmomentaDistribution(*args)
         else:
             raise ValueError(f"base_type={self.base_type} not implemented")
+
+    def init_coordinates(self):
+        if self.cfm.coordinates == "Fourmomenta":
+            self.coordinates = c.Fourmomenta()
+        elif self.cfm.coordinates == "PPPM2":
+            self.coordinates = c.PPPM2()
+        elif self.cfm.coordinates == "PPPLogM2":
+            self.coordinates = c.PPPLogM2()
+        elif self.cfm.coordinates == "FittedPPPLogM2":
+            self.coordinates = c.FittedPPPLogM2()
+        elif self.cfm.coordinates == "PtPhiEtaE":
+            self.coordinates = c.PtPhiEtaE()
+        elif self.cfm.coordinates == "PtPhiEtaM2":
+            self.coordinates = c.PtPhiEtaM2()
+        elif self.cfm.coordinates == "LogPtPhiEtaE":
+            self.coordinates = c.LogPtPhiEtaE(self.pt_min, self.units)
+        elif self.cfm.coordinates == "LogPtPhiEtaM2":
+            self.coordinates = c.LogPtPhiEtaM2(self.pt_min, self.units)
+        elif self.cfm.coordinates == "PtPhiEtaLogM2":
+            self.coordinates = c.PtPhiEtaLogM2()
+        elif self.cfm.coordinates == "LogPtPhiEtaM2":
+            self.coordinates = c.LogPtPhiEtaM2(self.pt_min, self.units)
+        elif self.cfm.coordinates == "LogPtPhiEtaLogM2":
+            self.coordinates = c.LogPtPhiEtaLogM2(self.pt_min, self.units)
+        elif self.cfm.coordinates == "FittedLogPtPhiEtaLogM2":
+            self.coordinates = c.FittedLogPtPhiEtaLogM2(self.pt_min, self.units)
+        else:
+            raise ValueError(f"coordinates={self.cfm.coordinates} not implemented")
 
     def preprocess(self, fourmomenta):
         fourmomenta = fourmomenta / self.units

@@ -11,8 +11,6 @@ from experiments.eventgen.helpers import (
     ensure_angle,
     delta_r,
 )
-import experiments.eventgen.distributions as distributions
-import experiments.eventgen.coordinates as coordinates
 
 
 def get_type_token(x_ref, type_token_channels):
@@ -41,21 +39,18 @@ def get_process_token(x_ref, ijet, process_token_channels):
 ### CFM on 4momenta
 
 
-class MLPCFMFourmomenta(EventCFM):
+class MLPCFM(EventCFM):
     def __init__(
         self,
         net,
-        cfm_kwargs,
-        odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
+        cfm,
+        odeint,
     ):
         super().__init__(
-            cfm_kwargs,
-            odeint_kwargs=odeint_kwargs,
+            cfm,
+            odeint,
         )
         self.net = net
-
-    def init_coordinates(self):
-        self.coordinates = coordinates.Fourmomenta()
 
     def get_velocity(self, x, t, ijet):
         t_embedding = self.t_embedding(t).squeeze()
@@ -67,30 +62,27 @@ class MLPCFMFourmomenta(EventCFM):
         return v
 
 
-class GAPCFMFourmomenta(EventCFM):
+class GAPCFM(EventCFM):
     def __init__(
         self,
         net,
-        cfm_kwargs,
+        cfm,
         beam_reference,
         two_beams,
         add_time_reference,
-        odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
+        odeint,
     ):
         super().__init__(
-            cfm_kwargs,
-            odeint_kwargs=odeint_kwargs,
+            cfm,
+            odeint=odeint,
         )
         self.net = net
         self.beam_reference = beam_reference
         self.two_beams = two_beams
         self.add_time_reference = add_time_reference
-
-    def init_coordinates(self):
-        self.coordinates = coordinates.Fourmomenta()
+        assert not self.x_velocity, f"x_velocity=true not possible for GA-models"
 
     def get_velocity(self, fourmomenta, t, ijet):
-        # GATr in fourmomenta space
         mv, s = self.embed_into_ga(fourmomenta, t, ijet)
         mv_outputs, s_outputs = self.net(mv, s)
         v_fourmomenta = self.extract_from_ga(mv_outputs, s_outputs)
@@ -122,14 +114,14 @@ class TransformerCFM(EventCFM):
     def __init__(
         self,
         net,
-        cfm_kwargs,
+        cfm,
         type_token_channels,
         process_token_channels,
-        odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
+        odeint,
     ):
         super().__init__(
-            cfm_kwargs,
-            odeint_kwargs=odeint_kwargs,
+            cfm,
+            odeint,
         )
         self.net = net
         self.type_token_channels = type_token_channels
@@ -146,21 +138,6 @@ class TransformerCFM(EventCFM):
         return v
 
 
-class TransformerCFMFourmomenta(TransformerCFM):
-    def init_coordinates(self):
-        self.coordinates = coordinates.Fourmomenta()
-
-
-class TransformerCFMPtPhiEtaM2(TransformerCFM):
-    def init_coordinates(self):
-        self.coordinates = coordinates.PtPhiEtaM2()
-
-
-class TransformerCFMLogPtPhiEtaLogM2(TransformerCFM):
-    def init_coordinates(self):
-        self.coordinates = coordinates.LogPtPhiEtaLogM2(self.pt_min, self.units)
-
-
 class GATrCFM(EventCFM):
     """
     Abstract base class for all GATrCFM's
@@ -170,17 +147,17 @@ class GATrCFM(EventCFM):
     def __init__(
         self,
         net,
-        cfm_kwargs,
+        cfm,
         type_token_channels,
         process_token_channels,
         beam_reference,
         two_beams,
         add_time_reference,
-        odeint_kwargs={"method": "dopri5", "atol": 1e-9, "rtol": 1e-7, "method": None},
+        odeint,
     ):
         super().__init__(
-            cfm_kwargs,
-            odeint_kwargs=odeint_kwargs,
+            cfm,
+            odeint,
         )
         self.net = net
         self.type_token_channels = type_token_channels
@@ -188,19 +165,13 @@ class GATrCFM(EventCFM):
         self.beam_reference = beam_reference
         self.two_beams = two_beams
         self.add_time_reference = add_time_reference
+        assert not self.x_velocity, f"x_velocity=true not possible for GA-models"
 
-    def get_velocity(self, x, t, ijet):
-        # transform from x space to fourmomenta
-        fourmomenta = self.coordinates.x_to_fourmomenta(x)
-
-        # GATr in fourmomenta space
+    def get_velocity(self, fourmomenta, t, ijet):
         mv, s = self.embed_into_ga(fourmomenta, t, ijet)
         mv_outputs, s_outputs = self.net(mv, s)
         v_fourmomenta = self.extract_from_ga(mv_outputs, s_outputs)
-
-        # transform velocities back to x space
-        v_x = self.coordinates.velocity_fourmomenta_to_x(v_fourmomenta, fourmomenta)
-        return v_x
+        return v_fourmomenta
 
     def embed_into_ga(self, x, t, ijet):
         # scalar embedding
@@ -227,50 +198,6 @@ class GATrCFM(EventCFM):
     def extract_from_ga(self, mv, s):
         v = extract_vector(mv).squeeze(dim=-2)
         return v
-
-
-# Note: For now, have a seperate class for every coordinate set (to make it easier to hack things)
-# Later, either pick one coordinate set or have a switch for it in the GATrCFM class
-
-
-class GATrCFMFourmomenta(GATrCFM):
-    def init_coordinates(self):
-        self.coordinates = coordinates.Fourmomenta()
-
-
-class GATrCFMPPPM2(GATrCFM):
-    def init_coordinates(self):
-        self.coordinates = coordinates.PPPM2()
-
-
-class GATrCFMPPPLogM2(GATrCFM):
-    def init_coordinates(self):
-        self.coordinates = coordinates.PPPLogM2()
-
-
-class GATrCFMPtPhiEtaE(GATrCFM):
-    def init_coordinates(self):
-        self.coordinates = coordinates.PtPhiEtaE()
-
-
-class GATrCFMPtPhiEtaM2(GATrCFM):
-    def init_coordinates(self):
-        self.coordinates = coordinates.PtPhiEtaM2()
-
-
-class GATrCFMPtPhiEtaLogM2(GATrCFM):
-    def init_coordinates(self):
-        self.coordinates = coordinates.PtPhiEtaLogM2(self.pt_min, self.units)
-
-
-class GATrCFMLogPtPhiEtaM2(GATrCFM):
-    def init_coordinates(self):
-        self.coordinates = coordinates.LogPtPhiEtaM2(self.pt_min, self.units)
-
-
-class GATrCFMLogPtPhiEtaLogM2(GATrCFM):
-    def init_coordinates(self):
-        self.coordinates = coordinates.LogPtPhiEtaLogM2(self.pt_min, self.units)
 
 
 """
@@ -324,7 +251,7 @@ class TransformerCFMPrecisesiastDeltaR(TransformerCFMPrecisesiast):
             )
             return v_t
 
-        x_t = odeint(velocity, x1, torch.tensor([1.0, t]), **self.odeint_kwargs)[-1]
+        x_t = odeint(velocity, x1, torch.tensor([1.0, t]), **self.odeint)[-1]
         v_t = get_velocity(None, x_t)
         return x_t, v_t
 """
