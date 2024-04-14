@@ -269,10 +269,15 @@ class CFM(nn.Module):
             with torch.set_grad_enabled(True):
                 x_t = state[0].detach().requires_grad_(True)
                 t = t * torch.ones(x0.shape[0], 1, 1, dtype=x0.dtype, device=x0.device)
+                if not self.x_velocity:
+                    x_t = self.coordinates.x_to_fourmomenta(x_t)
                 v_t = self.get_velocity(x_t, t, ijet=ijet)
+                if not self.x_velocity:
+                    v_t = self.coordinates.velocity_fourmomenta_to_x(v_t, x_t)
                 dlogp_dt = self.trace_fn(v_t, x_t).unsqueeze(-1)
             return v_t.detach(), dlogp_dt.detach()
 
+        # solve ODE in x space
         logp_diff0 = torch.zeros((x0.shape[0], 1), dtype=x0.dtype, device=x0.device)
         state0 = (x0, logp_diff0)
         x_t, logp_diff_t = odeint(
@@ -283,6 +288,9 @@ class CFM(nn.Module):
         )
         x1 = x_t[-1].detach()
         logp_diff1 = logp_diff_t[-1].detach()
+
+        # collect log_probs in fourmomenta space
+        logp_diff1 = self.coordinates.log_prob_x_to_fourmomenta(logp_diff1, x1)
         log_prob_base = self.distribution.log_prob(x1).unsqueeze(-1)
         log_prob = log_prob_base + logp_diff1
         return log_prob
