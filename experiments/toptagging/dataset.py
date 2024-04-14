@@ -147,10 +147,45 @@ class TopTaggingDataset(torch.utils.data.Dataset):
         # beam reference
         x = embed_vector(x)
         beam = embed_beam_reference(
-            x, self.cfg.data.beam_reference, self.cfg.data.add_time_reference
+            x,
+            self.cfg.data.beam_reference,
+            self.cfg.data.add_time_reference,
+            self.cfg.data.two_beams,
         )
         if beam is not None:
-            x = torch.cat((x, beam), dim=-2)
+            if self.cfg.data.beam_token:
+                # embed beam as extra token
+                beam = beam.unsqueeze(1)
+                x = torch.cat((x, beam), dim=-3)
+                scalars = torch.cat(
+                    (
+                        scalars,
+                        torch.zeros(
+                            beam.shape[0],
+                            scalars.shape[1],
+                            device=beam.device,
+                            dtype=beam.dtype,
+                        ),
+                    ),
+                    dim=-2,
+                )
+                is_global = torch.cat(
+                    (
+                        is_global,
+                        torch.zeros(
+                            beam.shape[0],
+                            1,
+                            device=beam.device,
+                            dtype=torch.bool,
+                        ),
+                    ),
+                    dim=-2,
+                )
+
+            else:
+                # embed beam as channel for each particle
+                beam = beam.unsqueeze(0).expand(x.shape[0], *beam.shape)
+                x = torch.cat((x, beam), dim=-2)
 
         # add information about which token is global
         scalars_is_global = torch.zeros(
@@ -240,7 +275,7 @@ def create_pairwise_tokens(single, cfg):
     return pairs, pairs_scalars
 
 
-def embed_beam_reference(p_ref, beam_reference, add_time_reference):
+def embed_beam_reference(p_ref, beam_reference, add_time_reference, two_beams):
     """
     Construct attention mask that makes sure that objects only attend to each other
     within the same batch element, and not across batch elements
@@ -253,6 +288,8 @@ def embed_beam_reference(p_ref, beam_reference, add_time_reference):
         Different options for adding a beam_reference
     add_time_reference: bool
         Whether to add the time direction as a reference to the network
+    two_beams: bool
+        Whether we only want (x, 0, 0, 1) or both (x, 0, 0, +/- 1) for the beam
 
     Returns
     -------
@@ -268,35 +305,28 @@ def embed_beam_reference(p_ref, beam_reference, add_time_reference):
             beam = [2**0.5, 0, 0, 1]
         elif beam_reference == "spacelike":
             beam = [0, 0, 0, 1]
-        beam = torch.tensor(beam, device=p_ref.device, dtype=p_ref.dtype)
-        beam = beam.unsqueeze(0).expand(p_ref.shape[0], 1, 4)
+        beam = torch.tensor(beam, device=p_ref.device, dtype=p_ref.dtype).reshape(1, 4)
         beam = embed_vector(beam)
-
-    elif beam_reference == "cgenn":
-        beam_mass = 1.0
-        beam = [[(1 + beam_mass) ** 0.5, 0, 0, 1], [(1 + beam_mass) ** 0.5, 0, 0, -1]]
-        beam = torch.tensor(beam, device=p_ref.device, dtype=p_ref.dtype)
-        beam = beam.unsqueeze(0).expand(p_ref.shape[0], 2, 4)
-        beam = embed_vector(beam)
+        if two_beams:
+            beam2 = beam.clone()
+            beam2[..., 4] = -1  # flip pz
+            beam = torch.cat((beam, beam2), dim=0)
 
     elif beam_reference == "xyplane":
         # add the x-y-plane, embedded as a bivector
         # convention for bivector components: [tx, ty, tz, xy, xz, yz]
-        beam = torch.zeros(
-            p_ref.shape[0], 1, 16, device=p_ref.device, dtype=p_ref.dtype
-        )
+        beam = torch.zeros(1, 16, device=p_ref.device, dtype=p_ref.dtype)
         beam[..., 8] = 1
 
     elif beam_reference is None:
         beam = None
 
     else:
-        raise NotImplementedError
+        raise ValueError(f"beam_reference {beam_reference} not implemented")
 
     if add_time_reference:
         time = [1, 0, 0, 0]
-        time = torch.tensor(time, device=p_ref.device, dtype=p_ref.dtype)
-        time = time.unsqueeze(0).expand(p_ref.shape[0], 1, 4)
+        time = torch.tensor(time, device=p_ref.device, dtype=p_ref.dtype).reshape(1, 4)
         time = embed_vector(time)
         if beam is None:
             reference = time

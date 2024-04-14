@@ -12,11 +12,13 @@ data:
   top_k: 10
   lowest_kt: false
   add_scalars: false
- beam_reference: null
- add_time_reference: false
+ beam_reference: spacelike
+ two_beams: false
+ beam_token: false
+ add_time_reference: true
  add_pt: false
  add_jet_momentum: false
- reinsert_channels: false
+ reinsert_channels: true
  rescale_data: true
 
 train: true
