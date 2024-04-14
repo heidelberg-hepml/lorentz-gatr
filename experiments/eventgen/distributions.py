@@ -117,7 +117,7 @@ class Distribution(BaseDistribution):
         raise NotImplementedError
 
 
-class NaiveDistribution(Distribution):
+class StandardPPPM2(Distribution):
     """Base distribution 1: 3-momentum from standard normal, mass from standard half-normal"""
 
     def __init__(self, *args, **kwargs):
@@ -139,11 +139,11 @@ class NaiveDistribution(Distribution):
         log_prob[..., 3] += math.log(2)  # normalization factor because half-gaussian
         log_prob[..., self.onshell_list, 3] = 0.0  # fixed components do not contribute
         log_prob = log_prob.sum(dim=[-1, -2])
-        log_prob = self.coordinates.log_prob_x_to_fourmomenta(log_prob, ppplogm2)
+        log_prob = self.coordinates.log_prob_x_to_fourmomenta(log_prob, pppm2)
         return log_prob
 
 
-class NaiveLogDistribution(Distribution):
+class StandardPPPLogM2(Distribution):
     """Base distribution 2: 3-momentum from standard normal, log(mass) from standard normal"""
 
     def __init__(self, *args, **kwargs):
@@ -169,7 +169,7 @@ class NaiveLogDistribution(Distribution):
         return log_prob
 
 
-class FourmomentaDistribution(Distribution):
+class FittedPPPLogM2(Distribution):
     """Base distribution 3: 3-momentum and mass from fitted normal"""
 
     def __init__(self, *args, **kwargs):
@@ -198,17 +198,17 @@ class FourmomentaDistribution(Distribution):
         log_prob[..., self.onshell_list, 3] = 0.0
         log_prob = log_prob.sum(dim=[-1, -2])
         log_prob = self.coordinates.log_prob_x_to_fourmomenta(log_prob, ppplogm2)
-        return
+        return log_prob
 
 
-class JetmomentaDistribution(Distribution):
+class FittedLogPtPhiEtaLogM2(Distribution):
     """Base distribution 4: phi uniform; eta, log(pt) and log(mass) from fitted normal"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         assert (
             self.use_pt_min
-        ), f"use_pt_min=False not implemented for JetmomentaDistribution"
+        ), f"use_pt_min=False not implemented for distribution FittedLogPtPhiEtaLogM2"
         self.coordinates = c.FittedLogPtPhiEtaLogM2(self.pt_min, self.units)
 
     def propose(self, shape, device, dtype, generator=None):

@@ -7,10 +7,10 @@ from torch.autograd import grad
 from torchdiffeq import odeint
 from experiments.eventgen.distributions import (
     BaseDistribution,
-    FourmomentaDistribution,
-    JetmomentaDistribution,
-    NaiveDistribution,
-    NaiveLogDistribution,
+    StandardPPPM2,
+    StandardPPPLogM2,
+    FittedPPPLogM2,
+    FittedLogPtPhiEtaLogM2,
 )
 import experiments.eventgen.coordinates as c
 
@@ -360,13 +360,13 @@ class EventCFM(CFM):
             self.use_pt_min,
         ]
         if self.base_type == 1:
-            self.distribution = NaiveDistribution(*args)
+            self.distribution = StandardPPPM2(*args)
         elif self.base_type == 2:
-            self.distribution = NaiveLogDistribution(*args)
+            self.distribution = StandardPPPLogM2(*args)
         elif self.base_type == 3:
-            self.distribution = FourmomentaDistribution(*args)
+            self.distribution = FittedPPPLogM2(*args)
         elif self.base_type == 4:
-            self.distribution = JetmomentaDistribution(*args)
+            self.distribution = FittedLogPtPhiEtaLogM2(*args)
         else:
             raise ValueError(f"base_type={self.base_type} not implemented")
 

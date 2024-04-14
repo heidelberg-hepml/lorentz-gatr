@@ -3,10 +3,10 @@ import torch
 
 import experiments.eventgen.coordinates as c
 from experiments.eventgen.distributions import (
-    NaiveDistribution,
-    NaiveLogDistribution,
-    FourmomentaDistribution,
-    JetmomentaDistribution,
+    StandardPPPM2,
+    StandardPPPLogM2,
+    FittedPPPLogM2,
+    FittedLogPtPhiEtaLogM2,
 )
 from experiments.eventgen.ttbarexperiment import ttbarExperiment
 from experiments.eventgen.zmumuexperiment import zmumuExperiment
@@ -17,10 +17,10 @@ from tests.helpers import MILD_TOLERANCES as TOLERANCES
 @pytest.mark.parametrize(
     "distribution",
     [
-        NaiveDistribution,
-        NaiveLogDistribution,
-        FourmomentaDistribution,
-        JetmomentaDistribution,
+        StandardPPPM2,
+        StandardPPPLogM2,
+        FittedPPPLogM2,
+        FittedLogPtPhiEtaLogM2,
     ],
 )
 @pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
@@ -35,7 +35,7 @@ def test_cuts(
     use_pt_min,
 ):
     """Test that the base distribution satisfies phase space cuts."""
-    if distribution == JetmomentaDistribution and not use_pt_min:
+    if distribution == FittedLogPtPhiEtaLogM2 and not use_pt_min:
         # this combination is not implemented
         return
     experiment, nparticles = experiment_np
@@ -63,10 +63,10 @@ def test_cuts(
 @pytest.mark.parametrize(
     "distribution",
     [
-        NaiveDistribution,
-        NaiveLogDistribution,
-        FourmomentaDistribution,
-        JetmomentaDistribution,
+        StandardPPPM2,
+        StandardPPPLogM2,
+        FittedPPPLogM2,
+        FittedLogPtPhiEtaLogM2,
     ],
 )
 @pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
@@ -81,7 +81,7 @@ def test_onshell(
     use_pt_min,
 ):
     """Test that the events that should be on-shell are on-shell."""
-    if distribution == JetmomentaDistribution and not use_pt_min:
+    if distribution == FittedLogPtPhiEtaLogM2 and not use_pt_min:
         # this combination is not implemented
         return
     experiment, nparticles = experiment_np

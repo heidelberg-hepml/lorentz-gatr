@@ -4,10 +4,10 @@ import numpy as np
 
 import experiments.eventgen.transforms as tr
 from experiments.eventgen.distributions import (
-    NaiveDistribution,
-    NaiveLogDistribution,
-    FourmomentaDistribution,
-    JetmomentaDistribution,
+    StandardPPPM2,
+    StandardPPPLogM2,
+    FittedPPPLogM2,
+    FittedLogPtPhiEtaLogM2,
 )
 from experiments.eventgen.ttbarexperiment import ttbarExperiment
 from experiments.eventgen.zmumuexperiment import zmumuExperiment
@@ -56,10 +56,10 @@ def test_simple():
 @pytest.mark.parametrize(
     "distribution",
     [
-        NaiveDistribution,
-        NaiveLogDistribution,
-        FourmomentaDistribution,
-        JetmomentaDistribution,
+        StandardPPPM2,
+        StandardPPPLogM2,
+        FittedPPPLogM2,
+        FittedLogPtPhiEtaLogM2,
     ],
 )
 @pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
@@ -148,10 +148,10 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
 @pytest.mark.parametrize(
     "distribution",
     [
-        NaiveDistribution,
-        NaiveLogDistribution,
-        FourmomentaDistribution,
-        JetmomentaDistribution,
+        StandardPPPM2,
+        StandardPPPLogM2,
+        FittedPPPLogM2,
+        FittedLogPtPhiEtaLogM2,
     ],
 )
 @pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
@@ -275,10 +275,10 @@ def test_jacobians(transforms, distribution, experiment_np, nevents):
 @pytest.mark.parametrize(
     "distribution",
     [
-        NaiveDistribution,
-        NaiveLogDistribution,
-        FourmomentaDistribution,
-        JetmomentaDistribution,
+        StandardPPPM2,
+        StandardPPPLogM2,
+        FittedPPPLogM2,
+        FittedLogPtPhiEtaLogM2,
     ],
 )
 @pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])

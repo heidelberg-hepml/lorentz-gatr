@@ -55,7 +55,7 @@ class BaseCoordinates:
         x = x.clone()
         for transform in self.transforms[::-1]:
             y = transform.inverse(x)
-            v = transform.velocity_forward(v, x, y)
+            v = transform.velocity_inverse(v, x, y)
         return v
 
     def log_prob_fourmomenta_to_x(self, log_prob_fourmomenta, fourmomenta):
