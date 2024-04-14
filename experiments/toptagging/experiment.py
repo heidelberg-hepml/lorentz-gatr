@@ -57,7 +57,10 @@ class TaggingExperiment(BaseExperiment):
                 if not self.cfg.data.beam_token:
                     if self.cfg.data.beam_reference is not None:
                         self.cfg.model.net.in_mv_channels += (
-                            2 if self.cfg.data.two_beams else 1
+                            2
+                            if self.cfg.data.two_beams
+                            and not self.cfg.data.beam_reference == "xyplane"
+                            else 1
                         )
                     if self.cfg.data.add_time_reference:
                         self.cfg.model.net.in_mv_channels += 1
