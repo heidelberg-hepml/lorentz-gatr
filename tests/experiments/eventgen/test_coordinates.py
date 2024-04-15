@@ -19,7 +19,7 @@ from tests.helpers import MILD_TOLERANCES as TOLERANCES
     [
         c.Fourmomenta,
         c.PPPM2,
-        c.EPtPhiPz,
+        c.EPhiPtPz,
         c.PtPhiEtaE,
         c.PtPhiEtaM2,
         c.PPPLogM2,
@@ -98,32 +98,30 @@ def test_invertibility(coordinates, distribution, experiment_np, nevents):
 @pytest.mark.parametrize(
     "coordinates",
     [
-        # c.Fourmomenta,
-        # c.PPPM2,
-        c.EPtPhiPz,
-        # c.PtPhiEtaE,
-        # c.PtPhiEtaM2,
-        # c.PPPLogM2,
-        # c.FittedPPPLogM2,
-        # c.LogPtPhiEtaE,
-        # c.PtPhiEtaLogM2,
-        # c.LogPtPhiEtaM2,
-        # c.LogPtPhiEtaLogM2,
-        # c.FittedLogPtPhiEtaLogM2,
+        c.Fourmomenta,
+        c.PPPM2,
+        c.EPhiPtPz,
+        c.PtPhiEtaE,
+        c.PtPhiEtaM2,
+        c.PPPLogM2,
+        c.FittedPPPLogM2,
+        c.LogPtPhiEtaE,
+        c.PtPhiEtaLogM2,
+        c.LogPtPhiEtaM2,
+        c.LogPtPhiEtaLogM2,
+        c.FittedLogPtPhiEtaLogM2,
     ],
 )
 @pytest.mark.parametrize(
     "distribution",
     [
-        # StandardPPPM2,
+        StandardPPPM2,
         StandardPPPLogM2,
-        # FittedPPPLogM2,
-        # FittedLogPtPhiEtaLogM2,
+        FittedPPPLogM2,
+        FittedLogPtPhiEtaLogM2,
     ],
 )
-@pytest.mark.parametrize(
-    "experiment_np", [[zmumuExperiment, 5]]
-)  # , [ttbarExperiment, 10]])
+@pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
 @pytest.mark.parametrize("nevents", [10000])
 def test_velocity(coordinates, distribution, experiment_np, nevents):
     """test correctness of jacobians from _jac_forward() and _jac_inverse() methods, and their invertibility"""
