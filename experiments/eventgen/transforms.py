@@ -393,7 +393,7 @@ class FitNormal(BaseTransform):
 
     def get_mean_std(self, x):
         params = self.params[x.shape[-2]]
-        return params["mean"], params["std"]
+        return params["mean"].to(x.device, dtype=x.dtype), params["std"].to(x.device, dtype=x.dtype)
 
     def _forward(self, x):
         mean, std = self.get_mean_std(x)
