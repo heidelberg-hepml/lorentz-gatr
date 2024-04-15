@@ -33,6 +33,7 @@ def test_simple():
         [tr.FitNormal],
         [tr.EPPP_to_PPPM2],
         [tr.EPPP_to_PtPhiEtaE],
+        [tr.EPPP_to_EPtPhiPz],
         [tr.EPPP_to_PPPM2, tr.M2_to_LogM2],
         [tr.EPPP_to_PtPhiEtaE, tr.Pt_to_LogPt],
         [tr.EPPP_to_PtPhiEtaE, tr.PtPhiEtaE_to_PtPhiEtaM2],
@@ -124,6 +125,7 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
     [
         [tr.FitNormal],
         [tr.EPPP_to_PPPM2],
+        [tr.EPPP_to_EPtPhiPz],
         [tr.EPPP_to_PtPhiEtaE],
         [tr.EPPP_to_PPPM2, tr.M2_to_LogM2],
         [tr.EPPP_to_PtPhiEtaE, tr.Pt_to_LogPt],

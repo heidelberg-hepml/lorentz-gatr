@@ -145,6 +145,60 @@ class EPPP_to_PPPM2(BaseTransform):
         return 2 * E
 
 
+class EPPP_to_EPtPhiPz(BaseTransform):
+    def _forward(self, eppp):
+        E, px, py, pz = unpack_last(eppp)
+
+        pt = torch.sqrt(px**2 + py**2)
+        phi = torch.arctan2(py, px)
+        return torch.stack((E, pt, phi, pz), dim=-1)
+
+    def _inverse(self, eptphipz):
+        E, pt, phi, pz = unpack_last(eptphipz)
+
+        px = pt * torch.cos(phi)
+        py = pt * torch.sin(phi)
+        return torch.stack((E, px, py, pz), dim=-1)
+
+    def _jac_forward(self, eppp, eptphipz):
+        E, px, py, pz = unpack_last(eppp)
+        E, pt, phi, pz = unpack_last(eptphipz)
+
+        # jac_ij = deptphipz_i / dfourmomenta_j
+        zero, one = torch.zeros_like(E), torch.ones_like(E)
+        jac_E = torch.stack((one, zero, zero, zero), dim=-1)
+        jac_px = torch.stack(
+            (zero, px / pt, -py / pt**2, zero),
+            dim=-1,
+        )
+        jac_py = torch.stack(
+            (zero, py / pt, px / pt**2, zero),
+            dim=-1,
+        )
+        jac_pz = torch.stack((zero, zero, zero, one), dim=-1)
+
+        return torch.stack((jac_E, jac_px, jac_py, jac_pz), dim=-1)
+
+    def _jac_inverse(self, eptphipz, eppp):
+        E, px, py, pz = unpack_last(eppp)
+        E, pt, phi, pz = unpack_last(eptphipz)
+
+        # jac_ij = dfourmomenta_i / deptphipz_j
+        zero, one = torch.zeros_like(E), torch.ones_like(E)
+        jac_E = torch.stack((one, zero, zero, zero), dim=-1)
+        jac_pt = torch.stack((zero, torch.cos(phi), torch.sin(phi), zero), dim=-1)
+        jac_phi = torch.stack(
+            (zero, -pt * torch.sin(phi), pt * torch.cos(phi), zero), dim=-1
+        )
+        jac_pz = torch.stack((zero, zero, zero, one), dim=-1)
+
+        return torch.stack((jac_E, jac_pt, jac_phi, jac_pz), dim=-1)
+
+    def _detjac_forward(self, eppp, ptphietae):
+        # det (deptphipz / dfourmomenta)
+        return 1.0
+
+
 class EPPP_to_PtPhiEtaE(BaseTransform):
     def _forward(self, eppp):
         E, px, py, pz = unpack_last(eppp)
@@ -191,7 +245,7 @@ class EPPP_to_PtPhiEtaE(BaseTransform):
         E, px, py, pz = unpack_last(eppp)
         pt, phi, eta, E = unpack_last(ptphietae)
 
-        # jac_ij = dfourmomenta_i / djetmomenta_j
+        # jac_ij = dfourmomenta_i / dptphietae_j
         zero, one = torch.zeros_like(E), torch.ones_like(E)
         jac_pt = torch.stack(
             (zero, torch.cos(phi), torch.sin(phi), torch.sinh(eta)), dim=-1
@@ -393,7 +447,9 @@ class FitNormal(BaseTransform):
 
     def get_mean_std(self, x):
         params = self.params[x.shape[-2]]
-        return params["mean"].to(x.device, dtype=x.dtype), params["std"].to(x.device, dtype=x.dtype)
+        return params["mean"].to(x.device, dtype=x.dtype), params["std"].to(
+            x.device, dtype=x.dtype
+        )
 
     def _forward(self, x):
         mean, std = self.get_mean_std(x)

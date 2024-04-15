@@ -98,6 +98,12 @@ class PhiCoordinates(BaseCoordinates):
         return x_t, v_t
 
 
+class EPtPhiPz(PhiCoordinates):
+    # (E, pt, phi, pz)
+    def __init__(self):
+        self.transforms = [tr.EPPP_to_EPtPhiPz()]
+
+
 class PtPhiEtaE(PhiCoordinates):
     # (pt, phi, eta, E)
     def __init__(self):

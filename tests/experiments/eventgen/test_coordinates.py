@@ -19,6 +19,7 @@ from tests.helpers import MILD_TOLERANCES as TOLERANCES
     [
         c.Fourmomenta,
         c.PPPM2,
+        c.EPtPhiPz,
         c.PtPhiEtaE,
         c.PtPhiEtaM2,
         c.PPPLogM2,
@@ -99,9 +100,10 @@ def test_invertibility(coordinates, distribution, experiment_np, nevents):
     [
         # c.Fourmomenta,
         # c.PPPM2,
+        c.EPtPhiPz,
         # c.PtPhiEtaE,
         # c.PtPhiEtaM2,
-        c.PPPLogM2,
+        # c.PPPLogM2,
         # c.FittedPPPLogM2,
         # c.LogPtPhiEtaE,
         # c.PtPhiEtaLogM2,
