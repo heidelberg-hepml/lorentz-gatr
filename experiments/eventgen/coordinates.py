@@ -48,6 +48,7 @@ class BaseCoordinates:
         for transform in self.transforms:
             y = transform.forward(x)
             v = transform.velocity_forward(v, x, y)
+            x = y
         return v
 
     def velocity_x_to_fourmomenta(self, v_x, x):
@@ -56,6 +57,7 @@ class BaseCoordinates:
         for transform in self.transforms[::-1]:
             y = transform.inverse(x)
             v = transform.velocity_inverse(v, x, y)
+            x = y
         return v
 
     def log_prob_fourmomenta_to_x(self, log_prob_fourmomenta, fourmomenta):

@@ -11,7 +11,7 @@ from experiments.eventgen.distributions import (
 )
 from experiments.eventgen.ttbarexperiment import ttbarExperiment
 from experiments.eventgen.zmumuexperiment import zmumuExperiment
-from tests.helpers import TOLERANCES as TOLERANCES
+from tests.helpers import STRICT_TOLERANCES as TOLERANCES
 
 
 def test_simple():

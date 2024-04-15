@@ -11,7 +11,7 @@ from experiments.eventgen.distributions import (
 )
 from experiments.eventgen.ttbarexperiment import ttbarExperiment
 from experiments.eventgen.zmumuexperiment import zmumuExperiment
-from tests.helpers import MILD_TOLERANCES as TOLERANCES
+from tests.helpers import STRICT_TOLERANCES as TOLERANCES
 
 
 @pytest.mark.parametrize(
@@ -92,9 +92,6 @@ def test_invertibility(coordinates, distribution, experiment_np, nevents):
     )  # fails with 0.1% rate for Fitted + zmumu (masses)
 
 
-# This fails whenever we have a log(...) step, especially if its log(m^2)
-# Seems to have something to do with EPS1
-# I am out of ideas for how to debug this
 @pytest.mark.parametrize(
     "coordinates",
     [
@@ -194,9 +191,9 @@ def test_velocity(coordinates, distribution, experiment_np, nevents):
     v_z_autograd = torch.einsum("...ij,...j->...i", jac_inv_autograd, v_y)
 
     # compare to autograd
-    print(v_y[0, 0, ...], v_y_autograd[0, 0, ...], jac_fw_autograd[0, 0, ...])
-    print(((v_y - v_y_autograd).abs() > 0.1).sum(dim=[0, 1]))
+    # print(v_y[0, 0, ...], v_y_autograd[0, 0, ...], jac_fw_autograd[0, 0, ...])
+    # print(((v_y - v_y_autograd).abs() > 0.1).sum(dim=[0, 1]))
     torch.testing.assert_close(v_y, v_y_autograd, **TOLERANCES)
     # print(v_z[0,0,...], v_z_autograd[0,0,...], jac_inv_autograd[0,0,...])
     # print(((v_z - v_z_autograd).abs() > 0.1).sum(dim=[0,1]))
-    # torch.testing.assert_close(v_z, v_z_autograd, **TOLERANCES)
+    torch.testing.assert_close(v_z, v_z_autograd, **TOLERANCES)
