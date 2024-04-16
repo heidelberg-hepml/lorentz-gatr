@@ -1,6 +1,7 @@
 import hydra
 from experiments.amplitudes.experiment import AmplitudeExperiment
 from experiments.toptagging.experiment import TopTaggingExperiment
+from experiments.toptagging.experiment import QGTaggingExperiment
 
 @hydra.main(config_path="config", config_name="toptagging", version_base=None)
 def main(cfg):
@@ -8,7 +9,9 @@ def main(cfg):
         exp = AmplitudeExperiment(cfg)
     elif cfg.exp_type == "toptagging":
         exp = TopTaggingExperiment(cfg)
-    
+    elif cfg.exp_type == "qgtagging":
+        exp = QGTaggingExperiment(cfg)
+
     exp()
 
 if __name__ == "__main__":

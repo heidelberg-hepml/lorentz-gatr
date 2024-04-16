@@ -190,6 +190,7 @@ class TopTaggingDataset(torch.utils.data.Dataset):
 
         return Data(x=x, scalars=scalars, label=batch.label, is_global=is_global)
 
+
 class QGTaggingDataset(torch.utils.data.Dataset):
 
     """
@@ -285,7 +286,6 @@ class QGTaggingDataset(torch.utils.data.Dataset):
 
             data = Data(x=x, pid=pid, label=label, is_global=is_global)
             self.data_list.append(data)
-
 
     def __len__(self):
         return len(self.data_list)

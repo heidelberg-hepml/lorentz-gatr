@@ -9,7 +9,6 @@ from gatr.interface import extract_scalar
 from xformers.ops.fmha import BlockDiagonalMask
 
 
-
 def attention_mask(batch, force_xformers=True):
     """
     Construct attention mask that makes sure that objects only attend to each other
@@ -95,7 +94,6 @@ class TopTaggingGATrWrapper(nn.Module):
         return multivector, scalars
 
     def extract_from_ga(self, batch, multivector, scalars):
-
         outputs = extract_scalar(multivector).squeeze()
         if self.mean_aggregation:
             outputs = outputs.squeeze()

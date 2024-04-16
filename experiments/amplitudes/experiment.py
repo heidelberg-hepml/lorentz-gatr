@@ -234,7 +234,6 @@ class AmplitudeExperiment(BaseExperiment):
 
     def evaluate(self):
         with torch.no_grad():
-
             # this is a bit ugly, but it does the job
             if self.ema is not None:
                 with self.ema.average_parameters():
