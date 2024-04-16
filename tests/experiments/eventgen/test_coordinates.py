@@ -83,13 +83,8 @@ def test_invertibility(coordinates, distribution, experiment_np, nevents):
 
     torch.testing.assert_close(
         fourmomenta_original, fourmomenta_transformed, **TOLERANCES
-    )  # runs fine
-    # print(((x_original - x_transformed).abs() > 0.1).sum(dim=[0,1]))
-    # mask = ((x_original - x_transformed).abs() > 0.1).any(dim=[1,2])
-    # print(x_original[mask,:,3], x_transformed[mask,:,3])
-    torch.testing.assert_close(
-        x_original, x_transformed, **TOLERANCES
-    )  # fails with 0.1% rate for Fitted + zmumu (masses)
+    )
+    torch.testing.assert_close(x_original, x_transformed, **TOLERANCES)
 
 
 @pytest.mark.parametrize(

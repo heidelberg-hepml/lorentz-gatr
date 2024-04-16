@@ -5,7 +5,7 @@ from experiments.eventgen.helpers import ensure_angle
 
 torch.autograd.set_detect_anomaly(True)
 
-DTYPE = torch.float32
+DTYPE = torch.float64
 
 
 def convert_coordinates(x1, coordinates1, coordinates2):
@@ -56,49 +56,49 @@ class BaseCoordinates:
         x_t = x1 + t * v_t
         return x_t, v_t
 
-    def fourmomenta_to_x(self, x):
-        x = x.to(dtype=DTYPE)
+    def fourmomenta_to_x(self, x_in):
+        x = x_in.to(dtype=DTYPE)
         for transform in self.transforms:
             x = transform.forward(x)
-        return x.to(dtype=torch.float32)
+        return x.to(dtype=x_in.dtype)
 
-    def x_to_fourmomenta(self, x):
-        x = x.to(dtype=DTYPE)
+    def x_to_fourmomenta(self, x_in):
+        x = x_in.to(dtype=DTYPE)
         for transform in self.transforms[::-1]:
             x = transform.inverse(x)
-        return x.to(dtype=torch.float32)
+        return x.to(dtype=x_in.dtype)
 
-    def velocity_fourmomenta_to_x(self, v, x):
-        v, x = v.to(dtype=DTYPE), x.to(dtype=DTYPE)
+    def velocity_fourmomenta_to_x(self, v_in, x_in):
+        v, x = v_in.to(dtype=DTYPE), x_in.to(dtype=DTYPE)
         for transform in self.transforms:
             y = transform.forward(x)
             v = transform.velocity_forward(v, x, y)
             x = y
-        return v.to(dtype=torch.float32), x.to(dtype=torch.float32)
+        return v.to(dtype=v_in.dtype), x.to(dtype=x_in.dtype)
 
-    def velocity_x_to_fourmomenta(self, v, x):
-        v, x = v.to(dtype=DTYPE), x.to(dtype=DTYPE)
+    def velocity_x_to_fourmomenta(self, v_in, x_in):
+        v, x = v_in.to(dtype=DTYPE), x_in.to(dtype=DTYPE)
         for transform in self.transforms[::-1]:
             y = transform.inverse(x)
             v = transform.velocity_inverse(v, x, y)
             x = y
-        return v.to(dtype=torch.float32), x.to(dtype=torch.float32)
+        return v.to(dtype=v_in.dtype), x.to(dtype=x_in.dtype)
 
-    def log_prob_fourmomenta_to_x(self, log_prob, x):
-        log_prob, x = log_prob.to(dtype=DTYPE), x.to(dtype=DTYPE)
+    def log_prob_fourmomenta_to_x(self, log_prob_in, x_in):
+        log_prob, x = log_prob_in.to(dtype=DTYPE), x_in.to(dtype=DTYPE)
         for transform in self.transforms:
             y = transform.forward(x)
             log_prob = log_prob + transform.logdetjac_forward(x, y)
             x = y
-        return log_prob.to(dtype=torch.float32), x.to(dtype=torch.float32)
+        return log_prob.to(dtype=log_prob_in.dtype), x.to(dtype=x_in.dtype)
 
-    def log_prob_x_to_fourmomenta(self, log_prob, x):
-        log_prob, x = log_prob.to(dtype=DTYPE), x.to(dtype=DTYPE)
+    def log_prob_x_to_fourmomenta(self, log_prob_in, x_in):
+        log_prob, x = log_prob_in.to(dtype=DTYPE), x_in.to(dtype=DTYPE)
         for transform in self.transforms[::-1]:
             y = transform.inverse(x)
             log_prob = log_prob + transform.logdetjac_inverse(x, y)
             x = y
-        return log_prob.to(dtype=torch.float32), x.to(dtype=torch.float32)
+        return log_prob.to(dtype=log_prob_in.dtype), x.to(dtype=x_in.dtype)
 
 
 class Fourmomenta(BaseCoordinates):

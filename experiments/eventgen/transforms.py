@@ -425,12 +425,14 @@ class FitNormal(BaseTransform):
     def __init__(self, dims_fixed):
         self.dims_fixed = dims_fixed
 
-    def init_fit(self, xs):
+    def init_fit(self, xs, eps=1e-3):
         n_particles = [x.shape[-2] for x in xs]
         self.params = {n_p: {"mean": None, "std": None} for n_p in n_particles}
         for i, n_p in enumerate(n_particles):
             self.params[n_p]["mean"] = xs[i].mean(dim=0)
-            self.params[n_p]["std"] = xs[i].std(dim=0)
+            std = xs[i].std(dim=0)
+            std[std < eps] = 1.0  # for numerical stability
+            self.params[n_p]["std"] = std
 
             # do not fit some distributions
             self.params[n_p]["mean"][..., self.dims_fixed] = 0.0
