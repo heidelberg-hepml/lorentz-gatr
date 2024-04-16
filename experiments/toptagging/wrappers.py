@@ -8,8 +8,6 @@ from torch import nn
 from gatr.interface import extract_scalar
 from xformers.ops.fmha import BlockDiagonalMask
 
-from experiments.logger import LOGGER
-
 
 def attention_mask(batch, force_xformers=True):
     """
@@ -96,7 +94,6 @@ class TopTaggingGATrWrapper(nn.Module):
         return multivector, scalars
 
     def extract_from_ga(self, batch, multivector, scalars):
-
         outputs = extract_scalar(multivector).squeeze()
         if self.mean_aggregation:
             outputs = outputs.squeeze()

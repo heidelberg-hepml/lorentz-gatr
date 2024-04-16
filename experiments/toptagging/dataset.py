@@ -2,7 +2,6 @@ import torch
 import numpy as np
 from torch_geometric.data import Data
 
-from experiments.logger import LOGGER
 from gatr.interface import embed_vector
 
 
@@ -108,6 +107,198 @@ class TopTaggingDataset(torch.utils.data.Dataset):
             single_scalars = torch.zeros(
                 single.shape[0], 0, device=self.device, dtype=self.dtype
             )
+        if self.cfg.data.pairs.use:
+            pairs, pairs_scalars = create_pairwise_tokens(single, self.cfg)
+
+            # combine arrays
+            x = torch.zeros(
+                single.shape[0] + pairs.shape[0],
+                single.shape[1] + pairs.shape[1],
+                4,
+                device=self.device,
+                dtype=self.dtype,
+            )
+            x[: single.shape[0], : single.shape[1], :] = single
+            x[single.shape[0] :, single.shape[1] :, :] = pairs
+
+            scalars = torch.zeros(
+                single_scalars.shape[0] + pairs_scalars.shape[0],
+                single_scalars.shape[1] + pairs_scalars.shape[1],
+                device=self.device,
+                dtype=self.dtype,
+            )
+            scalars[
+                : single_scalars.shape[0], : single_scalars.shape[1]
+            ] = single_scalars
+            scalars[
+                single_scalars.shape[0] :, single_scalars.shape[1] :
+            ] = pairs_scalars
+
+            pairs_are_not_global = torch.zeros(
+                pairs.shape[0], 1, dtype=torch.bool, device=self.device
+            )
+            is_global = torch.cat((batch.is_global, pairs_are_not_global), dim=0)
+        else:
+            x = single
+            scalars = single_scalars
+            is_global = batch.is_global
+
+        # beam reference
+        x = embed_vector(x)
+        beam = embed_beam_reference(
+            x,
+            self.cfg.data.beam_reference,
+            self.cfg.data.add_time_reference,
+            self.cfg.data.two_beams,
+        )
+        if beam is not None:
+            if self.cfg.data.beam_token:
+                # embed beam as extra token
+                beam = beam.unsqueeze(1)
+                x = torch.cat((x, beam), dim=-3)
+                scalars = torch.cat(
+                    (
+                        scalars,
+                        torch.zeros(
+                            beam.shape[0],
+                            scalars.shape[1],
+                            device=beam.device,
+                            dtype=beam.dtype,
+                        ),
+                    ),
+                    dim=-2,
+                )
+                is_global = torch.cat(
+                    (
+                        is_global,
+                        torch.zeros(
+                            beam.shape[0],
+                            1,
+                            device=beam.device,
+                            dtype=torch.bool,
+                        ),
+                    ),
+                    dim=-2,
+                )
+
+        # add information about which token is global
+        scalars_is_global = torch.zeros(
+            scalars.shape[0], 1, device=self.device, dtype=self.dtype
+        )
+        scalars_is_global[0, :] = 1.0
+        scalars = torch.cat([scalars_is_global, scalars], dim=-1)
+
+        return Data(x=x, scalars=scalars, label=batch.label, is_global=is_global)
+
+
+class QGTaggingDataset(torch.utils.data.Dataset):
+
+    """
+    We use torch_geometric to handle point cloud of jet constituents more efficiently
+    The torch_geometric dataloader concatenates jets along their constituent direction,
+    effectively combining the constituent index with the batch index in a single dimension.
+    An extra object batch.batch for each batch specifies to which jet the constituent belongs.
+    We extend the constituent list by a global token that is used to embed extra global
+    information and extract the classifier score.
+
+    Structure of the elements in self.data_list
+    x : torch.tensor of shape (num_elements, 4)
+        List of 4-momenta of jet constituents
+    pid : torch.tensor of shape (num_elements, 6), dtype torch.int
+        List of particle identification variables of jet constituents
+    label : torch.tensor of shape (1), dtype torch.int
+        label of the jet (0=quark, 1=gluon)
+    is_global : torch.tensor of shape (num_elements), dtype torch.bool
+        True for the global token (first element in constituent list), False otherwise
+    """
+
+    def __init__(
+        self,
+        filename,
+        mode,
+        cfg,
+        data_scale=None,
+        dtype=torch.float,
+        device="cpu",
+    ):
+        """
+        Parameters
+        ----------
+        filename : str
+            Path to file in npz format where the dataset in stored
+        mode : {"train", "test", "val"}
+            Purpose of the dataset
+            Train, test and validation datasets are already seperated in the specified file
+        cfg : dataclass
+            Dataclass object containing options for the format
+            in which the data is preprocessed at runtime
+        data_scale : float
+            std() of all entries in the train dataset
+            Effectively a change of units to make the network entries O(1)
+        dtype: str
+            Not supported consistently
+        device: torch.device
+            Device on which the dataset will be stored
+        """
+        self.cfg = cfg
+        self.dtype = dtype
+        self.device = device
+
+        data = np.load(filename)
+        kinematics = data[f"kinematics_{mode}"]
+        pids = data[f"pid_{mode}"]
+        labels = data[f"labels_{mode}"]
+
+        # preprocessing
+        if mode == "train":
+            data_scale = kinematics.std()
+        else:
+            assert data_scale is not None
+        self.data_scale = data_scale
+
+        if self.cfg.data.rescale_data:
+            kinematics = kinematics / self.data_scale
+        kinematics = torch.tensor(kinematics, dtype=dtype)
+        pids = torch.tensor(pids, dtype=dtype)
+        labels = torch.tensor(labels, dtype=torch.bool)
+
+        # create list of torch_geometric.data.Data objects
+        self.data_list = []
+        for i in range(kinematics.shape[0]):
+            # drop zero-padded components
+            mask = (kinematics[i, ...].abs() > 1e-5).all(dim=-1)
+            x = kinematics[i, ...][mask]
+            pid = pids[i, ...][mask]
+            label = labels[i, ...]
+
+            # construct global token
+            if self.cfg.data.add_jet_momentum:
+                global_token = x.sum(dim=0, keepdim=True)
+            else:
+                global_token = torch.zeros_like(x[[0], ...], dtype=self.dtype)
+                global_token[..., 0] = 1
+            x = torch.cat((global_token, x), dim=0)
+            is_global = torch.zeros(x.shape[0], 1, dtype=torch.bool)
+            is_global[0, 0] = True
+
+            global_token_pid = torch.zeros_like(pid[[0], ...], dtype=self.dtype)
+            pid = torch.cat((global_token_pid, pid), dim=0)
+
+            data = Data(x=x, pid=pid, label=label, is_global=is_global)
+            self.data_list.append(data)
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def __getitem__(self, idx):
+        batch = self.data_list[idx].to(self.device)
+
+        # create embeddings
+        single = batch.x.unsqueeze(1)
+        single_scalars = batch.pid
+        if self.cfg.data.add_pt:
+            single_scalars = torch.cat((single_scalars, get_pt(single)), dim=1)
+
         if self.cfg.data.pairs.use:
             pairs, pairs_scalars = create_pairwise_tokens(single, self.cfg)
 

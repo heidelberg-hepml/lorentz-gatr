@@ -9,6 +9,7 @@ from sklearn.metrics import roc_curve, roc_auc_score, accuracy_score
 
 from experiments.base_experiment import BaseExperiment
 from experiments.toptagging.dataset import TopTaggingDataset
+from experiments.toptagging.dataset import QGTaggingDataset
 from experiments.toptagging.plots import plot_mixer
 from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
@@ -44,9 +45,16 @@ class TaggingExperiment(BaseExperiment):
                 self.cfg.model._target_
                 == "experiments.toptagging.wrappers.TopTaggingGATrWrapper"
             ):
-                # make sure we know where we start from
-                self.cfg.model.net.in_s_channels = 1
-                self.cfg.model.net.in_mv_channels = 1
+                if self.cfg.exp_type == "toptagging":
+                    # make sure we know where we start from
+                    self.cfg.model.net.in_s_channels = 1
+                    self.cfg.model.net.in_mv_channels = 1
+
+                elif self.cfg.exp_type == "qgtagging":
+                    # We add 7 scalar channels, 1 for the global token and 6 for the particle id features 
+                    # (charge, electron, muon, photon, charged hadron and neutral hadron)
+                    self.cfg.model.net.in_s_channels = 7
+                    self.cfg.model.net.in_mv_channels = 1
 
                 # extra s channels for pt
                 self.cfg.model.add_pt = self.cfg.data.add_pt
@@ -292,3 +300,9 @@ class TopTaggingExperiment(TaggingExperiment):
             self.cfg.data.data_dir, f"toptagging_{self.cfg.data.dataset}.npz"
         )
         self._init_data(TopTaggingDataset, data_path)
+
+
+class QGTaggingExperiment(TaggingExperiment):
+    def init_data(self):
+        data_path = os.path.join(self.cfg.data.data_dir, f"qg_tagging_{self.cfg.data.dataset}.npz")
+        self._init_data(QGTaggingDataset, data_path)
