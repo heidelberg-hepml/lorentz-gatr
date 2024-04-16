@@ -24,7 +24,6 @@ colors = ["black", "#0343DE", "#A52A2A", "darkorange"]
 
 
 def plot_mixer(cfg, plot_path, title, plot_dict):
-
     if cfg.plotting.loss and cfg.train:
         file = f"{plot_path}/loss.pdf"
         with PdfPages(file) as out:

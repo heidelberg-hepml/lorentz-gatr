@@ -78,7 +78,6 @@ class DSI(nn.Module):
         )
 
     def forward(self, x):
-
         n_particles = 2 + self.num_particles_boson + self.num_particles_glu
         particles = x[:, : 4 * n_particles].reshape(-1, n_particles, 4)
         invariants = x[:, 4 * n_particles :]
