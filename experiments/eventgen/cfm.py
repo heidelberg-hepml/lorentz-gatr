@@ -201,12 +201,14 @@ class CFM(nn.Module):
             return v_t
 
         x1 = self.sample_base(shape, device, dtype)
+        x1 = self.coordinates_sampling.fourmomenta_to_x(x1)
         x0 = odeint(
             velocity,
             x1,
             torch.tensor([1.0, 0.0]),
             **self.odeint,
         )[-1]
+        x0 = self.coordinates_sampling.x_to_fourmomenta(x0)
 
         # save trajectories to file
         if save_trajectory:
@@ -214,6 +216,8 @@ class CFM(nn.Module):
             xts_learned = torch.stack(xts, dim=0)
             vts_learned = torch.stack(vts, dim=0)
             ts = torch.stack(ts, dim=0)
+
+            # determine true trajectories
             xts_learned_x = convert_coordinates(
                 xts_learned, self.coordinates_sampling, self.coordinates_straight
             )
@@ -226,19 +230,18 @@ class CFM(nn.Module):
                 .expand(xts_learned_x.shape),
                 ts.reshape(ts.shape[0], 1, 1, 1),
             )
-            vts_true, xts_true = convert_velocity(
-                vts_true, xts_true, self.coordinates_straight, self.coordinates_sampling
-            )
 
             # transform to fourmomenta space
-            xts_learned_fm = self.coordinates_sampling.x_to_fourmomenta(xts_learned)
-            xts_true_fm = self.coordinates_sampling.x_to_fourmomenta(xts_true)
-            vts_learned_fm = self.coordinates_sampling.velocity_x_to_fourmomenta(
+            (
+                vts_true_fm,
+                xts_true_fm,
+            ) = self.coordinates_straight.velocity_x_to_fourmomenta(vts_true, xts_true)
+            (
+                vts_learned_fm,
+                xts_learned_fm,
+            ) = self.coordinates_sampling.velocity_x_to_fourmomenta(
                 vts_learned, xts_learned
-            )[0]
-            vts_true_fm = self.coordinates_sampling.velocity_x_to_fourmomenta(
-                vts_true, xts_true
-            )[0]
+            )
 
             # save
             np.savez_compressed(
