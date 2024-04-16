@@ -13,6 +13,7 @@ from experiments.eventgen.distributions import (
     FittedLogPtPhiEtaLogM2,
 )
 import experiments.eventgen.coordinates as c
+from experiments.eventgen.coordinates import convert_coordinates, convert_velocity
 
 
 class GaussianFourierProjection(nn.Module):
@@ -89,6 +90,11 @@ class CFM(nn.Module):
             self.coordinates_sampling,
         ]
 
+        if cfm.transforms_float64:
+            c.DTYPE = torch.float64
+        else:
+            c.DTYPE = torch.float32
+
     def init_distribution(self):
         raise NotImplementedError
 
@@ -128,16 +134,16 @@ class CFM(nn.Module):
         x_t, v_t = self.coordinates_straight.get_trajectory(x0, x1, t)
 
         # predict velocity in coordinates_network
-        x_t = c.convert_coordinates(
+        x_t = convert_coordinates(
             x_t, self.coordinates_straight, self.coordinates_network
         )
         v_p = self.get_velocity(x_t, t, ijet=ijet)
 
         # transform all velocities to coordinates_loss
-        v_p = c.convert_velocity(
+        v_p = convert_velocity(
             v_p, x_t, self.coordinates_network, self.coordinates_loss
         )[0]
-        v_t = c.convert_velocity(
+        v_t = convert_velocity(
             v_t, x_t, self.coordinates_network, self.coordinates_loss
         )[0]
 
@@ -179,9 +185,13 @@ class CFM(nn.Module):
 
         def velocity(t, x_t):
             t = t * torch.ones(shape[0], 1, 1, dtype=x_t.dtype, device=x_t.device)
-            x_t = self.coordinates_sampling.x_to_fourmomenta(x_t)
+            x_t = convert_coordinates(
+                x_t, self.coordinates_sampling, self.coordinates_network
+            )
             v_t = self.get_velocity(x_t, t, ijet=ijet)
-            v_t, x_t = self.coordinates_sampling.velocity_fourmomenta_to_x(v_t, x_t)
+            v_t, x_t = convert_velocity(
+                v_t, x_t, self.coordinates_network, self.coordinates_sampling
+            )
 
             # collect trajectories
             if save_trajectory:
@@ -204,7 +214,7 @@ class CFM(nn.Module):
             xts_learned = torch.stack(xts, dim=0)
             vts_learned = torch.stack(vts, dim=0)
             ts = torch.stack(ts, dim=0)
-            xts_learned_x = c.convert_coordinates(
+            xts_learned_x = convert_coordinates(
                 xts_learned, self.coordinates_sampling, self.coordinates_straight
             )
             xts_true, vts_true = self.coordinates_straight.get_trajectory(
@@ -216,7 +226,7 @@ class CFM(nn.Module):
                 .expand(xts_learned_x.shape),
                 ts.reshape(ts.shape[0], 1, 1, 1),
             )
-            vts_true, xts_true = c.convert_velocity(
+            vts_true, xts_true = convert_velocity(
                 vts_true, xts_true, self.coordinates_straight, self.coordinates_sampling
             )
 
@@ -272,9 +282,13 @@ class CFM(nn.Module):
             with torch.set_grad_enabled(True):
                 x_t = state[0].detach().requires_grad_(True)
                 t = t * torch.ones(x0.shape[0], 1, 1, dtype=x0.dtype, device=x0.device)
-                x_t = self.coordinates_sampling.x_to_fourmomenta(x_t)
+                x_t = convert_coordinates(
+                    x_t, self.coordinates_sampling, self.coordinates_network
+                )
                 v_t = self.get_velocity(x_t, t, ijet=ijet)
-                v_t, x_t = self.coordinates_sampling.velocity_fourmomenta_to_x(v_t, x_t)
+                v_t, x_t = convert_velocity(
+                    v_t, x_t, self.coordinates_network, self.coordinates_sampling
+                )
                 dlogp_dt = self.trace_fn(v_t, x_t).unsqueeze(-1)
             return v_t.detach(), dlogp_dt.detach()
 
