@@ -76,18 +76,18 @@ class CFM(nn.Module):
         self.cfm = cfm
         self.loss = lambda v1, v2: nn.functional.mse_loss(v1, v2)
 
+        # initialize to base objects, this will be overwritten later
         self.distribution = BaseDistribution()
-        self.coordinates = c.BaseCoordinates()
-
-        # specify if things happen in x space or fourmomenta space
-        self.x_straight = cfm.x_straight  # space where straight trajectories happen
-        self.x_velocity = (
-            cfm.x_velocity
-        )  # space where velocities are evaluated (fourmomenta for GATr!)
-        self.x_loss = cfm.x_loss  # space where loss is evaluated
-        self.coordinates_straight = (
-            self.coordinates if self.x_straight else c.Fourmomenta()
-        )
+        self.coordinates_straight = c.BaseCoordinates()
+        self.coordinates_network = c.BaseCoordinates()
+        self.coordinates_loss = c.BaseCoordinates()
+        self.coordinates_sampling = c.BaseCoordinates()
+        self.coordinates_list = [
+            self.coordinates_straight,
+            self.coordinates_network,
+            self.coordinates_loss,
+            self.coordinates_sampling,
+        ]
 
     def init_distribution(self):
         raise NotImplementedError
@@ -99,8 +99,7 @@ class CFM(nn.Module):
         fourmomenta = self.distribution.sample(
             shape, device, dtype, generator=generator
         )
-        x = self.coordinates.fourmomenta_to_x(fourmomenta)
-        return x
+        return fourmomenta
 
     def batch_loss(self, x0, ijet):
         """
@@ -122,27 +121,25 @@ class CFM(nn.Module):
         t = torch.rand(x0.shape[0], 1, 1, dtype=x0.dtype, device=x0.device)
         x1 = self.sample_base(x0.shape, x0.device, x0.dtype)
 
-        # construct trajectories in the space specified by x_straight
-        # start from x0, x1 in x space
-        if not self.x_straight:
-            x0 = self.coordinates.x_to_fourmomenta(x0)
-            x1 = self.coordinates.x_to_fourmomenta(x1)
+        # construct trajectories in coordinates_straight
+        # start from x0, x1 in fourmomenta space
+        x0 = self.coordinates_straight.fourmomenta_to_x(x0)
+        x1 = self.coordinates_straight.fourmomenta_to_x(x1)
         x_t, v_t = self.coordinates_straight.get_trajectory(x0, x1, t)
 
-        # predict velocity in the space specified by x_velocity
-        if self.x_straight and self.x_velocity:
-            x_t = self.coordinates.x_to_fourmomenta(x_t)
-        elif not self.x_straight and self.x_velocity:
-            x_t = self.coordinates.fourmomenta_to_x(x_t)
+        # predict velocity in coordinates_network
+        x_t = c.convert_coordinates(
+            x_t, self.coordinates_straight, self.coordinates_network
+        )
         v_p = self.get_velocity(x_t, t, ijet=ijet)
 
-        # transform velocities to the space specified by x_loss
-        if self.x_loss and not self.x_velocity:
-            v_t = self.coordinates.velocity_fourmomenta_to_x(v_t, x_t)
-            v_p = self.coordinates.velocity_fourmomenta_to_x(v_p, x_t)
-        elif not self.x_loss and self.x_velocity:
-            v_t = self.coordinates.velocity_x_to_fourmomenta(v_t, x_t)
-            v_p = self.coordinates.velocity_x_to_fourmomenta(v_p, x_t)
+        # transform all velocities to coordinates_loss
+        v_p = c.convert_velocity(
+            v_p, x_t, self.coordinates_network, self.coordinates_loss
+        )[0]
+        v_t = c.convert_velocity(
+            v_t, x_t, self.coordinates_network, self.coordinates_loss
+        )[0]
 
         loss = self.loss(v_p, v_t)
         return loss, [self.loss(v_p[..., i], v_t[..., i]) for i in range(4)]
@@ -182,11 +179,9 @@ class CFM(nn.Module):
 
         def velocity(t, x_t):
             t = t * torch.ones(shape[0], 1, 1, dtype=x_t.dtype, device=x_t.device)
-            if not self.x_velocity:
-                x_t = self.coordinates.x_to_fourmomenta(x_t)
+            x_t = self.coordinates_sampling.x_to_fourmomenta(x_t)
             v_t = self.get_velocity(x_t, t, ijet=ijet)
-            if not self.x_velocity:
-                v_t = self.coordinates.velocity_fourmomenta_to_x(v_t, x_t)
+            v_t, x_t = self.coordinates_sampling.velocity_fourmomenta_to_x(v_t, x_t)
 
             # collect trajectories
             if save_trajectory:
@@ -209,23 +204,31 @@ class CFM(nn.Module):
             xts_learned = torch.stack(xts, dim=0)
             vts_learned = torch.stack(vts, dim=0)
             ts = torch.stack(ts, dim=0)
-            xts_true, vts_true = self.coordinates.get_trajectory(
-                xts_learned[-1, ...]
-                .reshape(1, *xts_learned.shape[1:])
-                .expand(xts_learned.shape),
+            xts_learned_x = c.convert_coordinates(
+                xts_learned, self.coordinates_sampling, self.coordinates_straight
+            )
+            xts_true, vts_true = self.coordinates_straight.get_trajectory(
+                xts_learned_x[-1, ...]
+                .reshape(1, *xts_learned_x.shape[1:])
+                .expand(xts_learned_x.shape),
                 xts_learned[0, ...]
-                .reshape(1, *xts_learned.shape[1:])
-                .expand(xts_learned.shape),
+                .reshape(1, *xts_learned_x.shape[1:])
+                .expand(xts_learned_x.shape),
                 ts.reshape(ts.shape[0], 1, 1, 1),
+            )
+            vts_true, xts_true = c.convert_velocity(
+                vts_true, xts_true, self.coordinates_straight, self.coordinates_sampling
             )
 
             # transform to fourmomenta space
-            xts_learned_fm = self.coordinates.x_to_fourmomenta(xts_learned)
-            xts_true_fm = self.coordinates.x_to_fourmomenta(xts_true)
-            vts_learned_fm = self.coordinates.velocity_x_to_fourmomenta(
+            xts_learned_fm = self.coordinates_sampling.x_to_fourmomenta(xts_learned)
+            xts_true_fm = self.coordinates_sampling.x_to_fourmomenta(xts_true)
+            vts_learned_fm = self.coordinates_sampling.velocity_x_to_fourmomenta(
                 vts_learned, xts_learned
             )
-            vts_true_fm = self.coordinates.velocity_x_to_fourmomenta(vts_true, xts_true)
+            vts_true_fm = self.coordinates_sampling.velocity_x_to_fourmomenta(
+                vts_true, xts_true
+            )
 
             # save
             np.savez_compressed(
@@ -269,11 +272,9 @@ class CFM(nn.Module):
             with torch.set_grad_enabled(True):
                 x_t = state[0].detach().requires_grad_(True)
                 t = t * torch.ones(x0.shape[0], 1, 1, dtype=x0.dtype, device=x0.device)
-                if not self.x_velocity:
-                    x_t = self.coordinates.x_to_fourmomenta(x_t)
+                x_t = self.coordinates_sampling.x_to_fourmomenta(x_t)
                 v_t = self.get_velocity(x_t, t, ijet=ijet)
-                if not self.x_velocity:
-                    v_t = self.coordinates.velocity_fourmomenta_to_x(v_t, x_t)
+                v_t, x_t = self.coordinates_sampling.velocity_fourmomenta_to_x(v_t, x_t)
                 dlogp_dt = self.trace_fn(v_t, x_t).unsqueeze(-1)
             return v_t.detach(), dlogp_dt.detach()
 
@@ -290,7 +291,9 @@ class CFM(nn.Module):
         logp_diff1 = logp_diff_t[-1].detach()
 
         # collect log_probs in fourmomenta space
-        logp_diff1 = self.coordinates.log_prob_x_to_fourmomenta(logp_diff1, x1)
+        logp_diff1 = self.coordinates_sampling.log_prob_x_to_fourmomenta(
+            logp_diff1, x1
+        )[0]
         log_prob_base = self.distribution.log_prob(x1).unsqueeze(-1)
         log_prob = log_prob_base + logp_diff1
         return log_prob
@@ -379,42 +382,57 @@ class EventCFM(CFM):
             raise ValueError(f"base_type={self.base_type} not implemented")
 
     def init_coordinates(self):
-        if self.cfm.coordinates == "Fourmomenta":
-            self.coordinates = c.Fourmomenta()
-        elif self.cfm.coordinates == "PPPM2":
-            self.coordinates = c.PPPM2()
-        elif self.cfm.coordinates == "PPPLogM2":
-            self.coordinates = c.PPPLogM2()
-        elif self.cfm.coordinates == "FittedPPPLogM2":
-            self.coordinates = c.FittedPPPLogM2()
-        elif self.cfm.coordinates == "EPhiPtPz":
-            self.coordinates = c.EPhiPtPz()
-        elif self.cfm.coordinates == "PtPhiEtaE":
-            self.coordinates = c.PtPhiEtaE()
-        elif self.cfm.coordinates == "PtPhiEtaM2":
-            self.coordinates = c.PtPhiEtaM2()
-        elif self.cfm.coordinates == "LogPtPhiEtaE":
-            self.coordinates = c.LogPtPhiEtaE(self.pt_min, self.units)
-        elif self.cfm.coordinates == "LogPtPhiEtaM2":
-            self.coordinates = c.LogPtPhiEtaM2(self.pt_min, self.units)
-        elif self.cfm.coordinates == "PtPhiEtaLogM2":
-            self.coordinates = c.PtPhiEtaLogM2()
-        elif self.cfm.coordinates == "LogPtPhiEtaM2":
-            self.coordinates = c.LogPtPhiEtaM2(self.pt_min, self.units)
-        elif self.cfm.coordinates == "LogPtPhiEtaLogM2":
-            self.coordinates = c.LogPtPhiEtaLogM2(self.pt_min, self.units)
-        elif self.cfm.coordinates == "FittedLogPtPhiEtaLogM2":
-            self.coordinates = c.FittedLogPtPhiEtaLogM2(self.pt_min, self.units)
+        self.coordinates_straight = self._init_coordinates(
+            self.cfm.coordinates_straight
+        )
+        self.coordinates_network = self._init_coordinates(self.cfm.coordinates_network)
+        self.coordinates_loss = self._init_coordinates(self.cfm.coordinates_loss)
+        self.coordinates_sampling = self._init_coordinates(
+            self.cfm.coordinates_sampling
+        )
+        self.coordinates = [
+            self.coordinates_straight,
+            self.coordinates_network,
+            self.coordinates_loss,
+            self.coordinates_sampling,
+        ]
+
+    def _init_coordinates(self, coordinates_label):
+        if coordinates_label == "Fourmomenta":
+            coordinates = c.Fourmomenta()
+        elif coordinates_label == "PPPM2":
+            coordinates = c.PPPM2()
+        elif coordinates_label == "PPPLogM2":
+            coordinates = c.PPPLogM2()
+        elif coordinates_label == "FittedPPPLogM2":
+            coordinates = c.FittedPPPLogM2()
+        elif coordinates_label == "EPhiPtPz":
+            coordinates = c.EPhiPtPz()
+        elif coordinates_label == "PtPhiEtaE":
+            coordinates = c.PtPhiEtaE()
+        elif coordinates_label == "PtPhiEtaM2":
+            coordinates = c.PtPhiEtaM2()
+        elif coordinates_label == "LogPtPhiEtaE":
+            coordinates = c.LogPtPhiEtaE(self.pt_min, self.units)
+        elif coordinates_label == "LogPtPhiEtaM2":
+            coordinates = c.LogPtPhiEtaM2(self.pt_min, self.units)
+        elif coordinates_label == "PtPhiEtaLogM2":
+            coordinates = c.PtPhiEtaLogM2()
+        elif coordinates_label == "LogPtPhiEtaM2":
+            coordinates = c.LogPtPhiEtaM2(self.pt_min, self.units)
+        elif coordinates_label == "LogPtPhiEtaLogM2":
+            coordinates = c.LogPtPhiEtaLogM2(self.pt_min, self.units)
+        elif coordinates_label == "FittedLogPtPhiEtaLogM2":
+            coordinates = c.FittedLogPtPhiEtaLogM2(self.pt_min, self.units)
         else:
-            raise ValueError(f"coordinates={self.cfm.coordinates} not implemented")
+            raise ValueError(f"coordinates={coordinates_label} not implemented")
+        return coordinates
 
     def preprocess(self, fourmomenta):
         fourmomenta = fourmomenta / self.units
-        x = self.coordinates.fourmomenta_to_x(fourmomenta)
-        return x
+        return fourmomenta
 
-    def undo_preprocess(self, x):
-        fourmomenta = self.coordinates.x_to_fourmomenta(x)
+    def undo_preprocess(self, fourmomenta):
         fourmomenta = fourmomenta * self.units
         return fourmomenta
 
@@ -422,10 +440,10 @@ class EventCFM(CFM):
         x = super().sample(*args, **kwargs)
 
         # enforce onshell-ness
-        fourmomenta = self.coordinates.x_to_fourmomenta(x)
+        fourmomenta = self.coordinates_sampling.x_to_fourmomenta(x)
         mass = torch.tensor(self.onshell_mass).unsqueeze(0).to(x.device, dtype=x.dtype)
         fourmomenta[..., self.onshell_list, 0] = torch.sqrt(
             mass**2 + torch.sum(fourmomenta[..., self.onshell_list, 1:] ** 2, dim=-1)
         )
-        x = self.coordinates.fourmomenta_to_x(fourmomenta)
+        x = self.coordinates_sampling.fourmomenta_to_x(fourmomenta)
         return x

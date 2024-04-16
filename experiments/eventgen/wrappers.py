@@ -80,7 +80,9 @@ class GAPCFM(EventCFM):
         self.beam_reference = beam_reference
         self.two_beams = two_beams
         self.add_time_reference = add_time_reference
-        assert not self.x_velocity, f"x_velocity=true not possible for GA-models"
+        assert (
+            self.cfm.coordinates_network == "Fourmomenta"
+        ), f"GA-networks require coordinates_network=Fourmomenta"
 
     def get_velocity(self, fourmomenta, t, ijet):
         mv, s = self.embed_into_ga(fourmomenta, t, ijet)
@@ -165,7 +167,9 @@ class GATrCFM(EventCFM):
         self.beam_reference = beam_reference
         self.two_beams = two_beams
         self.add_time_reference = add_time_reference
-        assert not self.x_velocity, f"x_velocity=true not possible for GA-models"
+        assert (
+            self.cfm.coordinates_network == "Fourmomenta"
+        ), f"GA-networks require coordinates_network=Fourmomenta"
 
     def get_velocity(self, fourmomenta, t, ijet):
         mv, s = self.embed_into_ga(fourmomenta, t, ijet)

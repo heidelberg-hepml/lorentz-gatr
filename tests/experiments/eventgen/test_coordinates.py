@@ -155,11 +155,9 @@ def test_velocity(coordinates, distribution, experiment_np, nevents):
     coord.init_fit([x])
 
     x.requires_grad_()
-    y = coord.fourmomenta_to_x(x)
-    z = coord.x_to_fourmomenta(y)
     v_x = torch.randn_like(x)
-    v_y = coord.velocity_fourmomenta_to_x(v_x, x)
-    v_z = coord.velocity_x_to_fourmomenta(v_y, y)
+    v_y, y = coord.velocity_fourmomenta_to_x(v_x, x)
+    v_z, z = coord.velocity_x_to_fourmomenta(v_y, y)
 
     # jacobians from autograd
     jac_fw_autograd, jac_inv_autograd = [], []
@@ -191,9 +189,5 @@ def test_velocity(coordinates, distribution, experiment_np, nevents):
     v_z_autograd = torch.einsum("...ij,...j->...i", jac_inv_autograd, v_y)
 
     # compare to autograd
-    # print(v_y[0, 0, ...], v_y_autograd[0, 0, ...], jac_fw_autograd[0, 0, ...])
-    # print(((v_y - v_y_autograd).abs() > 0.1).sum(dim=[0, 1]))
     torch.testing.assert_close(v_y, v_y_autograd, **TOLERANCES)
-    # print(v_z[0,0,...], v_z_autograd[0,0,...], jac_inv_autograd[0,0,...])
-    # print(((v_z - v_z_autograd).abs() > 0.1).sum(dim=[0,1]))
     torch.testing.assert_close(v_z, v_z_autograd, **TOLERANCES)

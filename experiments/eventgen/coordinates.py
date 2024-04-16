@@ -3,6 +3,30 @@ import experiments.eventgen.transforms as tr
 
 from experiments.eventgen.helpers import ensure_angle
 
+torch.autograd.set_detect_anomaly(True)
+
+
+def convert_coordinates(x1, coordinates1, coordinates2):
+    if type(coordinates1) == type(coordinates2):
+        # no conversion necessary
+        x2 = x1
+    else:
+        # go the long way to fourmomenta and back (could be improved)
+        fourmomenta = coordinates1.x_to_fourmomenta(x1)
+        x2 = coordinates2.fourmomenta_to_x(fourmomenta)
+    return x2
+
+
+def convert_velocity(v1, x1, coordinates1, coordinates2):
+    if type(coordinates1) == type(coordinates2):
+        # no conversion necessary
+        v2, x2 = v1, x1
+    else:
+        # go the long way to fourmomenta and back (could be improved)
+        v_fourmomenta, fourmomenta = coordinates1.velocity_x_to_fourmomenta(v1, x1)
+        v2, x2 = coordinates2.velocity_fourmomenta_to_x(v_fourmomenta, fourmomenta)
+    return v2, x2
+
 
 class BaseCoordinates:
     """
@@ -45,30 +69,28 @@ class BaseCoordinates:
             y = transform.forward(x)
             v = transform.velocity_forward(v, x, y)
             x = y
-        return v
+        return v, x
 
     def velocity_x_to_fourmomenta(self, v, x):
         for transform in self.transforms[::-1]:
             y = transform.inverse(x)
             v = transform.velocity_inverse(v, x, y)
             x = y
-        return v
+        return v, x
 
-    def log_prob_fourmomenta_to_x(self, log_prob_fourmomenta, fourmomenta):
-        log_prob = log_prob_fourmomenta.clone()
-        x = fourmomenta.clone()
+    def log_prob_fourmomenta_to_x(self, log_prob, x):
         for transform in self.transforms:
             y = transform.forward(x)
             log_prob = log_prob + transform.logdetjac_forward(x, y)
-        return log_prob
+            x = y
+        return log_prob, x
 
-    def log_prob_x_to_fourmomenta(self, log_prob_x, x):
-        log_prob = log_prob_x.clone()
-        x = x.clone()
+    def log_prob_x_to_fourmomenta(self, log_prob, x):
         for transform in self.transforms[::-1]:
             y = transform.inverse(x)
             log_prob = log_prob + transform.logdetjac_inverse(x, y)
-        return log_prob
+            x = y
+        return log_prob, x
 
 
 class Fourmomenta(BaseCoordinates):

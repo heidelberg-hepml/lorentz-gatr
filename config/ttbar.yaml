@@ -26,10 +26,10 @@ cfm:
  embed_t_dim: 8
  embed_t_scale: 30.
  hutchinson: true
- x_straight: true
- x_loss: true
- x_velocity: false
- coordinates: Fourmomenta
+ coordinates_straight: Fourmomenta
+ coordinates_network: Fourmomenta
+ coordinates_loss: Fourmomenta
+ coordinates_sampling: Fourmomenta
 
 training:
  iterations: 50
