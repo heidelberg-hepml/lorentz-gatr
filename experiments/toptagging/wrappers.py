@@ -8,7 +8,6 @@ from torch import nn
 from gatr.interface import extract_scalar
 from xformers.ops.fmha import BlockDiagonalMask
 
-from experiments.logger import LOGGER
 
 
 def attention_mask(batch, force_xformers=True):
