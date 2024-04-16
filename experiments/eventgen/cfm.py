@@ -235,10 +235,10 @@ class CFM(nn.Module):
             xts_true_fm = self.coordinates_sampling.x_to_fourmomenta(xts_true)
             vts_learned_fm = self.coordinates_sampling.velocity_x_to_fourmomenta(
                 vts_learned, xts_learned
-            )
+            )[0]
             vts_true_fm = self.coordinates_sampling.velocity_x_to_fourmomenta(
                 vts_true, xts_true
-            )
+            )[0]
 
             # save
             np.savez_compressed(

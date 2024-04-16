@@ -30,6 +30,7 @@ cfm:
  coordinates_network: Fourmomenta
  coordinates_loss: Fourmomenta
  coordinates_sampling: Fourmomenta
+ transforms_float64: false
 
 training:
  iterations: 50
