@@ -427,11 +427,17 @@ class FitNormal(BaseTransform):
 
     def init_fit(self, xs, eps=1e-3):
         n_particles = [x.shape[-2] for x in xs]
+        assert len(n_particles) == len(
+            set(n_particles)
+        ), f"n_particles should have unique elements, but n_particles={n_particles}"
         self.params = {n_p: {"mean": None, "std": None} for n_p in n_particles}
         for i, n_p in enumerate(n_particles):
+            assert len(xs[i].shape) == 3
             self.params[n_p]["mean"] = xs[i].mean(dim=0)
             std = xs[i].std(dim=0)
-            std[std < eps] = 1.0  # for numerical stability
+            std[
+                std < eps
+            ] = 1.0  # in case we have std=0 in some components (happens for hard-coded masses)
             self.params[n_p]["std"] = std
 
             # do not fit some distributions
