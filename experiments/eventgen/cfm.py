@@ -387,6 +387,8 @@ class EventCFM(CFM):
             self.coordinates = c.PPPLogM2()
         elif self.cfm.coordinates == "FittedPPPLogM2":
             self.coordinates = c.FittedPPPLogM2()
+        elif self.cfm.coordinates == "EPhiPtPz":
+            self.coordinates = c.EPhiPtPz()
         elif self.cfm.coordinates == "PtPhiEtaE":
             self.coordinates = c.PtPhiEtaE()
         elif self.cfm.coordinates == "PtPhiEtaM2":
