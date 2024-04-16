@@ -117,7 +117,6 @@ class EPPP_to_PPPM2(BaseTransform):
 
     def _jac_forward(self, eppp, pppm2):
         E, px, py, pz = unpack_last(eppp)
-        px, py, pz, m2 = unpack_last(pppm2)
 
         # jac_ij = dpppm2_i / deppp_j
         zero, one = torch.zeros_like(E), torch.ones_like(E)
@@ -129,7 +128,6 @@ class EPPP_to_PPPM2(BaseTransform):
 
     def _jac_inverse(self, pppm2, eppp):
         E, px, py, pz = unpack_last(eppp)
-        px, py, pz, m2 = unpack_last(pppm2)
 
         # jac_ij = deppp_i / dpppm2_j
         zero, one = torch.zeros_like(E), torch.ones_like(E)
@@ -141,7 +139,6 @@ class EPPP_to_PPPM2(BaseTransform):
 
     def _detjac_forward(self, eppp, pppm2):
         E, px, py, pz = unpack_last(eppp)
-        px, py, pz, m2 = unpack_last(pppm2)
         return 2 * E
 
 

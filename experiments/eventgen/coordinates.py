@@ -30,30 +30,24 @@ class BaseCoordinates:
         x_t = x1 + t * v_t
         return x_t, v_t
 
-    def fourmomenta_to_x(self, fourmomenta):
-        x = fourmomenta.clone()
+    def fourmomenta_to_x(self, x):
         for transform in self.transforms:
             x = transform.forward(x)
         return x
 
     def x_to_fourmomenta(self, x):
-        x = x.clone()
         for transform in self.transforms[::-1]:
             x = transform.inverse(x)
         return x
 
-    def velocity_fourmomenta_to_x(self, v_fourmomenta, fourmomenta):
-        v = v_fourmomenta.clone()
-        x = fourmomenta.clone()
+    def velocity_fourmomenta_to_x(self, v, x):
         for transform in self.transforms:
             y = transform.forward(x)
             v = transform.velocity_forward(v, x, y)
             x = y
         return v
 
-    def velocity_x_to_fourmomenta(self, v_x, x):
-        v = v_x.clone()
-        x = x.clone()
+    def velocity_x_to_fourmomenta(self, v, x):
         for transform in self.transforms[::-1]:
             y = transform.inverse(x)
             v = transform.velocity_inverse(v, x, y)
