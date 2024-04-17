@@ -491,8 +491,6 @@ class EventCFM(CFM):
             coordinates = c.LogPtPhiEtaM2(self.pt_min, self.units)
         elif coordinates_label == "PtPhiEtaLogM2":
             coordinates = c.PtPhiEtaLogM2()
-        elif coordinates_label == "LogPtPhiEtaM2":
-            coordinates = c.LogPtPhiEtaM2(self.pt_min, self.units)
         elif coordinates_label == "LogPtPhiEtaLogM2":
             coordinates = c.LogPtPhiEtaLogM2(self.pt_min, self.units)
         elif coordinates_label == "FittedLogPtPhiEtaLogM2":
