@@ -3,8 +3,6 @@ import experiments.eventgen.transforms as tr
 
 from experiments.eventgen.helpers import ensure_angle
 
-torch.autograd.set_detect_anomaly(True)
-
 DTYPE = torch.float64
 
 
