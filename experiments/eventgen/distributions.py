@@ -139,7 +139,7 @@ class StandardPPPM2(Distribution):
         log_prob[..., 3] += math.log(2)  # normalization factor because half-gaussian
         log_prob[..., self.onshell_list, 3] = 0.0  # fixed components do not contribute
         log_prob = log_prob.sum(dim=[-1, -2])
-        log_prob = self.coordinates.log_prob_x_to_fourmomenta(log_prob, pppm2)
+        log_prob = self.coordinates.log_prob_x_to_fourmomenta(log_prob, pppm2)[0]
         return log_prob
 
 
@@ -165,7 +165,7 @@ class StandardPPPLogM2(Distribution):
         log_prob = log_prob_normal(ppplogm2)
         log_prob[..., self.onshell_list, 3] = 0.0
         log_prob = log_prob.sum(dim=[-1, -2])
-        log_prob = self.coordinates.log_prob_x_to_fourmomenta(log_prob, ppplogm2)
+        log_prob = self.coordinates.log_prob_x_to_fourmomenta(log_prob, ppplogm2)[0]
         return log_prob
 
 
@@ -197,7 +197,7 @@ class FittedPPPLogM2(Distribution):
         log_prob = log_prob_normal(ppplogm2)
         log_prob[..., self.onshell_list, 3] = 0.0
         log_prob = log_prob.sum(dim=[-1, -2])
-        log_prob = self.coordinates.log_prob_x_to_fourmomenta(log_prob, ppplogm2)
+        log_prob = self.coordinates.log_prob_x_to_fourmomenta(log_prob, ppplogm2)[0]
         return log_prob
 
 
@@ -243,7 +243,7 @@ class FittedLogPtPhiEtaLogM2(Distribution):
         log_prob = log_prob.sum(dim=[-1, -2])
         log_prob = self.coordinates.log_prob_x_to_fourmomenta(
             log_prob, logptphietalogm2
-        )
+        )[0]
         return log_prob
 
 

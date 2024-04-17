@@ -110,15 +110,14 @@ class CFM(nn.Module):
     def batch_loss(self, x0, ijet):
         """
         Construct the flow matching MSE (CFM training objective)
-        We use the convention x0 = target space, x1 = latent space
 
         Parameters
         ----------
         x0 : torch.tensor with shape (batchsize, n_particles, 4)
-            Target space particles in the coordinates specified in self.coordinates
+            Target space particles in fourmomenta space
         ijet: int
             Process information (eg ttbar+0j vs ttbar+1j)
-            Only used in transformer architectures
+            Only used in transformer architectures, ignored for MLP and GAP
 
         Returns
         -------
@@ -200,14 +199,19 @@ class CFM(nn.Module):
                 ts.append(t[0, 0, 0])
             return v_t
 
+        # sample fourmomenta from base distribution
         x1 = self.sample_base(shape, device, dtype)
         x1 = self.coordinates_sampling.fourmomenta_to_x(x1)
+
+        # solve ODE in space coordinates_sampling
         x0 = odeint(
             velocity,
             x1,
             torch.tensor([1.0, 0.0]),
             **self.odeint,
         )[-1]
+
+        # transform generated event back to fourmomenta
         x0 = self.coordinates_sampling.x_to_fourmomenta(x0)
 
         # save trajectories to file
@@ -270,7 +274,7 @@ class CFM(nn.Module):
         Parameters
         ----------
         x0 : torch.tensor with shape (batchsize, n_particles, 4)
-            Target space particles in the coordinates specified in self.coordinates
+            Target space particles in fourmomenta space
         ijet: int
             Process information (eg ttbar+0j vs ttbar+1j)
             Only used in transformer architectures
@@ -278,7 +282,7 @@ class CFM(nn.Module):
         Returns
         -------
         log_prob : torch.tensor with shape (batchsize)
-            log_prob of each event in x0
+            log_prob of each event in x0, evaluated in fourmomenta space
         """
 
         def net_wrapper(t, state):
@@ -296,6 +300,7 @@ class CFM(nn.Module):
             return v_t.detach(), dlogp_dt.detach()
 
         # solve ODE in x space
+        x0 = self.coordinates_sampling.fourmomenta_to_x(x0)
         logp_diff0 = torch.zeros((x0.shape[0], 1), dtype=x0.dtype, device=x0.device)
         state0 = (x0, logp_diff0)
         x_t, logp_diff_t = odeint(
@@ -454,13 +459,15 @@ class EventCFM(CFM):
         return fourmomenta
 
     def sample(self, *args, **kwargs):
-        x = super().sample(*args, **kwargs)
+        fourmomenta = super().sample(*args, **kwargs)
 
         # enforce onshell-ness
-        fourmomenta = self.coordinates_sampling.x_to_fourmomenta(x)
-        mass = torch.tensor(self.onshell_mass).unsqueeze(0).to(x.device, dtype=x.dtype)
+        mass = (
+            torch.tensor(self.onshell_mass)
+            .unsqueeze(0)
+            .to(fourmomenta.device, dtype=fourmomenta.dtype)
+        )
         fourmomenta[..., self.onshell_list, 0] = torch.sqrt(
             mass**2 + torch.sum(fourmomenta[..., self.onshell_list, 1:] ** 2, dim=-1)
         )
-        x = self.coordinates_sampling.fourmomenta_to_x(fourmomenta)
-        return x
+        return fourmomenta
