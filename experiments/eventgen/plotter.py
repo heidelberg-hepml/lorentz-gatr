@@ -136,6 +136,7 @@ def plot_preprocessed(exp, filename, model_label):
         for ijet in range(len(exp.cfg.data.n_jets)):
 
             def extract(x, channel):
+                x = exp.model.coordinates_sampling.fourmomenta_to_x(x)
                 x = x.reshape(x.shape[0], -1)
                 return x[:, channel]
 
