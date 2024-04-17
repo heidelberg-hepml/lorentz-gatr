@@ -107,13 +107,13 @@ class CFM(nn.Module):
         )
         return fourmomenta
 
-    def batch_loss(self, x0, ijet):
+    def batch_loss(self, x0_fourmomenta, ijet):
         """
         Construct the flow matching MSE (CFM training objective)
 
         Parameters
         ----------
-        x0 : torch.tensor with shape (batchsize, n_particles, 4)
+        x0_fourmomenta : torch.tensor with shape (batchsize, n_particles, 4)
             Target space particles in fourmomenta space
         ijet: int
             Process information (eg ttbar+0j vs ttbar+1j)
@@ -123,31 +123,40 @@ class CFM(nn.Module):
         -------
         loss : torch.tensor with shape (1)
         """
-        t = torch.rand(x0.shape[0], 1, 1, dtype=x0.dtype, device=x0.device)
-        x1 = self.sample_base(x0.shape, x0.device, x0.dtype)
+        t = torch.rand(
+            x0_fourmomenta.shape[0],
+            1,
+            1,
+            dtype=x0_fourmomenta.dtype,
+            device=x0_fourmomenta.device,
+        )
+        x1_fourmomenta = self.sample_base(
+            x0_fourmomenta.shape, x0_fourmomenta.device, x0_fourmomenta.dtype
+        )
 
         # construct trajectories in coordinates_straight
-        # start from x0, x1 in fourmomenta space
-        x0 = self.coordinates_straight.fourmomenta_to_x(x0)
-        x1 = self.coordinates_straight.fourmomenta_to_x(x1)
-        x_t, v_t = self.coordinates_straight.get_trajectory(x0, x1, t)
+        x0_straight = self.coordinates_straight.fourmomenta_to_x(x0_fourmomenta)
+        x1_straight = self.coordinates_straight.fourmomenta_to_x(x1_fourmomenta)
+        xt_straight, vt_straight = self.coordinates_straight.get_trajectory(
+            x0_straight, x1_straight, t
+        )
 
         # predict velocity in coordinates_network
-        x_t = convert_coordinates(
-            x_t, self.coordinates_straight, self.coordinates_network
+        xt_network = convert_coordinates(
+            xt_straight, self.coordinates_straight, self.coordinates_network
         )
-        v_p = self.get_velocity(x_t, t, ijet=ijet)
+        vp_network = self.get_velocity(xt_network, t, ijet=ijet)
 
         # transform all velocities to coordinates_loss
-        v_p = convert_velocity(
-            v_p, x_t, self.coordinates_network, self.coordinates_loss
+        vp_loss = convert_velocity(
+            vp_network, xt_network, self.coordinates_network, self.coordinates_loss
         )[0]
-        v_t = convert_velocity(
-            v_t, x_t, self.coordinates_network, self.coordinates_loss
+        vt_loss = convert_velocity(
+            vt_straight, xt_straight, self.coordinates_straight, self.coordinates_loss
         )[0]
 
-        loss = self.loss(v_p, v_t)
-        return loss, [self.loss(v_p[..., i], v_t[..., i]) for i in range(4)]
+        loss = self.loss(vp_loss, vt_loss)
+        return loss, [self.loss(vp_loss[..., i], vt_loss[..., i]) for i in range(4)]
 
     def sample(
         self, ijet, shape, device, dtype, trajectory_path=None, n_trajectories=100
@@ -174,95 +183,102 @@ class CFM(nn.Module):
 
         Returns
         -------
-        x0 : torch.tensor with shape shape = (batchsize, n_particles, 4)
+        x0_fourmomenta : torch.tensor with shape shape = (batchsize, n_particles, 4)
             Generated events
         """
         # overhead for saving trajectories
         save_trajectory = trajectory_path is not None
         if save_trajectory:
-            xts, vts, ts = [], [], []
+            xts_sampling, vts_sampling, ts = [], [], []
 
-        def velocity(t, x_t):
-            t = t * torch.ones(shape[0], 1, 1, dtype=x_t.dtype, device=x_t.device)
-            x_t = convert_coordinates(
-                x_t, self.coordinates_sampling, self.coordinates_network
+        def velocity(t, xt_sampling):
+            t = t * torch.ones(
+                shape[0], 1, 1, dtype=xt_sampling.dtype, device=xt_sampling.device
             )
-            v_t = self.get_velocity(x_t, t, ijet=ijet)
-            v_t, x_t = convert_velocity(
-                v_t, x_t, self.coordinates_network, self.coordinates_sampling
+            xt_network = convert_coordinates(
+                xt_sampling, self.coordinates_sampling, self.coordinates_network
+            )
+            vt_network = self.get_velocity(xt_network, t, ijet=ijet)
+            vt_sampling, xt_sampling = convert_velocity(
+                vt_network,
+                xt_network,
+                self.coordinates_network,
+                self.coordinates_sampling,
             )
 
             # collect trajectories
             if save_trajectory:
-                xts.append(x_t[:n_trajectories, ...])
-                vts.append(v_t[:n_trajectories, ...])
+                xts_sampling.append(xt_sampling[:n_trajectories, ...])
+                vts_sampling.append(vt_sampling[:n_trajectories, ...])
                 ts.append(t[0, 0, 0])
-            return v_t
+            return vt_sampling
 
         # sample fourmomenta from base distribution
-        x1 = self.sample_base(shape, device, dtype)
-        x1 = self.coordinates_sampling.fourmomenta_to_x(x1)
+        x1_fourmomenta = self.sample_base(shape, device, dtype)
+        x1_sampling = self.coordinates_sampling.fourmomenta_to_x(x1_fourmomenta)
 
-        # solve ODE in space coordinates_sampling
-        x0 = odeint(
+        # solve ODE in sampling space
+        x0_sampling = odeint(
             velocity,
-            x1,
+            x1_sampling,
             torch.tensor([1.0, 0.0]),
             **self.odeint,
         )[-1]
 
         # transform generated event back to fourmomenta
-        x0 = self.coordinates_sampling.x_to_fourmomenta(x0)
+        x0_fourmomenta = self.coordinates_sampling.x_to_fourmomenta(x0_sampling)
 
         # save trajectories to file
         if save_trajectory:
             # collect trajectories
-            xts_learned = torch.stack(xts, dim=0)
-            vts_learned = torch.stack(vts, dim=0)
+            xts_sampling = torch.stack(xts_sampling, dim=0)
+            vts_sampling = torch.stack(vts_sampling, dim=0)
             ts = torch.stack(ts, dim=0)
 
             # determine true trajectories
-            xts_learned_x = convert_coordinates(
-                xts_learned, self.coordinates_sampling, self.coordinates_straight
+            xts_straight = convert_coordinates(
+                xts_sampling, self.coordinates_sampling, self.coordinates_straight
             )
-            xts_true, vts_true = self.coordinates_straight.get_trajectory(
-                xts_learned_x[-1, ...]
-                .reshape(1, *xts_learned_x.shape[1:])
-                .expand(xts_learned_x.shape),
-                xts_learned[0, ...]
-                .reshape(1, *xts_learned_x.shape[1:])
-                .expand(xts_learned_x.shape),
+            vts_straight_t, xts_straight_t = self.coordinates_straight.get_trajectory(
+                xts_straight[-1, ...]
+                .reshape(1, *xts_straight.shape[1:])
+                .expand(xts_straight.shape),
+                xts_straight[0, ...]
+                .reshape(1, *xts_straight.shape[1:])
+                .expand(xts_straight.shape),
                 ts.reshape(ts.shape[0], 1, 1, 1),
             )
 
             # transform to fourmomenta space
             (
-                vts_true_fm,
-                xts_true_fm,
-            ) = self.coordinates_straight.velocity_x_to_fourmomenta(vts_true, xts_true)
+                vts_fourmomenta_t,
+                xts_fourmomenta_t,
+            ) = self.coordinates_straight.velocity_x_to_fourmomenta(
+                vts_straight_t, xts_straight_t
+            )
             (
-                vts_learned_fm,
-                xts_learned_fm,
+                vts_fourmomenta,
+                xts_fourmomenta,
             ) = self.coordinates_sampling.velocity_x_to_fourmomenta(
-                vts_learned, xts_learned
+                vts_sampling, xts_sampling
             )
 
             # save
             np.savez_compressed(
                 trajectory_path,
-                xts_learned=xts_learned_fm.cpu() * self.units,
-                vts_learned=vts_learned_fm.cpu() * self.units,
-                xts_true=xts_true_fm.cpu() * self.units,
-                vts_true=vts_true_fm.cpu() * self.units,
+                xts_learned=xts_fourmomenta.cpu() * self.units,
+                vts_learned=vts_fourmomenta.cpu() * self.units,
+                xts_true=xts_fourmomenta_t.cpu() * self.units,
+                vts_true=vts_fourmomenta_t.cpu() * self.units,
                 ts=ts.cpu(),
             )
 
-        return x0
+        return x0_fourmomenta
 
     def get_velocity(self, x, t, ijet):
         raise NotImplementedError
 
-    def log_prob(self, x0, ijet):
+    def log_prob(self, x0_fourmomenta, ijet):
         """
         Evaluate log_prob for existing target samples in a CFM model
         Have to solve an ODE involving the trace of the velocity field, which is more expensive than plain sampling
@@ -273,7 +289,7 @@ class CFM(nn.Module):
 
         Parameters
         ----------
-        x0 : torch.tensor with shape (batchsize, n_particles, 4)
+        x0_fourmomenta : torch.tensor with shape (batchsize, n_particles, 4)
             Target space particles in fourmomenta space
         ijet: int
             Process information (eg ttbar+0j vs ttbar+1j)
@@ -281,44 +297,66 @@ class CFM(nn.Module):
 
         Returns
         -------
-        log_prob : torch.tensor with shape (batchsize)
+        log_prob_fourmomenta : torch.tensor with shape (batchsize)
             log_prob of each event in x0, evaluated in fourmomenta space
         """
 
         def net_wrapper(t, state):
             with torch.set_grad_enabled(True):
-                x_t = state[0].detach().requires_grad_(True)
-                t = t * torch.ones(x0.shape[0], 1, 1, dtype=x0.dtype, device=x0.device)
-                x_t = convert_coordinates(
-                    x_t, self.coordinates_sampling, self.coordinates_network
+                xt_sampling = state[0].detach().requires_grad_(True)
+                t = t * torch.ones(
+                    xt_sampling.shape[0],
+                    1,
+                    1,
+                    dtype=xt_sampling.dtype,
+                    device=xt_sampling.device,
                 )
-                v_t = self.get_velocity(x_t, t, ijet=ijet)
-                v_t, x_t = convert_velocity(
-                    v_t, x_t, self.coordinates_network, self.coordinates_sampling
+                xt_network = convert_coordinates(
+                    xt_sampling, self.coordinates_sampling, self.coordinates_network
                 )
-                dlogp_dt = self.trace_fn(v_t, x_t).unsqueeze(-1)
-            return v_t.detach(), dlogp_dt.detach()
+                vt_network = self.get_velocity(xt_network, t, ijet=ijet)
+                vt_sampling, xt_sampling = convert_velocity(
+                    vt_network,
+                    xt_network,
+                    self.coordinates_network,
+                    self.coordinates_sampling,
+                )
+                dlogp_dt = self.trace_fn(vt_sampling, xt_sampling).unsqueeze(-1)
+            return vt_sampling.detach(), dlogp_dt.detach()
 
-        # solve ODE in x space
-        x0 = self.coordinates_sampling.fourmomenta_to_x(x0)
-        logp_diff0 = torch.zeros((x0.shape[0], 1), dtype=x0.dtype, device=x0.device)
-        state0 = (x0, logp_diff0)
-        x_t, logp_diff_t = odeint(
+        # solve ODE in sampling space
+        x0_sampling = self.coordinates_sampling.fourmomenta_to_x(x0_fourmomenta)
+        logp_diff0_sampling = torch.zeros(
+            (x0_sampling.shape[0], 1),
+            dtype=x0_sampling.dtype,
+            device=x0_sampling.device,
+        )
+        state0 = (x0_sampling, logp_diff0_sampling)
+        xt_sampling, logp_difft_sampling = odeint(
             net_wrapper,
             state0,
-            torch.tensor([0.0, 1.0], dtype=x0.dtype, device=x0.device),
+            torch.tensor(
+                [0.0, 1.0], dtype=x0_sampling.dtype, device=x0_sampling.device
+            ),
             **self.odeint,
         )
-        x1 = x_t[-1].detach()
-        logp_diff1 = logp_diff_t[-1].detach()
+        x1_sampling = xt_sampling[-1].detach()
+        logp_diff1_sampling = logp_difft_sampling[-1].detach()
 
-        # collect log_probs in fourmomenta space
-        logp_diff1 = self.coordinates_sampling.log_prob_x_to_fourmomenta(
-            logp_diff1, x1
-        )[0]
-        log_prob_base = self.distribution.log_prob(x1).unsqueeze(-1)
-        log_prob = log_prob_base + logp_diff1
-        return log_prob
+        # collect move to fourmomenta space
+        (
+            logp_diff1_fourmomenta,
+            x1_fourmomenta,
+        ) = self.coordinates_sampling.log_prob_x_to_fourmomenta(
+            logp_diff1_sampling, x1_sampling
+        )
+
+        # collect log_probs
+        log_prob_base_fourmomenta = self.distribution.log_prob(
+            x1_fourmomenta
+        ).unsqueeze(-1)
+        log_prob_fourmomenta = log_prob_base_fourmomenta + logp_diff1_fourmomenta
+        return log_prob_fourmomenta
 
 
 class EventCFM(CFM):
