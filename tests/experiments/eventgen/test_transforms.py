@@ -363,8 +363,12 @@ def test_logdetjac(transforms, distribution, experiment_np, nevents):
         jac_inv_autograd.append(inv_autograd)
     jac_fw_autograd = torch.stack(jac_fw_autograd, dim=-2)
     jac_inv_autograd = torch.stack(jac_inv_autograd, dim=-2)
-    logdetjac_fw_autograd = torch.linalg.det(jac_fw_autograd).abs().log().sum(dim=-1)
-    logdetjac_inv_autograd = torch.linalg.det(jac_inv_autograd).abs().log().sum(dim=-1)
+    logdetjac_fw_autograd = (
+        torch.linalg.det(jac_fw_autograd).abs().log().sum(dim=-1, keepdims=True)
+    )
+    logdetjac_inv_autograd = (
+        torch.linalg.det(jac_inv_autograd).abs().log().sum(dim=-1, keepdims=True)
+    )
 
     # compare logdetjac to autograd
     torch.testing.assert_close(logdetjac_fw, logdetjac_fw_autograd, **TOLERANCES)

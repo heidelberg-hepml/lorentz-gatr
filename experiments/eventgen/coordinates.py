@@ -28,6 +28,21 @@ def convert_velocity(v1, x1, coordinates1, coordinates2):
     return v2, x2
 
 
+def convert_log_prob(log_prob1, x1, coordinates1, coordinates2):
+    if type(coordinates1) == type(coordinates2):
+        # no conversion necessary
+        log_prob2, x2 = log_prob1, x1
+    else:
+        # go the long way to fourmomenta and back (could be improved)
+        log_prob_fourmomenta, fourmomenta = coordinates1.log_prob_x_to_fourmomenta(
+            log_prob1, x1
+        )
+        log_prob2, x2 = coordinates2.log_prob_fourmomenta_to_x(
+            log_prob_fourmomenta, fourmomenta
+        )
+    return log_prob2, x2
+
+
 class BaseCoordinates:
     """
     Class that implements transformations

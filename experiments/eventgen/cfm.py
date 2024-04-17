@@ -13,7 +13,11 @@ from experiments.eventgen.distributions import (
     FittedLogPtPhiEtaLogM2,
 )
 import experiments.eventgen.coordinates as c
-from experiments.eventgen.coordinates import convert_coordinates, convert_velocity
+from experiments.eventgen.coordinates import (
+    convert_coordinates,
+    convert_velocity,
+    convert_log_prob,
+)
 
 
 class GaussianFourierProjection(nn.Module):
@@ -315,17 +319,23 @@ class CFM(nn.Module):
                     xt_sampling, self.coordinates_sampling, self.coordinates_network
                 )
                 vt_network = self.get_velocity(xt_network, t, ijet=ijet)
+                dlogp_dt_network = (
+                    self.trace_fn(vt_network, xt_network).unsqueeze(-1).detach()
+                )
+                xt_network, vt_network = xt_network.detach(), vt_network.detach()
                 vt_sampling = convert_velocity(
                     vt_network,
                     xt_network,
                     self.coordinates_network,
                     self.coordinates_sampling,
                 )[0]
-                xt_sampling = convert_coordinates(
-                    xt_network, self.coordinates_network, self.coordinates_sampling
-                )  # required to not destroy graph
-                dlogp_dt = self.trace_fn(vt_sampling, xt_sampling).unsqueeze(-1)
-            return vt_sampling.detach(), dlogp_dt.detach()
+                dlogp_dt_sampling = convert_log_prob(
+                    dlogp_dt_network,
+                    xt_network,
+                    self.coordinates_network,
+                    self.coordinates_sampling,
+                )[0]
+            return vt_sampling, dlogp_dt_sampling
 
         # solve ODE in sampling space
         x0_sampling = self.coordinates_sampling.fourmomenta_to_x(x0_fourmomenta)

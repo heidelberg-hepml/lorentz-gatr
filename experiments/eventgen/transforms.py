@@ -43,13 +43,13 @@ class BaseTransform(nn.Module):
         return v_x
 
     def logdetjac_forward(self, x, y):
-        logdetjac = self._detjac_forward(x, y).abs().log().sum(dim=-1)
+        logdetjac = self._detjac_forward(x, y).abs().log().sum(dim=-1, keepdims=True)
         assert torch.isfinite(logdetjac).all()
         return logdetjac
 
     def logdetjac_inverse(self, y, x):
         # log(det(J^-1)) = log(1/det(J)) = -log(det(J))
-        logdetjac = -self._detjac_forward(x, y).abs().log().sum(dim=-1)
+        logdetjac = -self._detjac_forward(x, y).abs().log().sum(dim=-1, keepdims=True)
         assert torch.isfinite(logdetjac).all()
         return logdetjac
 
