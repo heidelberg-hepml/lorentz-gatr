@@ -315,12 +315,15 @@ class CFM(nn.Module):
                     xt_sampling, self.coordinates_sampling, self.coordinates_network
                 )
                 vt_network = self.get_velocity(xt_network, t, ijet=ijet)
-                vt_sampling, xt_sampling = convert_velocity(
+                vt_sampling = convert_velocity(
                     vt_network,
                     xt_network,
                     self.coordinates_network,
                     self.coordinates_sampling,
-                )
+                )[0]
+                xt_sampling = convert_coordinates(
+                    xt_network, self.coordinates_network, self.coordinates_sampling
+                )  # required to not destroy graph
                 dlogp_dt = self.trace_fn(vt_sampling, xt_sampling).unsqueeze(-1)
             return vt_sampling.detach(), dlogp_dt.detach()
 
