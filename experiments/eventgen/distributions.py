@@ -138,7 +138,7 @@ class StandardPPPM2(Distribution):
         log_prob = log_prob_normal(pppm2)
         log_prob[..., 3] += math.log(2)  # normalization factor because half-gaussian
         log_prob[..., self.onshell_list, 3] = 0.0  # fixed components do not contribute
-        log_prob = log_prob.sum(dim=[-1, -2])
+        log_prob = log_prob.sum(dim=[-1, -2]).unsqueeze(-1)
         log_prob = self.coordinates.log_prob_x_to_fourmomenta(log_prob, pppm2)[0]
         return log_prob
 
@@ -193,7 +193,7 @@ class FittedPPPLogM2(Distribution):
         return eps
 
     def log_prob_raw(self, fourmomenta):
-        ppplogm2 = self.coordinates.fourmomenta_to_x(fourmomenta * self.units)
+        ppplogm2 = self.coordinates.fourmomenta_to_x(fourmomenta)
         log_prob = log_prob_normal(ppplogm2)
         log_prob[..., self.onshell_list, 3] = 0.0
         log_prob = log_prob.sum(dim=[-1, -2]).unsqueeze(-1)
@@ -226,19 +226,24 @@ class FittedLogPtPhiEtaLogM2(Distribution):
         )
 
         # be careful with phi and eta
-        eps[..., 2] = eps[..., 2].clamp(min=-3, max=3)  # clamp eta
+        eps[..., 2] = eps[..., 2].clamp(
+            min=-3, max=3
+        )  # clamp eta for numerical stability
         eps[..., 1] = math.pi * (
             2 * torch.rand(shape[:-1], device=device, dtype=dtype, generator=generator)
             - 1
-        )
+        )  # sample phi uniformly
 
         for t in self.coordinates.transforms[:-1][::-1]:
             eps = t.inverse(eps)
         return eps
 
     def log_prob_raw(self, fourmomenta):
-        logptphietalogm2 = self.coordinates.fourmomenta_to_x(fourmomenta * self.units)
+        logptphietalogm2 = self.coordinates.fourmomenta_to_x(fourmomenta)
         log_prob = log_prob_normal(logptphietalogm2)
+        log_prob[..., 1] = -math.log(
+            2 * math.pi
+        )  # normalization factor for uniform phi distribution: 1/(2 pi)
         log_prob[..., self.onshell_list, 3] = 0.0
         log_prob = log_prob.sum(dim=[-1, -2]).unsqueeze(-1)
         log_prob = self.coordinates.log_prob_x_to_fourmomenta(
