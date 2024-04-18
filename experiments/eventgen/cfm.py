@@ -513,7 +513,7 @@ class EventCFM(CFM):
             torch.tensor(self.onshell_mass)
             .unsqueeze(0)
             .to(fourmomenta.device, dtype=fourmomenta.dtype)
-        )
+        ) / self.units
         fourmomenta[..., self.onshell_list, 0] = torch.sqrt(
             mass**2 + torch.sum(fourmomenta[..., self.onshell_list, 1:] ** 2, dim=-1)
         )
