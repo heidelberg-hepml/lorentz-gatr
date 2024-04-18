@@ -365,9 +365,7 @@ class CFM(nn.Module):
         )
 
         # collect log_probs
-        log_prob_base_fourmomenta = self.distribution.log_prob(
-            x1_fourmomenta
-        ).unsqueeze(-1)
+        log_prob_base_fourmomenta = self.distribution.log_prob(x1_fourmomenta)
         log_prob_fourmomenta = log_prob_base_fourmomenta + logp_diff1_fourmomenta
         return log_prob_fourmomenta
 

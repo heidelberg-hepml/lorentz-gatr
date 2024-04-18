@@ -225,7 +225,7 @@ class EventGenerationExperiment(BaseExperiment):
                 x0 = data_single.to(self.device)
                 log_prob = self.model.log_prob(x0, ijet).squeeze().cpu()
                 log_probs[f"{self.cfg.data.n_jets[ijet]}j"].extend(
-                    log_prob.numpy().tolist()
+                    log_prob.squeeze().numpy().tolist()
                 )
         dt = time.time() - t0
         LOGGER.info(

@@ -11,7 +11,7 @@ data:
  data_path_4j: /media/jspinner/shared/Studium/project3/data/ttbar_4j_200M.npy
  subsample: 100000
  train_test_val: [.4, .5, .1]
- base_type: 1
+ base_type: 2
  use_delta_r_min: true
  use_pt_min: true
 

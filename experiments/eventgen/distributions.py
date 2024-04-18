@@ -164,7 +164,7 @@ class StandardPPPLogM2(Distribution):
         ppplogm2 = self.coordinates.fourmomenta_to_x(fourmomenta)
         log_prob = log_prob_normal(ppplogm2)
         log_prob[..., self.onshell_list, 3] = 0.0
-        log_prob = log_prob.sum(dim=[-1, -2])
+        log_prob = log_prob.sum(dim=[-1, -2]).unsqueeze(-1)
         log_prob = self.coordinates.log_prob_x_to_fourmomenta(log_prob, ppplogm2)[0]
         return log_prob
 
@@ -196,7 +196,7 @@ class FittedPPPLogM2(Distribution):
         ppplogm2 = self.coordinates.fourmomenta_to_x(fourmomenta * self.units)
         log_prob = log_prob_normal(ppplogm2)
         log_prob[..., self.onshell_list, 3] = 0.0
-        log_prob = log_prob.sum(dim=[-1, -2])
+        log_prob = log_prob.sum(dim=[-1, -2]).unsqueeze(-1)
         log_prob = self.coordinates.log_prob_x_to_fourmomenta(log_prob, ppplogm2)[0]
         return log_prob
 
@@ -240,7 +240,7 @@ class FittedLogPtPhiEtaLogM2(Distribution):
         logptphietalogm2 = self.coordinates.fourmomenta_to_x(fourmomenta * self.units)
         log_prob = log_prob_normal(logptphietalogm2)
         log_prob[..., self.onshell_list, 3] = 0.0
-        log_prob = log_prob.sum(dim=[-1, -2])
+        log_prob = log_prob.sum(dim=[-1, -2]).unsqueeze(-1)
         log_prob = self.coordinates.log_prob_x_to_fourmomenta(
             log_prob, logptphietalogm2
         )[0]
