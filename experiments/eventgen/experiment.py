@@ -217,25 +217,24 @@ class EventGenerationExperiment(BaseExperiment):
 
     def _evaluate_log_prob_single(self, loader, title):
         self.model.eval()
-        log_probs = {f"{n_jets}j": [] for n_jets in self.cfg.data.n_jets}
+        NLLs = {f"{n_jets}j": [] for n_jets in self.cfg.data.n_jets}
         LOGGER.info(f"Starting to evaluate log_prob for model on {title} dataset")
         t0 = time.time()
         for i, data in enumerate(tqdm(loader)):
             for ijet, data_single in enumerate(data):
                 x0 = data_single.to(self.device)
-                log_prob = self.model.log_prob(x0, ijet).squeeze().cpu()
-                log_probs[f"{self.cfg.data.n_jets[ijet]}j"].extend(
-                    log_prob.squeeze().numpy().tolist()
+                NLL = -self.model.log_prob(x0, ijet).squeeze().cpu()
+                NLLs[f"{self.cfg.data.n_jets[ijet]}j"].extend(
+                    NLL.squeeze().numpy().tolist()
                 )
         dt = time.time() - t0
         LOGGER.info(
             f"Finished evaluating log_prob for {title} dataset after {dt/60:.2f}min"
         )
-        for key, values in log_probs.items():
-            LOGGER.info(f"log_prob_{key} = {np.mean(values)} +- {np.std(values)}")
+        for key, values in NLLs.items():
+            LOGGER.info(f"NLL_{key} = {np.mean(values)} +- {np.std(values)}")
             if self.cfg.use_mlflow:
-                log_mlflow(f"eval.{title}.{key}.log_prob", np.mean(values))
-                log_mlflow(f"eval.{title}.{key}.log_prob_std", np.std(values))
+                log_mlflow(f"eval.{title}.{key}.NLL", np.mean(values))
 
     def _sample_events(self):
         self.model.eval()

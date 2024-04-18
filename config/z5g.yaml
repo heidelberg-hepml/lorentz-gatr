@@ -6,7 +6,7 @@ data:
  n_jets: [5]
  data_path_5j: /media/jspinner/shared/Studium/project3/data/z5g_prepd.npy
  subsample: null
- train_test_val: [.5, .4, .1]
+ train_test_val: [.9, .09, .01]
 
 evaluation:
  nsamples: 1000
