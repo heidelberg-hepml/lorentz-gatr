@@ -235,7 +235,7 @@ class EventGenerationExperiment(BaseExperiment):
             f"Finished evaluating log_prob for {title} dataset after {dt/60:.2f}min"
         )
         for key, values in NLLs.items():
-            LOGGER.info(f"NLL_{key} = {np.mean(values)} +- {np.std(values)}")
+            LOGGER.info(f"NLL_{key} = {np.mean(values)}")
             if self.cfg.use_mlflow:
                 log_mlflow(f"eval.{title}.{key}.NLL", np.mean(values))
 
