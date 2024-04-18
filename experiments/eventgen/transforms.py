@@ -20,37 +20,41 @@ class BaseTransform(nn.Module):
 
     def forward(self, x):
         y = self._forward(x)
-        assert torch.isfinite(y).all()
+        assert torch.isfinite(y).all(), self.__class__.__name__
         return y
 
     def inverse(self, x):
         y = self._inverse(x)
-        assert torch.isfinite(y).all()
+        assert torch.isfinite(y).all(), self.__class__.__name__
         return y
 
     def velocity_forward(self, v_x, x, y):
         # v_y = dy/dx * v_x
         jac = self._jac_forward(x, y)
         v_y = torch.einsum("...ij,...j->...i", jac, v_x)
-        assert torch.isfinite(v_y).all()
+        assert torch.isfinite(v_y).all(), self.__class__.__name__
         return v_y
 
     def velocity_inverse(self, v_y, y, x):
         # v_x = dx/dy * v_y
         jac = self._jac_inverse(y, x)
         v_x = torch.einsum("...ij,...j->...i", jac, v_y)
-        assert torch.isfinite(v_x).all()
+        assert torch.isfinite(v_x).all(), self.__class__.__name__
         return v_x
 
     def logdetjac_forward(self, x, y):
-        logdetjac = self._detjac_forward(x, y).abs().log().sum(dim=-1, keepdims=True)
-        assert torch.isfinite(logdetjac).all()
+        logdetjac = torch.log(self._detjac_forward(x, y).abs() + EPS2).sum(
+            dim=-1, keepdims=True
+        )
+        assert torch.isfinite(logdetjac).all(), self.__class__.__name__
         return logdetjac
 
     def logdetjac_inverse(self, y, x):
         # log(det(J^-1)) = log(1/det(J)) = -log(det(J))
-        logdetjac = -self._detjac_forward(x, y).abs().log().sum(dim=-1, keepdims=True)
-        assert torch.isfinite(logdetjac).all()
+        logdetjac = -torch.log(self._detjac_forward(x, y).abs() + EPS2).sum(
+            dim=-1, keepdims=True
+        )
+        assert torch.isfinite(logdetjac).all(), self.__class__.__name__
         return logdetjac
 
     def _forward(self, x):
@@ -339,7 +343,7 @@ class M2_to_LogM2(BaseTransform):
         jac_x1 = torch.stack((one, zero, zero, zero), dim=-1)
         jac_x2 = torch.stack((zero, one, zero, zero), dim=-1)
         jac_x3 = torch.stack((zero, zero, one, zero), dim=-1)
-        jac_m2 = torch.stack((zero, zero, zero, 1 / (m2 + EPS1)), dim=-1)
+        jac_m2 = torch.stack((zero, zero, zero, 1 / (m2 + EPS1 + EPS2)), dim=-1)
         return torch.stack((jac_x1, jac_x2, jac_x3, jac_m2), dim=-1)
 
     def _jac_inverse(self, logxm2, xm2):
@@ -355,7 +359,7 @@ class M2_to_LogM2(BaseTransform):
 
     def _detjac_forward(self, xm2, logxm2):
         x1, x2, x3, m2 = unpack_last(xm2)
-        return 1 / (m2 + EPS1)
+        return 1 / (m2 + EPS1 + EPS2)
 
 
 class Pt_to_LogPt(BaseTransform):
@@ -388,7 +392,7 @@ class Pt_to_LogPt(BaseTransform):
         dpt = self.get_dpt(pt)
         jac_pt = torch.stack(
             (
-                1 / (dpt + EPS1),
+                1 / (dpt + EPS1 + EPS2),
                 zero,
                 zero,
                 zero,
@@ -415,7 +419,7 @@ class Pt_to_LogPt(BaseTransform):
     def _detjac_forward(self, ptx, logptx):
         pt, x1, x2, x3 = unpack_last(ptx)
         dpt = self.get_dpt(pt)
-        return 1 / (dpt + EPS1)
+        return 1 / (dpt + EPS1 + EPS2)
 
 
 class FitNormal(BaseTransform):
