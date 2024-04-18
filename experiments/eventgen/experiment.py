@@ -290,6 +290,12 @@ class EventGenerationExperiment(BaseExperiment):
             m2 = samples_raw[..., 0] ** 2 - (samples_raw[..., 1:] ** 2).sum(dim=-1)
             LOGGER.info(f"Fraction of events with m2<0: {(m2<0).float().mean():.4f}")
 
+            if self.cfg.evaluation.save_samples:
+                filename = os.path.join(
+                    self.cfg.run_dir, f"samples_{self.cfg.run_idx}_{n_jets}j.npy"
+                )
+                np.save(filename, samples_raw)
+
         self.sample_loader = torch.utils.data.DataLoader(
             dataset=EventDataset([x["gen"] for x in self.data_prepd], dtype=self.dtype),
             batch_size=self.cfg.evaluation.batchsize,

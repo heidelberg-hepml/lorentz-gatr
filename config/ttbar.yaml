@@ -38,6 +38,7 @@ training:
 
 evaluation:
  sample: true
+ save_samples: false
  nsamples: 1000
  batchsize: 1024
  eval_loss: []
