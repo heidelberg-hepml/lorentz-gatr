@@ -37,6 +37,7 @@ training:
  batchsize: 1024
 
 evaluation:
+ sample: true
  nsamples: 1000
  batchsize: 1024
  eval_loss: []

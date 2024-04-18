@@ -169,15 +169,18 @@ class EventGenerationExperiment(BaseExperiment):
 
     @torch.no_grad()
     def evaluate(self):
-        self._sample_events()
-
         # EMA-evaluation not implemented
         loaders = {
             "train": self.train_loader,
             "test": self.test_loader,
             "val": self.val_loader,
-            "gen": self.sample_loader,
         }
+        if self.cfg.evaluation.sample:
+            self._sample_events()
+            loaders["gen"] = self.sample_loader
+        else:
+            LOGGER.info("Skip sampling")
+
         for key in self.cfg.evaluation.eval_loss:
             self._evaluate_loss_single(loaders[key], key)
         for key in self.cfg.evaluation.eval_log_prob:
@@ -311,27 +314,27 @@ class EventGenerationExperiment(BaseExperiment):
             filename = os.path.join(path, "loss.pdf")
             plotter.plot_losses(filename=filename, **kwargs)
 
-        if self.cfg.plotting.fourmomenta:
+        if self.cfg.plotting.fourmomenta and self.cfg.evaluation.sample:
             filename = os.path.join(path, "fourmomenta.pdf")
             plotter.plot_fourmomenta(filename=filename, **kwargs)
 
-        if self.cfg.plotting.jetmomenta:
+        if self.cfg.plotting.jetmomenta and self.cfg.evaluation.sample:
             filename = os.path.join(path, "jetmomenta.pdf")
             plotter.plot_jetmomenta(filename=filename, **kwargs)
 
-        if self.cfg.plotting.preprocessed:
+        if self.cfg.plotting.preprocessed and self.cfg.evaluation.sample:
             filename = os.path.join(path, "preprocessed.pdf")
             plotter.plot_preprocessed(filename=filename, **kwargs)
 
-        if self.cfg.plotting.virtual:
+        if self.cfg.plotting.virtual and self.cfg.evaluation.sample:
             filename = os.path.join(path, "virtual.pdf")
             plotter.plot_virtual(filename=filename, **kwargs)
 
-        if self.cfg.plotting.delta:
+        if self.cfg.plotting.delta and self.cfg.evaluation.sample:
             filename = os.path.join(path, "delta.pdf")
             plotter.plot_delta(filename=filename, **kwargs)
 
-        if self.cfg.plotting.deta_dphi:
+        if self.cfg.plotting.deta_dphi and self.cfg.evaluation.sample:
             filename = os.path.join(path, "deta_dphi.pdf")
             plotter.plot_deta_dphi(filename=filename, **kwargs)
 
