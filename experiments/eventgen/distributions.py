@@ -2,7 +2,6 @@ import torch
 import math
 
 from experiments.eventgen.helpers import (
-    EPS1,
     get_pt,
     delta_r_fast,
     unpack_last,
@@ -12,6 +11,10 @@ import experiments.eventgen.coordinates as c
 
 # sample a few extra events to speed up rejection sampling
 SAMPLING_FACTOR = 10  # typically acceptance_rate > 0.5
+
+# log(x) -> log(x+EPS1)
+# in (invertible) preprocessing functions to avoid being close to log(0)
+EPS1 = 1e-3
 
 
 class BaseDistribution:

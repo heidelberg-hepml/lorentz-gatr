@@ -10,7 +10,7 @@ data:
  data_path_3j: /media/jspinner/shared/Studium/project3/data/ttbar_3j_200M.npy
  data_path_4j: /media/jspinner/shared/Studium/project3/data/ttbar_4j_200M.npy
  subsample: 100000
- train_test_val: [.4, .5, .1]
+ train_test_val: [.5, .4, .1]
  base_type: 2
  use_delta_r_min: true
  use_pt_min: true
@@ -26,11 +26,12 @@ cfm:
  embed_t_dim: 8
  embed_t_scale: 30.
  hutchinson: true
- coordinates_straight: Fourmomenta
+ coordinates_straight: ${cfm.coordinates_sampling}
  coordinates_network: Fourmomenta
- coordinates_loss: Fourmomenta
+ coordinates_loss: ${cfm.coordinates_sampling}
  coordinates_sampling: Fourmomenta
- transforms_float64: false
+ transforms_float64: true
+ eps1: 1e-3
 
 training:
  iterations: 50

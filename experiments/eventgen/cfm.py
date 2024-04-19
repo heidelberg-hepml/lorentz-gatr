@@ -13,6 +13,8 @@ from experiments.eventgen.distributions import (
     FittedLogPtPhiEtaLogM2,
 )
 import experiments.eventgen.coordinates as c
+import experiments.eventgen.transforms as t
+import experiments.eventgen.distributions as d
 from experiments.eventgen.coordinates import (
     convert_coordinates,
     convert_velocity,
@@ -98,6 +100,8 @@ class CFM(nn.Module):
             c.DTYPE = torch.float64
         else:
             c.DTYPE = torch.float32
+        t.EPS1 = cfm.eps1
+        d.EPS1 = cfm.eps1
 
     def init_distribution(self):
         raise NotImplementedError

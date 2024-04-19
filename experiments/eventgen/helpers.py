@@ -1,10 +1,6 @@
 import math
 import torch
 
-# log(x) -> log(x+EPS1)
-# in (invertible) preprocessing functions to avoid being close to log(0)
-EPS1 = 1e-3
-
 # generic numerical stability cutoff
 EPS2 = 1e-10
 
