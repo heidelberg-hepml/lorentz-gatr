@@ -182,7 +182,8 @@ class EventGenerationExperiment(BaseExperiment):
             LOGGER.info("Skip sampling")
 
         for key in self.cfg.evaluation.eval_loss:
-            self._evaluate_loss_single(loaders[key], key)
+            if key in loaders.keys():
+                self._evaluate_loss_single(loaders[key], key)
         for key in self.cfg.evaluation.eval_log_prob:
             if key == "gen":
                 # log_probs of generated events are not interesting
