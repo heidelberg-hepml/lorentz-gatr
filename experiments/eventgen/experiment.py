@@ -125,19 +125,19 @@ class EventGenerationExperiment(BaseExperiment):
         self.data_raw, self.data_prepd = [], []
         for ijet, n_jets in enumerate(self.cfg.data.n_jets):
             n_data = self.events_raw[ijet].shape[0]
-            split_train = int(n_data * self.cfg.data.train_test_val[0])
-            split_test = int(n_data * sum(self.cfg.data.train_test_val[:2]))
-            split_val = int(n_data * sum(self.cfg.data.train_test_val))
+            split_val = int(n_data * self.cfg.data.train_test_val[::-1][0])
+            split_test = int(n_data * sum(self.cfg.data.train_test_val[::-1][:2]))
+            split_train = int(n_data * sum(self.cfg.data.train_test_val[::-1]))
 
             data_raw = {
-                "trn": self.events_raw[ijet][0:split_train],
-                "tst": self.events_raw[ijet][split_train:split_test],
-                "val": self.events_raw[ijet][split_test:split_val],
+                "val": self.events_raw[ijet][0:split_val],
+                "tst": self.events_raw[ijet][split_val:split_test],
+                "trn": self.events_raw[ijet][split_test:split_train],
             }
             data_prepd = {
-                "trn": self.events_prepd[ijet][0:split_train],
-                "tst": self.events_prepd[ijet][split_train:split_test],
-                "val": self.events_prepd[ijet][split_test:split_val],
+                "val": self.events_prepd[ijet][0:split_val],
+                "tst": self.events_prepd[ijet][split_val:split_test],
+                "trn": self.events_prepd[ijet][split_test:split_train],
             }
             self.data_raw.append(data_raw)
             self.data_prepd.append(data_prepd)
