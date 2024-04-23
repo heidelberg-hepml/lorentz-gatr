@@ -16,7 +16,7 @@ data:
  use_pt_min: true
 
 odeint:
- method: dopri5
+ method: rk4
  rtol: 1e-5
  atol: 1e-5
  options:

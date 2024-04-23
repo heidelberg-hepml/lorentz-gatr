@@ -18,7 +18,6 @@ import experiments.eventgen.distributions as d
 from experiments.eventgen.coordinates import (
     convert_coordinates,
     convert_velocity,
-    convert_log_prob,
 )
 
 
@@ -324,32 +323,25 @@ class CFM(nn.Module):
                 )
                 vt_network = self.get_velocity(xt_network, t, ijet=ijet)
                 dlogp_dt_network = (
-                    self.trace_fn(vt_network, xt_network).unsqueeze(-1).detach()
+                    -self.trace_fn(vt_network, xt_network).unsqueeze(-1).detach()
                 )
-                xt_network, vt_network = xt_network.detach(), vt_network.detach()
                 vt_sampling = convert_velocity(
-                    vt_network,
-                    xt_network,
+                    vt_network.detach(),
+                    xt_network.detach(),
                     self.coordinates_network,
                     self.coordinates_sampling,
                 )[0]
-                dlogp_dt_sampling = convert_log_prob(
-                    dlogp_dt_network,
-                    xt_network,
-                    self.coordinates_network,
-                    self.coordinates_sampling,
-                )[0]
-            return vt_sampling, dlogp_dt_sampling
+            return vt_sampling, dlogp_dt_network
 
         # solve ODE in sampling space
         x0_sampling = self.coordinates_sampling.fourmomenta_to_x(x0_fourmomenta)
-        logp_diff0_sampling = torch.zeros(
+        logdetjac0_cfm_network = torch.zeros(
             (x0_sampling.shape[0], 1),
             dtype=x0_sampling.dtype,
             device=x0_sampling.device,
         )
-        state0 = (x0_sampling, logp_diff0_sampling)
-        xt_sampling, logp_difft_sampling = odeint(
+        state0 = (x0_sampling, logdetjac0_cfm_network)
+        xt_sampling, logdetjact_cfm_network = odeint(
             net_wrapper,
             state0,
             torch.tensor(
@@ -357,20 +349,24 @@ class CFM(nn.Module):
             ),
             **self.odeint,
         )
+        logdetjac_cfm_network = logdetjact_cfm_network[-1].detach()
         x1_sampling = xt_sampling[-1].detach()
-        logp_diff1_sampling = logp_difft_sampling[-1].detach()
-
-        # collect move to fourmomenta space
-        (
-            logp_diff1_fourmomenta,
-            x1_fourmomenta,
-        ) = self.coordinates_sampling.log_prob_x_to_fourmomenta(
-            logp_diff1_sampling, x1_sampling
-        )
+        x1_fourmomenta = self.coordinates_sampling.x_to_fourmomenta(x1_sampling)
+        logdetjac_forward = self.coordinates_network.logdetjac_fourmomenta_to_x(
+            x0_fourmomenta
+        )[0]
+        logdetjac_inverse = -self.coordinates_network.logdetjac_fourmomenta_to_x(
+            x1_fourmomenta
+        )[0]
 
         # collect log_probs
         log_prob_base_fourmomenta = self.distribution.log_prob(x1_fourmomenta)
-        log_prob_fourmomenta = log_prob_base_fourmomenta + logp_diff1_fourmomenta
+        log_prob_fourmomenta = (
+            log_prob_base_fourmomenta
+            - logdetjac_cfm_network
+            - logdetjac_forward
+            - logdetjac_inverse
+        )
         return log_prob_fourmomenta
 
 

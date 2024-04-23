@@ -28,21 +28,6 @@ def convert_velocity(v1, x1, coordinates1, coordinates2):
     return v2, x2
 
 
-def convert_log_prob(log_prob1, x1, coordinates1, coordinates2):
-    if type(coordinates1) == type(coordinates2):
-        # no conversion necessary
-        log_prob2, x2 = log_prob1, x1
-    else:
-        # go the long way to fourmomenta and back (could be improved)
-        log_prob_fourmomenta, fourmomenta = coordinates1.log_prob_x_to_fourmomenta(
-            log_prob1, x1
-        )
-        log_prob2, x2 = coordinates2.log_prob_fourmomenta_to_x(
-            log_prob_fourmomenta, fourmomenta
-        )
-    return log_prob2, x2
-
-
 class BaseCoordinates:
     """
     Class that implements transformations
@@ -69,49 +54,57 @@ class BaseCoordinates:
         x_t = x1 + t * v_t
         return x_t, v_t
 
-    def fourmomenta_to_x(self, x_in):
-        x = x_in.to(dtype=DTYPE)
+    def fourmomenta_to_x(self, a_in):
+        a = a_in.to(dtype=DTYPE)
         for transform in self.transforms:
-            x = transform.forward(x)
-        return x.to(dtype=x_in.dtype)
+            a = transform.forward(a)
+        return a.to(dtype=a_in.dtype)
 
-    def x_to_fourmomenta(self, x_in):
-        x = x_in.to(dtype=DTYPE)
+    def x_to_fourmomenta(self, a_in):
+        a = a_in.to(dtype=DTYPE)
         for transform in self.transforms[::-1]:
-            x = transform.inverse(x)
-        return x.to(dtype=x_in.dtype)
+            a = transform.inverse(a)
+        return a.to(dtype=a_in.dtype)
 
-    def velocity_fourmomenta_to_x(self, v_in, x_in):
-        v, x = v_in.to(dtype=DTYPE), x_in.to(dtype=DTYPE)
+    def velocity_fourmomenta_to_x(self, v_in, a_in):
+        v, a = v_in.to(dtype=DTYPE), a_in.to(dtype=DTYPE)
         for transform in self.transforms:
-            y = transform.forward(x)
-            v = transform.velocity_forward(v, x, y)
-            x = y
-        return v.to(dtype=v_in.dtype), x.to(dtype=x_in.dtype)
+            b = transform.forward(a)
+            v = transform.velocity_forward(v, a, b)
+            a = b
+        return v.to(dtype=v_in.dtype), a.to(dtype=a_in.dtype)
 
-    def velocity_x_to_fourmomenta(self, v_in, x_in):
-        v, x = v_in.to(dtype=DTYPE), x_in.to(dtype=DTYPE)
+    def velocity_x_to_fourmomenta(self, v_in, a_in):
+        v, a = v_in.to(dtype=DTYPE), a_in.to(dtype=DTYPE)
         for transform in self.transforms[::-1]:
-            y = transform.inverse(x)
-            v = transform.velocity_inverse(v, x, y)
-            x = y
-        return v.to(dtype=v_in.dtype), x.to(dtype=x_in.dtype)
+            b = transform.inverse(a)
+            v = transform.velocity_inverse(v, a, b)
+            a = b
+        return v.to(dtype=v_in.dtype), a.to(dtype=a_in.dtype)
 
-    def log_prob_fourmomenta_to_x(self, log_prob_in, x_in):
-        log_prob, x = log_prob_in.to(dtype=DTYPE), x_in.to(dtype=DTYPE)
-        for transform in self.transforms:
-            y = transform.forward(x)
-            log_prob = log_prob + transform.logdetjac_forward(x, y)
-            x = y
-        return log_prob.to(dtype=log_prob_in.dtype), x.to(dtype=x_in.dtype)
+    def logdetjac_fourmomenta_to_x(self, a_in):
+        # logdetjac = log|da/db| = -log|db/da| with a=fourmomenta, b=x
+        a = a_in.to(dtype=DTYPE)
+        b = self.transforms[0].forward(a)
+        logdetjac = -self.transforms[0].logdetjac_forward(a, b)
+        a = b
+        for transform in self.transforms[1:]:
+            b = transform.forward(a)
+            logdetjac -= transform.logdetjac_forward(a, b)
+            a = b
+        return logdetjac.to(dtype=a_in.dtype), a.to(dtype=a_in.dtype)
 
-    def log_prob_x_to_fourmomenta(self, log_prob_in, x_in):
-        log_prob, x = log_prob_in.to(dtype=DTYPE), x_in.to(dtype=DTYPE)
-        for transform in self.transforms[::-1]:
-            y = transform.inverse(x)
-            log_prob = log_prob + transform.logdetjac_inverse(x, y)
-            x = y
-        return log_prob.to(dtype=log_prob_in.dtype), x.to(dtype=x_in.dtype)
+    def logdetjac_x_to_fourmomenta(self, a_in):
+        # logdetjac = log|da/db| = -log|db/da| with a=x, b=fourmomenta
+        a = a_in.to(dtype=DTYPE)
+        b = self.transforms[-1].inverse(a)
+        logdetjac = -self.transforms[-1].logdetjac_inverse(a, b)
+        a = b
+        for transform in self.transforms[::-1][1:]:
+            b = transform.inverse(a)
+            logdetjac -= transform.logdetjac_inverse(a, b)
+            a = b
+        return logdetjac.to(dtype=a_in.dtype), a.to(dtype=a_in.dtype)
 
 
 class Fourmomenta(BaseCoordinates):

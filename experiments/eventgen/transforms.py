@@ -46,6 +46,8 @@ class BaseTransform(nn.Module):
         return v_x
 
     def logdetjac_forward(self, x, y):
+        # log(det(J))
+        # J = dy/dx
         logdetjac = torch.log(self._detjac_forward(x, y).abs() + EPS2).sum(
             dim=-1, keepdims=True
         )
@@ -54,6 +56,7 @@ class BaseTransform(nn.Module):
 
     def logdetjac_inverse(self, y, x):
         # log(det(J^-1)) = log(1/det(J)) = -log(det(J))
+        # J = dy/dx
         logdetjac = -torch.log(self._detjac_forward(x, y).abs() + EPS2).sum(
             dim=-1, keepdims=True
         )
@@ -101,10 +104,10 @@ class EmptyTransform(BaseTransform):
         return v
 
     def logdetjac_forward(self, x, y):
-        return 0.0
+        return torch.zeros_like(x[..., 0])
 
     def logdetjac_inverse(self, x, y):
-        return 0.0
+        return torch.zeros_like(x[..., 0])
 
 
 class EPPP_to_PPPM2(BaseTransform):
