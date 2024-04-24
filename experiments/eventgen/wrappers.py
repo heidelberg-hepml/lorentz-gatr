@@ -1,16 +1,11 @@
 import math
 import torch
 from torch import nn
-from torchdiffeq import odeint
 
 from gatr.interface import embed_vector, extract_vector, extract_scalar
 from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity
 from experiments.toptagging.dataset import embed_beam_reference
 from experiments.eventgen.cfm import EventCFM
-from experiments.eventgen.helpers import (
-    ensure_angle,
-    delta_r,
-)
 
 
 def get_type_token(x_ref, type_token_channels):
@@ -202,60 +197,3 @@ class GATrCFM(EventCFM):
     def extract_from_ga(self, mv, s):
         v = extract_vector(mv).squeeze(dim=-2)
         return v
-
-
-"""
-# deltaR business (on hold right now)
-
-class TransformerCFMPrecisesiastDeltaR(TransformerCFMPrecisesiast):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.alpha = 1.0
-        self.k = 0.5
-
-    def get_trajectory(self, x0, x1, t):
-        # naive distance
-        distance_naive = x1 - x0
-        distance_naive[..., 1] = ensure_angle(distance_naive[..., 1])
-
-        # set naive distance (will overwrite the [..., [1,2]] components later)
-        x_t = x0 + distance_naive * t
-        v_t = distance
-
-        def potential(diff):
-            return (diff[..., 1] ** 2 + diff[..., 2] ** 2 - self.delta_r_min**2) ** (
-                -self.k
-            )
-
-        def get_diff(x, i, j):
-            diff = x[..., i, :] - x[..., j, :]
-            diff[..., 0] = ensure_angle(diff[..., 0])
-            return diff
-
-        def potential_metric(x0, x1):
-            terms = 0.0
-            for i in range(x0.shape[1]):
-                for j in range(i):
-                    diff_x0, diff_x1 = diff(x0, i, j), diff(x1, i, j)
-                    terms += (potential(diff_x0) - potential(diff_x1)) ** 2
-            return self.alpha * terms
-
-        def velocity(ta, x_t):
-            # Fixed velocity function
-            # Note: ta is not the same as t; both are not used here
-            metric = torch.sum(
-                distance_naive[..., [1, 2]] ** 2, dim=-2
-            ) + potential_metric(x0, x_t)
-            gradient_phi = 0.0  # TBD
-            gradient_eta = 0.0  # TBD
-            v_t = (
-                metric
-                * torch.stack([gradient_phi, gradient_eta], dim=-1)
-                / torch.sqrt(gradient_phi**2 + gradient_eta**2)
-            )
-            return v_t
-
-        x_t = odeint(velocity, x1, torch.tensor([1.0, t]), **self.odeint)[-1]
-        v_t = get_velocity(None, x_t)
-        return x_t, v_t
-"""
