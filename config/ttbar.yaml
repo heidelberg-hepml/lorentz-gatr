@@ -31,7 +31,8 @@ cfm:
  coordinates_loss: ${cfm.coordinates_sampling}
  coordinates_sampling: Fourmomenta
  transforms_float64: true
- eps1: 1e-3
+ eps1_pt: 1e-3
+ eps1_m2: 1e-3
 
 training:
  iterations: 50
