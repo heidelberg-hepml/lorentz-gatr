@@ -19,7 +19,7 @@ training:
  subsample: null
  es_patience: 100
  es_load_best_model: true
- validate_every_n_steps: 10
+ validate_every_n_steps: 100
 
  clip_grad_norm: 5
  clip_grad_value: null
