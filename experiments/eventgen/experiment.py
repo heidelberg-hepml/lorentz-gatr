@@ -180,7 +180,7 @@ class EventGenerationExperiment(BaseExperiment):
         else:
             LOGGER.info("Skip sampling")
 
-        if self.cfg.evaluation.classifier.use:
+        if self.cfg.evaluation.classifier:
             self.classifiers = {}
             for ijet, n_jets in enumerate(self.cfg.data.n_jets):
                 self.classifiers[n_jets] = self._evaluate_classifier_metric(
@@ -212,6 +212,9 @@ class EventGenerationExperiment(BaseExperiment):
 
         data_true = self.events_raw[ijet]
         data_fake = self.data_raw[ijet]["gen"]
+        LOGGER.info(
+            f"Classifier data true/fake has shape {data_true.shape}/{data_fake.shape}"
+        )
 
         # preprocessing
         cls_params = {"mean": None, "std": None}
@@ -323,7 +326,9 @@ class EventGenerationExperiment(BaseExperiment):
             self.data_raw[ijet]["gen"] = samples_raw
 
             m2 = samples_raw[..., 0] ** 2 - (samples_raw[..., 1:] ** 2).sum(dim=-1)
-            LOGGER.info(f"Fraction of events with m2<0: {(m2<0).float().mean():.4f}")
+            LOGGER.info(
+                f"Fraction of events with m2<0: {(m2<0).float().mean():.4f} (flip m2->-m2 for these events)"
+            )
 
             if self.cfg.evaluation.save_samples:
                 filename = os.path.join(
@@ -355,7 +360,7 @@ class EventGenerationExperiment(BaseExperiment):
             filename = os.path.join(path, "loss.pdf")
             plotter.plot_losses(filename=filename, **kwargs)
 
-        if self.cfg.evaluation.classifier.use:
+        if self.cfg.evaluation.classifier:
             filename = os.path.join(path, "classifier.pdf")
             plotter.plot_classifier(filename=filename, **kwargs)
 

@@ -45,9 +45,7 @@ evaluation:
  batchsize: 1024
  eval_loss: []
  eval_log_prob: [] # expensive
- classifier:
-  use: true
-  nsamples: 1000
+ classifier: true
 
 plot: true
 plotting:
@@ -58,7 +56,7 @@ plotting:
  virtual: true
  delta: true
  deta_dphi: true
- save_trajectories: true
+ save_trajectories: false
 
 defaults:
 - model: gatr_eventgen

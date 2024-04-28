@@ -10,7 +10,6 @@ cfg_training:
  scheduler: ReduceLROnPlateau
  lr_factor: 0.1
  lr_patience: 5
- load_best_model: true
 
 net:
  _target_: experiments.baselines.MLP

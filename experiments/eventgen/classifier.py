@@ -16,7 +16,7 @@ from sklearn.calibration import calibration_curve
 
 class MLPClassifier:
     def __init__(self, net, cfg_training, experiment, device):
-        self.net = net
+        self.net = net.to(device)
         self.cfg_training = cfg_training
         self.exp = experiment  # this is bad style (but convenient)
         self.device = device
@@ -133,7 +133,7 @@ class MLPClassifier:
                 smallest_val_loss_epoch = epoch
                 es_patience = 0
 
-                if self.cfg_training.load_best_model and self.exp.cfg.save:
+                if self.cfg_training.es_load_best_model and self.exp.cfg.save:
                     path = os.path.join(
                         self.exp.cfg.run_dir,
                         "models",
@@ -148,7 +148,7 @@ class MLPClassifier:
 
         dt = time.time() - t0
         LOGGER.info(f"Finished classifier training after {dt/60:.2f} min")
-        if self.cfg_training.load_best_model and self.exp.cfg.save:
+        if self.cfg_training.es_load_best_model and self.exp.cfg.save:
             path = os.path.join(
                 self.exp.cfg.run_dir,
                 "models",
@@ -165,7 +165,7 @@ class MLPClassifier:
         loss.backward()
         self.optimizer.step()
 
-        self.tracker["loss"].append(loss.detach().item())
+        self.tracker["loss"].append(loss.detach().cpu().item())
         self.tracker["lr"].append(self.optimizer.param_groups[0]["lr"])
 
     @torch.no_grad()
@@ -176,7 +176,7 @@ class MLPClassifier:
             loss = self.batch_loss(x_true, x_fake)
             losses.append(loss)
         val_loss = torch.stack(losses, dim=0).mean()
-        self.tracker["val_loss"].append(val_loss)
+        self.tracker["val_loss"].append(val_loss.cpu())
         return val_loss
 
     def batch_loss(self, x_true, x_fake):
@@ -197,8 +197,8 @@ class MLPClassifier:
             scores_true.append(self.net(x.to(self.device)))
         for (x,) in self.loaders_tst[1]:
             scores_fake.append(self.net(x.to(self.device)))
-        scores_true = torch.cat(scores_true, dim=0).squeeze()
-        scores_fake = torch.cat(scores_fake, dim=0).squeeze()
+        scores_true = torch.cat(scores_true, dim=0).squeeze().cpu()
+        scores_fake = torch.cat(scores_fake, dim=0).squeeze().cpu()
         labels = torch.cat(
             (torch.ones_like(scores_true), torch.zeros_like(scores_fake)), dim=0
         )
@@ -210,7 +210,17 @@ class MLPClassifier:
         fpr, tpr, th = roc_curve(labels, logits)
         auc = roc_auc_score(labels, logits)
         accuracy = accuracy_score(labels, torch.round(logits))
-        prob_true, prob_pred = calibration_curve(labels, logits, n_bins=30)
+        n_min = min(scores_true.shape[0], scores_fake.shape[0])
+        labels_calib = torch.cat(
+            (
+                torch.ones_like(scores_true)[:n_min],
+                torch.zeros_like(scores_fake)[:n_min],
+            )
+        )
+        logits_calib = torch.cat(
+            (sigmoid(scores_true)[:n_min], sigmoid(scores_fake)[:n_min])
+        )
+        prob_true, prob_pred = calibration_curve(labels_calib, logits_calib, n_bins=30)
         LOGGER.info(f"Classifier score: AUC={auc:.4f}, accuracy={accuracy:.4f}")
         self.results = {
             "labels": {
