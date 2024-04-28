@@ -282,3 +282,85 @@ def plot_histogram_2d(
     fig.suptitle(title)
     plt.savefig(file, format="pdf", bbox_inches="tight")
     plt.close()
+
+
+def plot_calibration(file, prob_true, prob_pred):
+    fig, ax = plt.subplots(figsize=(5, 4))
+    ax.plot(
+        prob_true, prob_pred, color="#A52A2A", marker="o", markersize=3, linewidth=1
+    )
+    ax.plot([0, 1], [0, 1], "k--", linewidth=1, alpha=0.5)
+    ax.set_xlabel("classifier probability for true events", fontsize=FONTSIZE)
+    ax.set_ylabel("true fraction of true events", fontsize=FONTSIZE)
+    ax.tick_params(axis="both", labelsize=TICKLABELSIZE)
+    ax.set_xlim(0.0, 1.0)
+    ax.set_ylim(0.0, 1.0)
+    plt.savefig(file, bbox_inches="tight", format="pdf")
+    plt.close()
+
+
+def plot_roc(file, tpr, fpr, auc):
+    fig, ax = plt.subplots(figsize=(5, 4))
+    ax.plot(fpr, tpr, color="#A52A2A", linewidth=1.0)
+    ax.plot([0, 1], [0, 1], "k--", linewidth=1.0, alpha=0.5)
+    ax.set_xlabel("false positive rate", fontsize=FONTSIZE)
+    ax.set_ylabel("true positive rate", fontsize=FONTSIZE)
+    ax.tick_params(axis="both", labelsize=TICKLABELSIZE)
+    ax.text(
+        0.95,
+        0.05,
+        f"AUC = {auc:.4f}",
+        verticalalignment="bottom",
+        horizontalalignment="right",
+        transform=ax.transAxes,
+        fontsize=FONTSIZE,
+    )
+    plt.savefig(file, format="pdf", bbox_inches="tight")
+    plt.close()
+
+
+def simple_histogram(
+    file, data, labels, xrange, xlabel, logx=False, logy=False, n_bins=80
+):
+    assert len(data) == 2 and len(labels) == 2
+    colors = ["#0343DE", "#A52A2A"]
+    dup_last = lambda a: np.append(a, a[-1])
+
+    data = [np.clip(data_i.clone(), xrange[0], xrange[1]) for data_i in data]
+    if logx:
+        data = [np.log(data_i) for data_i in data]
+        xrange = np.log(xrange)
+
+    bins = np.histogram(data[0], bins=n_bins, range=xrange)[1]
+    hists = [np.histogram(data_i, bins=bins, range=xrange)[0] for data_i in data]
+    integrals = [np.sum((bins[1:] - bins[:-1]) * y) for y in hists]
+    scales = [1 / integral if integral != 0.0 else 1.0 for integral in integrals]
+    if logx:
+        bins = np.exp(bins)
+        xrange = np.exp(xrange)
+
+    fig, ax = plt.subplots(figsize=(5, 4))
+    for y, scale, label, color in zip(hists, scales, labels, colors):
+        ax.step(
+            bins,
+            dup_last(y) * scale,
+            label=label,
+            color=color,
+            linewidth=1.0,
+            where="post",
+        )
+    ax.legend(loc="upper right", frameon=False, fontsize=FONTSIZE_LEGEND)
+    ax.set_ylabel("Normalized", fontsize=FONTSIZE)
+    ax.set_xlabel(xlabel, fontsize=FONTSIZE)
+
+    if logy:
+        ax.set_yscale("log")
+    else:
+        _, ymax = ax.get_ylim()
+        ax.set_ylim(0.0, ymax)
+    if logx:
+        ax.set_xscale("log")
+    ax.set_xlim(xrange)
+    ax.tick_params(axis="both", labelsize=TICKLABELSIZE)
+    plt.savefig(file, bbox_inches="tight", format="pdf")
+    plt.close()

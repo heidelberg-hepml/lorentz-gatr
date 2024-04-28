@@ -3,13 +3,12 @@ import torch
 
 import os, time
 from omegaconf import OmegaConf, open_dict
+from hydra.utils import instantiate
 from tqdm import trange, tqdm
 
 from experiments.base_experiment import BaseExperiment
 from experiments.eventgen.dataset import EventDataset, EventDataLoader
-from experiments.eventgen.helpers import (
-    ensure_onshell,
-)
+from experiments.eventgen.helpers import ensure_onshell
 import experiments.eventgen.plotter as plotter
 from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
@@ -181,6 +180,13 @@ class EventGenerationExperiment(BaseExperiment):
         else:
             LOGGER.info("Skip sampling")
 
+        if self.cfg.evaluation.classifier.use:
+            self.classifiers = {}
+            for ijet, n_jets in enumerate(self.cfg.data.n_jets):
+                self.classifiers[n_jets] = self._evaluate_classifier_metric(
+                    ijet, n_jets
+                )
+
         for key in self.cfg.evaluation.eval_loss:
             if key in loaders.keys():
                 self._evaluate_loss_single(loaders[key], key)
@@ -191,6 +197,34 @@ class EventGenerationExperiment(BaseExperiment):
                 # that are not included in the base distribution (because of pt_min, delta_r_min)
                 continue
             self._evaluate_log_prob_single(loaders[key], key)
+
+    def _evaluate_classifier_metric(self, ijet, n_jets):
+        assert self.cfg.evaluation.sample, "need samples for classifier evaluation"
+
+        # initiate
+        with open_dict(self.cfg):
+            np = self.n_hard_particles + n_jets
+            self.cfg.classifier.net.in_shape = (
+                np * (np - 1) // 2 + 4 * np + 4 * len(self.virtual_components)
+            )
+        classifier_factory = instantiate(self.cfg.classifier, _partial_=True)
+        classifier = classifier_factory(experiment=self, device=self.device)
+
+        data_true = self.events_raw[ijet]
+        data_fake = self.data_raw[ijet]["gen"]
+
+        # preprocessing
+        cls_params = {"mean": None, "std": None}
+        data_true, cls_params = classifier.preprocess(data_true, cls_params)
+        data_fake = classifier.preprocess(data_fake, cls_params)[0]
+        data_true = classifier.train_test_val_split(data_true)
+        data_fake = classifier.train_test_val_split(data_fake)
+        classifier.init_data(data_true, data_fake)
+
+        # do things
+        classifier.train()
+        classifier.evaluate()
+        return classifier
 
     def _evaluate_loss_single(self, loader, title):
         # use the same random numbers for all datasets to get comparable results
@@ -317,9 +351,13 @@ class EventGenerationExperiment(BaseExperiment):
             "model_label": self.modelname,
         }
 
-        if self.cfg.plotting.loss and self.cfg.train:
+        if self.cfg.train:
             filename = os.path.join(path, "loss.pdf")
             plotter.plot_losses(filename=filename, **kwargs)
+
+        if self.cfg.evaluation.classifier.use:
+            filename = os.path.join(path, "classifier.pdf")
+            plotter.plot_classifier(filename=filename, **kwargs)
 
         if self.cfg.plotting.fourmomenta and self.cfg.evaluation.sample:
             filename = os.path.join(path, "fourmomenta.pdf")

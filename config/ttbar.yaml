@@ -29,7 +29,7 @@ cfm:
  coordinates_straight: ${cfm.coordinates_sampling}
  coordinates_network: Fourmomenta
  coordinates_loss: ${cfm.coordinates_sampling}
- coordinates_sampling: Fourmomenta
+ coordinates_sampling: LogPtPhiEtaLogM2
  transforms_float64: true
  eps1_pt: 1e-3
  eps1_m2: 1e-3
@@ -45,6 +45,9 @@ evaluation:
  batchsize: 1024
  eval_loss: []
  eval_log_prob: [] # expensive
+ classifier:
+  use: true
+  nsamples: 1000
 
 plot: true
 plotting:
@@ -59,6 +62,7 @@ plotting:
 
 defaults:
 - model: gatr_eventgen
+- classifier: classifier
 - default
 - hydra
 - _self_
