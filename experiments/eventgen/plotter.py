@@ -55,7 +55,7 @@ def plot_losses(exp, filename, model_label):
 
 def plot_classifier(exp, filename, model_label):
     with PdfPages(filename) as file:
-        for n_jets, ijet in enumerate(exp.cfg.data.n_jets):
+        for ijet, n_jets in enumerate(exp.cfg.data.n_jets):
             # classifier train and validation loss
             plot_loss(
                 file,
