@@ -181,11 +181,9 @@ class EventGenerationExperiment(BaseExperiment):
             LOGGER.info("Skip sampling")
 
         if self.cfg.evaluation.classifier:
-            self.classifiers = {}
+            self.classifiers = []
             for ijet, n_jets in enumerate(self.cfg.data.n_jets):
-                self.classifiers[n_jets] = self._evaluate_classifier_metric(
-                    ijet, n_jets
-                )
+                self.classifiers.append(self._evaluate_classifier_metric(ijet, n_jets))
 
         for key in self.cfg.evaluation.eval_loss:
             if key in loaders.keys():

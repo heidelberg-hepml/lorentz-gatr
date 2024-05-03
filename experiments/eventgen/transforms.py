@@ -289,6 +289,7 @@ class PtPhiEtaE_to_PtPhiEtaM2(BaseTransform):
         pt, phi, eta, m2 = unpack_last(ptphietam2)
 
         m2 = stay_positive(m2)
+        eta = eta.clamp(min=-CUTOFF, max=CUTOFF)
         p_abs = pt * torch.cosh(eta)
         E = torch.sqrt(m2 + p_abs**2)
 
@@ -449,6 +450,7 @@ class FitNormal(BaseTransform):
             std[
                 std < eps
             ] = 1.0  # in case we have std=0 in some components (happens for hard-coded masses)
+            assert torch.isfinite(std).all()
             self.params[n_p]["std"] = std
 
             # do not fit some distributions

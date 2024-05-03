@@ -59,16 +59,16 @@ def plot_classifier(exp, filename, model_label):
             # classifier train and validation loss
             plot_loss(
                 file,
-                [exp.classifiers[n_jets].tracker[key] for key in ["loss", "val_loss"]],
-                lr=exp.classifiers[n_jets].tracker["lr"],
+                [exp.classifiers[ijet].tracker[key] for key in ["loss", "val_loss"]],
+                lr=exp.classifiers[ijet].tracker["lr"],
                 labels=[f"train mse {n_jets}j", f"val mse {n_jets}j"],
                 logy=True,
             )
 
             # probabilities
             data = [
-                exp.classifiers[n_jets].results["logits"]["true"],
-                exp.classifiers[n_jets].results["logits"]["fake"],
+                exp.classifiers[ijet].results["logits"]["true"],
+                exp.classifiers[ijet].results["logits"]["fake"],
             ]
             simple_histogram(
                 file,
@@ -91,8 +91,8 @@ def plot_classifier(exp, filename, model_label):
 
             # weights
             data = [
-                exp.classifiers[n_jets].results["weights"]["true"],
-                exp.classifiers[n_jets].results["weights"]["fake"],
+                exp.classifiers[ijet].results["weights"]["true"],
+                exp.classifiers[ijet].results["weights"]["fake"],
             ]
             simple_histogram(
                 file,
@@ -116,15 +116,15 @@ def plot_classifier(exp, filename, model_label):
             # roc curve
             plot_roc(
                 file,
-                exp.classifiers[n_jets].results["tpr"],
-                exp.classifiers[n_jets].results["fpr"],
-                exp.classifiers[n_jets].results["auc"],
+                exp.classifiers[ijet].results["tpr"],
+                exp.classifiers[ijet].results["fpr"],
+                exp.classifiers[ijet].results["auc"],
             )
             # calibration curve
             plot_calibration(
                 file,
-                exp.classifiers[n_jets].results["prob_true"],
-                exp.classifiers[n_jets].results["prob_pred"],
+                exp.classifiers[ijet].results["prob_true"],
+                exp.classifiers[ijet].results["prob_pred"],
             )
 
 
