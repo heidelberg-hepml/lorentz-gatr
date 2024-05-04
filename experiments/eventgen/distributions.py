@@ -232,9 +232,6 @@ class FittedLogPtPhiEtaLogM2(Distribution):
         )
 
         # be careful with phi and eta
-        eps[..., 2] = eps[..., 2].clamp(
-            min=-3, max=3
-        )  # clamp eta for numerical stability
         eps[..., 1] = math.pi * (
             2 * torch.rand(shape[:-1], device=device, dtype=dtype, generator=generator)
             - 1
