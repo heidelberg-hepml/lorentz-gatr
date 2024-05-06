@@ -37,6 +37,8 @@ cfm:
 training:
  iterations: 50
  batchsize: 1024
+ tune_iterations: 10
+ scheduler: ReduceLROnPlateau
 
 evaluation:
  sample: true

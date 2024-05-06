@@ -50,7 +50,10 @@ class EventGenerationExperiment(BaseExperiment):
 
             # extra treatment for lorentz-symmetry breaking inputs in equivariant models
             if self.modelname in ["GATr", "GAP"]:
-                if self.cfg.model.beam_reference is not None:
+                if (
+                    self.cfg.model.beam_reference is not None
+                    or self.cfg.model.beam_reference is not "xyplane"
+                ):
                     self.cfg.model.net.in_mv_channels += (
                         2 if self.cfg.model.two_beams else 1
                     )
@@ -165,6 +168,34 @@ class EventGenerationExperiment(BaseExperiment):
             f"train_batches={len(self.train_loader)}, test_batches={len(self.test_loader)}, val_batches={len(self.val_loader)}, "
             f"batch_size={self.cfg.training.batchsize} (training), {self.cfg.evaluation.batchsize} (evaluation)"
         )
+
+    def train(self):
+        super().train()
+
+        # manual fine-tuning stage
+        if self.cfg.training.tune_iterations > 0:
+            LOGGER.info(
+                f"Starting manual tuning for {self.cfg.training.tune_iterations} iterations"
+            )
+            assert self.cfg.training.scheduler == "ReduceLROnPlateau"
+            for _ in range(
+                self.cfg.training.reduceplateau_patience + 1
+            ):  # force LR decrease
+                self.scheduler.step(1e10)
+
+            def cycle(iterable):
+                while True:
+                    for x in iterable:
+                        yield x
+
+            iterator = iter(cycle(self.train_loader))
+            t0 = time.time()
+            for step in range(self.cfg.training.tune_iterations):
+                self.model.train()
+                data = next(iterator)
+                self._step(data, step + self.cfg.training.iterations)
+            dt = time.time() - t0
+            LOGGER.info(f"Finished tuning after {dt/60:.2f}min")
 
     @torch.no_grad()
     def evaluate(self):
