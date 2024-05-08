@@ -53,6 +53,18 @@ def plot_losses(exp, filename, model_label):
                 )
 
 
+def plot_log_prob(exp, filename, model_label):
+    # ugly out of the box plot
+    import matplotlib.pyplot as plt
+
+    with PdfPages(filename) as file:
+        for ijet, n_jets in enumerate(exp.cfg.data.n_jets):
+            plt.hist(exp.NLLs[f"{n_jets}j"], bins=100, alpha=0.5)
+            plt.xlabel(r"$-\log p(x)$")
+            plt.savefig(file, bbox_inches="tight", format="pdf")
+            plt.close()
+
+
 def plot_classifier(exp, filename, model_label):
     with PdfPages(filename) as file:
         for ijet, n_jets in enumerate(exp.cfg.data.n_jets):

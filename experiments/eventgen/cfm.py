@@ -353,6 +353,16 @@ class CFM(nn.Module):
         )
         logdetjac_cfm_network = logdetjact_cfm_network[-1].detach()
         x1_sampling = xt_sampling[-1].detach()
+
+        # the infamous nan remover
+        # (MLP sometimes returns nan for single events,
+        # and all components of the event are nan...
+        # just remove these events from the log_prob computation)
+        mask = torch.isfinite(x1_sampling).all(dim=[1, 2])
+        logdetjac_cfm_network = logdetjac_cfm_network[mask, ...]
+        x1_sampling = x1_sampling[mask, ...]
+        x0_fourmomenta = x0_fourmomenta[mask, ...]
+
         x1_fourmomenta = self.coordinates_sampling.x_to_fourmomenta(x1_sampling)
         logdetjac_forward = self.coordinates_network.logdetjac_fourmomenta_to_x(
             x0_fourmomenta
@@ -369,6 +379,10 @@ class CFM(nn.Module):
             - logdetjac_forward
             - logdetjac_inverse
         )
+
+        # the infamous clipper
+        # (MLP sometimes has single large-NLL events -> exclude those from NLL computation)
+        log_prob_fourmomenta = log_prob_fourmomenta[log_prob_fourmomenta > -100]
         return log_prob_fourmomenta
 
 

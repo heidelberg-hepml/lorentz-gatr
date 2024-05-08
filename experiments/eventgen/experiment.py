@@ -169,34 +169,6 @@ class EventGenerationExperiment(BaseExperiment):
             f"batch_size={self.cfg.training.batchsize} (training), {self.cfg.evaluation.batchsize} (evaluation)"
         )
 
-    def train(self):
-        super().train()
-
-        # manual fine-tuning stage
-        if self.cfg.training.tune_iterations > 0:
-            LOGGER.info(
-                f"Starting manual tuning for {self.cfg.training.tune_iterations} iterations"
-            )
-            assert self.cfg.training.scheduler == "ReduceLROnPlateau"
-            for _ in range(
-                self.cfg.training.reduceplateau_patience + 1
-            ):  # force LR decrease
-                self.scheduler.step(1e10)
-
-            def cycle(iterable):
-                while True:
-                    for x in iterable:
-                        yield x
-
-            iterator = iter(cycle(self.train_loader))
-            t0 = time.time()
-            for step in range(self.cfg.training.tune_iterations):
-                self.model.train()
-                data = next(iterator)
-                self._step(data, step + self.cfg.training.iterations)
-            dt = time.time() - t0
-            LOGGER.info(f"Finished tuning after {dt/60:.2f}min")
-
     @torch.no_grad()
     def evaluate(self):
         # EMA-evaluation not implemented
@@ -287,21 +259,21 @@ class EventGenerationExperiment(BaseExperiment):
 
     def _evaluate_log_prob_single(self, loader, title):
         self.model.eval()
-        NLLs = {f"{n_jets}j": [] for n_jets in self.cfg.data.n_jets}
+        self.NLLs = {f"{n_jets}j": [] for n_jets in self.cfg.data.n_jets}
         LOGGER.info(f"Starting to evaluate log_prob for model on {title} dataset")
         t0 = time.time()
         for i, data in enumerate(tqdm(loader)):
             for ijet, data_single in enumerate(data):
                 x0 = data_single.to(self.device)
                 NLL = -self.model.log_prob(x0, ijet).squeeze().cpu()
-                NLLs[f"{self.cfg.data.n_jets[ijet]}j"].extend(
+                self.NLLs[f"{self.cfg.data.n_jets[ijet]}j"].extend(
                     NLL.squeeze().numpy().tolist()
                 )
         dt = time.time() - t0
         LOGGER.info(
             f"Finished evaluating log_prob for {title} dataset after {dt/60:.2f}min"
         )
-        for key, values in NLLs.items():
+        for key, values in self.NLLs.items():
             LOGGER.info(f"NLL_{key} = {np.mean(values)}")
             if self.cfg.use_mlflow:
                 log_mlflow(f"eval.{title}.{key}.NLL", np.mean(values))
@@ -388,6 +360,10 @@ class EventGenerationExperiment(BaseExperiment):
         if self.cfg.train:
             filename = os.path.join(path, "loss.pdf")
             plotter.plot_losses(filename=filename, **kwargs)
+
+        if self.cfg.plotting.log_prob and len(self.cfg.evaluation.eval_log_prob) > 0:
+            filename = os.path.join(path, "neg_log_prob.pdf")
+            plotter.plot_log_prob(filename=filename, **kwargs)
 
         if self.cfg.evaluation.classifier:
             filename = os.path.join(path, "classifier.pdf")
