@@ -234,6 +234,14 @@ class CFM(nn.Module):
             **self.odeint,
         )[-1]
 
+        # the infamous nan remover
+        # (MLP sometimes returns nan for single events,
+        # and all components of the event are nan...
+        # just sample another event in this case)
+        mask = torch.isfinite(x0_sampling).all(dim=[1, 2])
+        x0_sampling = x0_sampling[mask, ...]
+        x1_fourmomenta = x1_fourmomenta[mask, ...]
+
         # transform generated event back to fourmomenta
         x0_fourmomenta = self.coordinates_sampling.x_to_fourmomenta(x0_sampling)
 
