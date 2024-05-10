@@ -52,7 +52,7 @@ class EventGenerationExperiment(BaseExperiment):
             if self.modelname in ["GATr", "GAP"]:
                 if (
                     self.cfg.model.beam_reference is not None
-                    or self.cfg.model.beam_reference is not "xyplane"
+                    or self.cfg.model.beam_reference != "xyplane"
                 ):
                     self.cfg.model.net.in_mv_channels += (
                         2 if self.cfg.model.two_beams else 1
@@ -204,9 +204,11 @@ class EventGenerationExperiment(BaseExperiment):
 
         # initiate
         with open_dict(self.cfg):
-            np = self.n_hard_particles + n_jets
+            num_particles = self.n_hard_particles + n_jets
             self.cfg.classifier.net.in_shape = (
-                np * (np - 1) // 2 + 4 * np + 4 * len(self.virtual_components)
+                num_particles * (num_particles - 1) // 2
+                + 4 * num_particles
+                + 4 * len(self.virtual_components)
             )
         classifier_factory = instantiate(self.cfg.classifier, _partial_=True)
         classifier = classifier_factory(experiment=self, device=self.device)
@@ -228,6 +230,28 @@ class EventGenerationExperiment(BaseExperiment):
         # do things
         classifier.train()
         classifier.evaluate()
+
+        # save weighted events
+        if self.cfg.evaluation.save_samples and self.cfg.save:
+            events_true = classifier.train_test_val_split(self.events_raw[ijet])["tst"]
+            events_fake = classifier.train_test_val_split(self.data_raw[ijet]["gen"])[
+                "tst"
+            ]
+            weights_true = classifier.results["weights"]["true"]
+            weights_fake = classifier.results["weights"]["fake"]
+            os.makedirs(os.path.join(self.cfg.run_dir, "samples"), exist_ok=True)
+            filename = os.path.join(
+                self.cfg.run_dir,
+                "samples",
+                f"samples_weighted_{self.cfg.run_idx}_{n_jets}j",
+            )
+            np.savez(
+                filename,
+                events_true=events_true,
+                events_fake=events_fake,
+                weights_true=weights_true,
+                weights_fake=weights_fake,
+            )
         return classifier
 
     def _evaluate_loss_single(self, loader, title):
@@ -331,9 +355,12 @@ class EventGenerationExperiment(BaseExperiment):
                 f"Fraction of events with m2<0: {(m2<0).float().mean():.4f} (flip m2->-m2 for these events)"
             )
 
-            if self.cfg.evaluation.save_samples:
+            if self.cfg.evaluation.save_samples and self.cfg.save:
+                os.makedirs(os.path.join(self.cfg.run_dir, "samples"), exist_ok=True)
                 filename = os.path.join(
-                    self.cfg.run_dir, f"samples_{self.cfg.run_idx}_{n_jets}j.npy"
+                    self.cfg.run_dir,
+                    "samples",
+                    f"samples_{self.cfg.run_idx}_{n_jets}j.npy",
                 )
                 np.save(filename, samples_raw)
 
