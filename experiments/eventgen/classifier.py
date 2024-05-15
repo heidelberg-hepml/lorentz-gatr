@@ -21,6 +21,13 @@ class MLPClassifier:
         self.exp = experiment  # this is bad style (but convenient)
         self.device = device
 
+        num_parameters = sum(
+            p.numel() for p in self.net.parameters() if p.requires_grad
+        )
+        LOGGER.info(
+            f"Instantiated MLPClassifier with {num_parameters} learnable parameters"
+        )
+
     def preprocess(self, events, cls_params, eps=1e-10):
         # naive channels
         naive_raw = fourmomenta_to_jetmomenta(events)
@@ -80,16 +87,26 @@ class MLPClassifier:
         return {"trn": trn, "tst": tst, "val": val}
 
     def init_data(self, data_true, data_fake):
-        def create_dataloader(x, shuffle=True):
+        LOGGER.info(
+            f"Classifier training data has shape {data_true['trn'].shape}(true) / {data_fake['trn'].shape}(fake)"
+        )
+
+        def create_dataloader(x, shuffle):
             return torch.utils.data.DataLoader(
                 torch.utils.data.TensorDataset(x),
                 batch_size=self.cfg_training.batchsize,
                 shuffle=shuffle,
             )
 
-        self.loaders_trn = [create_dataloader(x["trn"]) for x in [data_true, data_fake]]
-        self.loaders_val = [create_dataloader(x["val"]) for x in [data_true, data_fake]]
-        self.loaders_tst = [create_dataloader(x["tst"]) for x in [data_true, data_fake]]
+        self.loaders_trn = [
+            create_dataloader(x["trn"], shuffle=True) for x in [data_true, data_fake]
+        ]
+        self.loaders_val = [
+            create_dataloader(x["val"], shuffle=False) for x in [data_true, data_fake]
+        ]
+        self.loaders_tst = [
+            create_dataloader(x["tst"], shuffle=False) for x in [data_true, data_fake]
+        ]
 
     def init_dataloaders(self, data_true, data_fake):
         # data_true and data_fake have shape (nevents, ncomponents)
@@ -246,3 +263,24 @@ class MLPClassifier:
             "prob_true": prob_true,
             "prob_pred": prob_pred,
         }
+
+        # evaluate weights on train, test, val sets (only fake) for reweighting plots
+        scores_fake = []
+
+        def unshuffle_dataloader(loader):
+            return torch.utils.data.DataLoader(
+                loader.dataset,
+                batch_size=self.cfg_training.batchsize,
+                shuffle=False,
+            )
+
+        for (x,) in unshuffle_dataloader(self.loaders_trn[1]):
+            scores_fake.append(self.net(x.to(self.device)))
+        for (x,) in unshuffle_dataloader(self.loaders_tst[1]):
+            scores_fake.append(self.net(x.to(self.device)))
+        for (x,) in unshuffle_dataloader(self.loaders_val[1]):
+            scores_fake.append(self.net(x.to(self.device)))
+        scores_fake = torch.cat(scores_fake, dim=0).squeeze().cpu()
+        self.weights_fake = self.get_LR(scores_fake).clamp(
+            max=100
+        )  # likelihood ratio p_true/p_fake

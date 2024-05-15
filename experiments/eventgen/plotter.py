@@ -140,7 +140,7 @@ def plot_classifier(exp, filename, model_label):
             )
 
 
-def plot_fourmomenta(exp, filename, model_label):
+def plot_fourmomenta(exp, filename, model_label, weights, mask_dict):
     obs_names = []
     for name in exp.obs_names_index:
         obs_names.extend(
@@ -178,10 +178,12 @@ def plot_fourmomenta(exp, filename, model_label):
                     xrange=xrange,
                     logy=logy,
                     model_label=model_label,
+                    weights=weights[ijet],
+                    mask_dict=mask_dict[ijet],
                 )
 
 
-def plot_jetmomenta(exp, filename, model_label):
+def plot_jetmomenta(exp, filename, model_label, weights, mask_dict):
     obs_names = []
     for name in exp.obs_names_index:
         obs_names.extend(
@@ -221,10 +223,12 @@ def plot_jetmomenta(exp, filename, model_label):
                     xrange=xrange,
                     logy=logy,
                     model_label=model_label,
+                    weights=weights[ijet],
+                    mask_dict=mask_dict[ijet],
                 )
 
 
-def plot_preprocessed(exp, filename, model_label):
+def plot_preprocessed(exp, filename, model_label, weights, mask_dict):
     with PdfPages(filename) as file:
         for ijet in range(len(exp.cfg.data.n_jets)):
 
@@ -254,10 +258,12 @@ def plot_preprocessed(exp, filename, model_label):
                     xrange=xrange,
                     logy=logy,
                     model_label=model_label,
+                    weights=weights[ijet],
+                    mask_dict=mask_dict[ijet],
                 )
 
 
-def plot_delta(exp, filename, model_label):
+def plot_delta(exp, filename, model_label, weights, mask_dict):
     with PdfPages(filename) as file:
         for ijet in range(len(exp.cfg.data.n_jets)):
             num_particles = exp.n_hard_particles + exp.cfg.data.n_jets[ijet]
@@ -290,6 +296,8 @@ def plot_delta(exp, filename, model_label):
                         xrange=xrange,
                         logy=False,
                         model_label=model_label,
+                        weights=weights[ijet],
+                        mask_dict=mask_dict[ijet],
                     )
 
                     # delta phi
@@ -314,6 +322,8 @@ def plot_delta(exp, filename, model_label):
                         xrange=xrange,
                         logy=False,
                         model_label=model_label,
+                        weights=weights[ijet],
+                        mask_dict=mask_dict[ijet],
                     )
 
                     # delta R
@@ -338,10 +348,12 @@ def plot_delta(exp, filename, model_label):
                         xrange=xrange,
                         logy=False,
                         model_label=model_label,
+                        weights=weights[ijet],
+                        mask_dict=mask_dict[ijet],
                     )
 
 
-def plot_virtual(exp, filename, model_label):
+def plot_virtual(exp, filename, model_label, weights, mask_dict):
     logys = [True, False, False, False]
     with PdfPages(filename) as file:
         for ijet in range(len(exp.cfg.data.n_jets)):
@@ -363,6 +375,8 @@ def plot_virtual(exp, filename, model_label):
                         xrange=exp.virtual_ranges[4 * i + j],
                         logy=logys[j],
                         model_label=model_label,
+                        weights=weights[ijet],
+                        mask_dict=mask_dict[ijet],
                     )
 
 

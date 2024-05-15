@@ -29,7 +29,7 @@ cfm:
  coordinates_straight: ${cfm.coordinates_sampling}
  coordinates_network: Fourmomenta
  coordinates_loss: ${cfm.coordinates_sampling}
- coordinates_sampling: LogPtPhiEtaLogM2
+ coordinates_sampling: FittedLogPtPhiEtaLogM2
  transforms_float64: true
  eps1_pt: 1e-3
  eps1_m2: 1e-3
@@ -59,6 +59,8 @@ plotting:
  deta_dphi: true
  save_trajectories: false
  log_prob: true
+ reweighted: true
+ create_mask: false
 
 defaults:
 - model: gatr_eventgen

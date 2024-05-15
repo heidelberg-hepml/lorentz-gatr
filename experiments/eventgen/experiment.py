@@ -384,6 +384,26 @@ class EventGenerationExperiment(BaseExperiment):
             "model_label": self.modelname,
         }
 
+        # If specified, collect weights from classifier
+        if self.cfg.evaluation.classifier and self.cfg.plotting.reweighted:
+            weights = {
+                ijet: self.classifiers[ijet].weights_fake.squeeze()
+                for ijet, n_jets in enumerate(self.cfg.data.n_jets)
+            }
+        else:
+            weights = {ijet: None for ijet, n_jets in enumerate(self.cfg.data.n_jets)}
+
+        # can manually create a mask
+        if self.cfg.plotting.create_mask:
+            mask_dict = {}
+            for ijet, n_jets in enumerate(self.cfg.data.n_jets):
+                # create your mask here
+                assert weights[ijet] is not None
+                mask_dict[ijet] = {"condition": "w<0.5", "mask": weights[ijet] < 0.5}
+            weights[ijet] = None
+        else:
+            mask_dict = {ijet: None for ijet, n_jets in enumerate(self.cfg.data.n_jets)}
+
         if self.cfg.train:
             filename = os.path.join(path, "loss.pdf")
             plotter.plot_losses(filename=filename, **kwargs)
@@ -398,23 +418,33 @@ class EventGenerationExperiment(BaseExperiment):
 
         if self.cfg.plotting.fourmomenta and self.cfg.evaluation.sample:
             filename = os.path.join(path, "fourmomenta.pdf")
-            plotter.plot_fourmomenta(filename=filename, **kwargs)
+            plotter.plot_fourmomenta(
+                filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
+            )
 
         if self.cfg.plotting.jetmomenta and self.cfg.evaluation.sample:
             filename = os.path.join(path, "jetmomenta.pdf")
-            plotter.plot_jetmomenta(filename=filename, **kwargs)
+            plotter.plot_jetmomenta(
+                filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
+            )
 
         if self.cfg.plotting.preprocessed and self.cfg.evaluation.sample:
             filename = os.path.join(path, "preprocessed.pdf")
-            plotter.plot_preprocessed(filename=filename, **kwargs)
+            plotter.plot_preprocessed(
+                filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
+            )
 
         if self.cfg.plotting.virtual and self.cfg.evaluation.sample:
             filename = os.path.join(path, "virtual.pdf")
-            plotter.plot_virtual(filename=filename, **kwargs)
+            plotter.plot_virtual(
+                filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
+            )
 
         if self.cfg.plotting.delta and self.cfg.evaluation.sample:
             filename = os.path.join(path, "delta.pdf")
-            plotter.plot_delta(filename=filename, **kwargs)
+            plotter.plot_delta(
+                filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
+            )
 
         if self.cfg.plotting.deta_dphi and self.cfg.evaluation.sample:
             filename = os.path.join(path, "deta_dphi.pdf")

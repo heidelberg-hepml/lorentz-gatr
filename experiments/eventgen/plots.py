@@ -41,6 +41,8 @@ def plot_histogram(
     n_bins=60,
     error_range=[0.85, 1.15],
     error_ticks=[0.9, 1.0, 1.1],
+    weights=None,
+    mask_dict=None,
 ):
     """
     Plotting code used for all 1d distributions
@@ -58,6 +60,9 @@ def plot_histogram(
     n_bins: int
     error_range: tuple with 2 floats
     error_ticks: tuple with 3 floats
+    weights: np.ndarray of shape (nevents)
+    mask_dict: dict
+        mask (np.ndarray), condition (str)
     """
     # construct labels and colors
     labels = ["Train", "Test", model_label]
@@ -70,18 +75,37 @@ def plot_histogram(
     hists = [y_trn, y_tst, y_mod]
     hist_errors = [np.sqrt(y_trn), np.sqrt(y_tst), np.sqrt(y_mod)]
 
+    if weights is not None:
+        labels.append(f"Rew. {model_label}")
+        colors.append("darkorange")
+        assert model.shape == weights.shape
+        y_weighted = np.histogram(model, bins=bins, weights=weights)[0]
+        hists.append(y_weighted)
+        hist_errors.append(np.sqrt(y_weighted))
+
+    if mask_dict is not None:
+        labels.append(f"{model_label} {mask_dict['condition']}")
+        colors.append("violet")
+        y_masked = np.histogram(model[mask_dict["mask"]], bins=bins)[0]
+        hists.append(y_masked)
+        hist_errors.append(np.sqrt(y_masked))
+
     integrals = [np.sum((bins[1:] - bins[:-1]) * y) for y in hists]
     scales = [1 / integral if integral != 0.0 else 1.0 for integral in integrals]
 
     dup_last = lambda a: np.append(a, a[-1])
 
-    fig, axs = plt.subplots(
-        3,
-        1,
-        sharex=True,
-        figsize=(6, 4),
-        gridspec_kw={"height_ratios": [3, 1, 1], "hspace": 0.00},
-    )
+    if mask_dict is None:
+        fig, axs = plt.subplots(
+            3,
+            1,
+            sharex=True,
+            figsize=(6, 4),
+            gridspec_kw={"height_ratios": [3, 1, 1], "hspace": 0.00},
+        )
+    else:
+        fig, ax = plt.subplots(figsize=(6, 4))
+        axs = [ax]
 
     for i, y, y_err, scale, label, color in zip(
         range(len(hists)), hists, hist_errors, scales, labels, colors
@@ -129,6 +153,9 @@ def plot_histogram(
                 alpha=0.1,
                 step="post",
             )
+            continue
+
+        if mask_dict is not None:
             continue
 
         ratio = (y * scale) / (hists[0] * scales[0])
@@ -204,47 +231,48 @@ def plot_histogram(
         fontsize=FONTSIZE,
     )
 
-    axs[1].set_ylabel(
-        r"$\frac{\mathrm{{%s}}}{\mathrm{Test}}$" % model_label, fontsize=FONTSIZE
-    )
-    axs[1].set_yticks(error_ticks)
-    axs[1].set_ylim(error_range)
-    axs[1].axhline(y=error_ticks[0], c="black", ls="dotted", lw=0.5)
-    axs[1].axhline(y=error_ticks[1], c="black", ls="--", lw=0.7)
-    axs[1].axhline(y=error_ticks[2], c="black", ls="dotted", lw=0.5)
+    if mask_dict is None:
+        axs[1].set_ylabel(
+            r"$\frac{\mathrm{{%s}}}{\mathrm{Test}}$" % model_label, fontsize=FONTSIZE
+        )
+        axs[1].set_yticks(error_ticks)
+        axs[1].set_ylim(error_range)
+        axs[1].axhline(y=error_ticks[0], c="black", ls="dotted", lw=0.5)
+        axs[1].axhline(y=error_ticks[1], c="black", ls="--", lw=0.7)
+        axs[1].axhline(y=error_ticks[2], c="black", ls="dotted", lw=0.5)
 
-    axs[2].set_ylim((0.05, 20))
-    axs[2].set_yscale("log")
-    axs[2].set_yticks([0.1, 1.0, 10.0])
-    axs[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
-    axs[2].set_yticks(
-        [
-            0.2,
-            0.3,
-            0.4,
-            0.5,
-            0.6,
-            0.7,
-            0.8,
-            0.9,
-            2.0,
-            3.0,
-            4.0,
-            5.0,
-            6.0,
-            7.0,
-            8.0,
-            9.0,
-        ],
-        minor=True,
-    )
+        axs[2].set_ylim((0.05, 20))
+        axs[2].set_yscale("log")
+        axs[2].set_yticks([0.1, 1.0, 10.0])
+        axs[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
+        axs[2].set_yticks(
+            [
+                0.2,
+                0.3,
+                0.4,
+                0.5,
+                0.6,
+                0.7,
+                0.8,
+                0.9,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0,
+                9.0,
+            ],
+            minor=True,
+        )
 
-    axs[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
-    axs[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
-    axs[2].set_ylabel(r"$\delta [\%]$", fontsize=FONTSIZE)
+        axs[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
+        axs[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+        axs[2].set_ylabel(r"$\delta [\%]$", fontsize=FONTSIZE)
 
-    axs[1].tick_params(axis="both", labelsize=TICKLABELSIZE)
-    axs[2].tick_params(axis="both", labelsize=TICKLABELSIZE)
+        axs[1].tick_params(axis="both", labelsize=TICKLABELSIZE)
+        axs[2].tick_params(axis="both", labelsize=TICKLABELSIZE)
 
     plt.savefig(file, bbox_inches="tight", format="pdf")
     plt.close()
