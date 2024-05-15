@@ -50,12 +50,14 @@ class EventGenerationExperiment(BaseExperiment):
 
             # extra treatment for lorentz-symmetry breaking inputs in equivariant models
             if self.modelname in ["GATr", "GAP"]:
-                if (
-                    self.cfg.model.beam_reference is not None
-                    or self.cfg.model.beam_reference != "xyplane"
-                ):
+                if self.cfg.model.beam_reference is not None:
                     self.cfg.model.net.in_mv_channels += (
-                        2 if self.cfg.model.two_beams else 1
+                        2
+                        if (
+                            self.cfg.model.two_beams
+                            and self.cfg.model.beam_reference != "xyplane"
+                        )
+                        else 1
                     )
                 if self.cfg.model.add_time_reference:
                     self.cfg.model.net.in_mv_channels += 1
