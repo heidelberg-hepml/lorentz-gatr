@@ -15,9 +15,10 @@ from sklearn.calibration import calibration_curve
 
 
 class MLPClassifier:
-    def __init__(self, net, cfg_training, experiment, device):
+    def __init__(self, net, cfg_training, cfg_preprocessing, experiment, device):
         self.net = net.to(device)
         self.cfg_training = cfg_training
+        self.cfg_preprocessing = cfg_preprocessing
         self.exp = experiment  # this is bad style (but convenient)
         self.device = device
 
@@ -51,7 +52,11 @@ class MLPClassifier:
         )
 
         # combine everything and standardize
-        x = torch.cat((naive, dr, virtual), dim=-1)
+        x = naive
+        if self.cfg_preprocessing.add_delta_r:
+            x = torch.cat((x, dr), dim=-1)
+        if self.cfg_preprocessing.add_virtual:
+            x = torch.cat((x, virtual), dim=-1)
         if cls_params["mean"] is None or cls_params["std"] is None:
             cls_params["mean"] = x.mean(dim=0, keepdim=True)
             cls_params["std"] = x.std(dim=0, keepdim=True)

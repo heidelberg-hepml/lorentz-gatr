@@ -1,5 +1,9 @@
 _target_: experiments.eventgen.classifier.MLPClassifier
 
+cfg_preprocessing:
+ add_virtual: true
+ add_delta_r: true
+
 cfg_training:
  batchsize: 1024
  nepochs: 500

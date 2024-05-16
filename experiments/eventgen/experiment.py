@@ -207,11 +207,13 @@ class EventGenerationExperiment(BaseExperiment):
         # initiate
         with open_dict(self.cfg):
             num_particles = self.n_hard_particles + n_jets
-            self.cfg.classifier.net.in_shape = (
-                num_particles * (num_particles - 1) // 2
-                + 4 * num_particles
-                + 4 * len(self.virtual_components)
-            )
+            self.cfg.classifier.net.in_shape = 4 * num_particles
+            if self.cfg.classifier.cfg_preprocessing.add_delta_r:
+                self.cfg.classifier.net.in_shape += (
+                    num_particles * (num_particles - 1) // 2
+                )
+            if self.cfg.classifier.cfg_preprocessing.add_virtual:
+                self.cfg.classifier.net.in_shape += 4 * len(self.virtual_components)
         classifier_factory = instantiate(self.cfg.classifier, _partial_=True)
         classifier = classifier_factory(experiment=self, device=self.device)
 
