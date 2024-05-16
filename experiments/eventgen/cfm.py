@@ -86,12 +86,10 @@ class CFM(nn.Module):
         self.distribution = BaseDistribution()
         self.coordinates_straight = c.BaseCoordinates()
         self.coordinates_network = c.BaseCoordinates()
-        self.coordinates_loss = c.BaseCoordinates()
         self.coordinates_sampling = c.BaseCoordinates()
         self.coordinates_list = [
             self.coordinates_straight,
             self.coordinates_network,
-            self.coordinates_loss,
             self.coordinates_sampling,
         ]
 
@@ -115,6 +113,14 @@ class CFM(nn.Module):
             shape, device, dtype, generator=generator
         )
         return fourmomenta
+
+    def get_velocity_sampling(self, xt_network, t, ijet):
+        # This method is only overwritten by GATrCFM
+        vp_network = self.get_velocity(xt_network, t, ijet=ijet)
+        vp_sampling, xt_sampling = convert_velocity(
+            vp_network, xt_network, self.coordinates_network, self.coordinates_sampling
+        )
+        return vp_sampling, xt_sampling
 
     def batch_loss(self, x0_fourmomenta, ijet):
         """
@@ -143,29 +149,30 @@ class CFM(nn.Module):
             x0_fourmomenta.shape, x0_fourmomenta.device, x0_fourmomenta.dtype
         )
 
-        # construct trajectories in coordinates_straight
+        # construct target trajectories
         x0_straight = self.coordinates_straight.fourmomenta_to_x(x0_fourmomenta)
         x1_straight = self.coordinates_straight.fourmomenta_to_x(x1_fourmomenta)
         xt_straight, vt_straight = self.coordinates_straight.get_trajectory(
             x0_straight, x1_straight, t
         )
+        vt_sampling = convert_velocity(
+            vt_straight,
+            xt_straight,
+            self.coordinates_straight,
+            self.coordinates_sampling,
+        )[0]
 
-        # predict velocity in coordinates_network
+        # predict velocity
         xt_network = convert_coordinates(
             xt_straight, self.coordinates_straight, self.coordinates_network
         )
-        vp_network = self.get_velocity(xt_network, t, ijet=ijet)
+        vp_sampling = self.get_velocity_sampling(xt_network, t, ijet=ijet)[0]
 
-        # transform all velocities to coordinates_loss
-        vp_loss = convert_velocity(
-            vp_network, xt_network, self.coordinates_network, self.coordinates_loss
-        )[0]
-        vt_loss = convert_velocity(
-            vt_straight, xt_straight, self.coordinates_straight, self.coordinates_loss
-        )[0]
-
-        loss = self.loss(vp_loss, vt_loss)
-        return loss, [self.loss(vp_loss[..., i], vt_loss[..., i]) for i in range(4)]
+        # evaluate loss
+        loss = self.loss(vp_sampling, vt_sampling)
+        return loss, [
+            self.loss(vp_sampling[..., i], vt_sampling[..., i]) for i in range(4)
+        ]
 
     def sample(
         self, ijet, shape, device, dtype, trajectory_path=None, n_trajectories=100
@@ -207,12 +214,8 @@ class CFM(nn.Module):
             xt_network = convert_coordinates(
                 xt_sampling, self.coordinates_sampling, self.coordinates_network
             )
-            vt_network = self.get_velocity(xt_network, t, ijet=ijet)
-            vt_sampling, xt_sampling = convert_velocity(
-                vt_network,
-                xt_network,
-                self.coordinates_network,
-                self.coordinates_sampling,
+            vt_sampling, xt_sampling = self.get_velocity_sampling(
+                xt_network, t, ijet=ijet
             )
 
             # collect trajectories
@@ -331,27 +334,21 @@ class CFM(nn.Module):
                 xt_network = convert_coordinates(
                     xt_sampling, self.coordinates_sampling, self.coordinates_network
                 )
-                vt_network = self.get_velocity(xt_network, t, ijet=ijet)
-                dlogp_dt_network = (
-                    -self.trace_fn(vt_network, xt_network).unsqueeze(-1).detach()
+                vt_sampling = self.get_velocity_sampling(xt_network, t, ijet=ijet)[0]
+                dlogp_dt_sampling = (
+                    -self.trace_fn(vt_sampling, xt_sampling).unsqueeze(-1).detach()
                 )
-                vt_sampling = convert_velocity(
-                    vt_network.detach(),
-                    xt_network.detach(),
-                    self.coordinates_network,
-                    self.coordinates_sampling,
-                )[0]
-            return vt_sampling, dlogp_dt_network
+            return vt_sampling, dlogp_dt_sampling
 
         # solve ODE in sampling space
         x0_sampling = self.coordinates_sampling.fourmomenta_to_x(x0_fourmomenta)
-        logdetjac0_cfm_network = torch.zeros(
+        logdetjac0_cfm_sampling = torch.zeros(
             (x0_sampling.shape[0], 1),
             dtype=x0_sampling.dtype,
             device=x0_sampling.device,
         )
-        state0 = (x0_sampling, logdetjac0_cfm_network)
-        xt_sampling, logdetjact_cfm_network = odeint(
+        state0 = (x0_sampling, logdetjac0_cfm_sampling)
+        xt_sampling, logdetjact_cfm_sampling = odeint(
             net_wrapper,
             state0,
             torch.tensor(
@@ -359,7 +356,7 @@ class CFM(nn.Module):
             ),
             **self.odeint,
         )
-        logdetjac_cfm_network = logdetjact_cfm_network[-1].detach()
+        logdetjac_cfm_sampling = logdetjact_cfm_sampling[-1].detach()
         x1_sampling = xt_sampling[-1].detach()
 
         # the infamous nan remover
@@ -367,15 +364,15 @@ class CFM(nn.Module):
         # and all components of the event are nan...
         # just remove these events from the log_prob computation)
         mask = torch.isfinite(x1_sampling).all(dim=[1, 2])
-        logdetjac_cfm_network = logdetjac_cfm_network[mask, ...]
+        logdetjac_cfm_sampling = logdetjac_cfm_sampling[mask, ...]
         x1_sampling = x1_sampling[mask, ...]
         x0_fourmomenta = x0_fourmomenta[mask, ...]
 
         x1_fourmomenta = self.coordinates_sampling.x_to_fourmomenta(x1_sampling)
-        logdetjac_forward = self.coordinates_network.logdetjac_fourmomenta_to_x(
+        logdetjac_forward = self.coordinates_sampling.logdetjac_fourmomenta_to_x(
             x0_fourmomenta
         )[0]
-        logdetjac_inverse = -self.coordinates_network.logdetjac_fourmomenta_to_x(
+        logdetjac_inverse = -self.coordinates_sampling.logdetjac_fourmomenta_to_x(
             x1_fourmomenta
         )[0]
 
@@ -383,7 +380,7 @@ class CFM(nn.Module):
         log_prob_base_fourmomenta = self.distribution.log_prob(x1_fourmomenta)
         log_prob_fourmomenta = (
             log_prob_base_fourmomenta
-            - logdetjac_cfm_network
+            - logdetjac_cfm_sampling
             - logdetjac_forward
             - logdetjac_inverse
         )
@@ -481,14 +478,12 @@ class EventCFM(CFM):
             self.cfm.coordinates_straight
         )
         self.coordinates_network = self._init_coordinates(self.cfm.coordinates_network)
-        self.coordinates_loss = self._init_coordinates(self.cfm.coordinates_loss)
         self.coordinates_sampling = self._init_coordinates(
             self.cfm.coordinates_sampling
         )
         self.coordinates = [
             self.coordinates_straight,
             self.coordinates_network,
-            self.coordinates_loss,
             self.coordinates_sampling,
         ]
 

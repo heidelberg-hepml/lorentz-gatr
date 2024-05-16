@@ -44,6 +44,7 @@ class EventGenerationExperiment(BaseExperiment):
                 self.cfg.model.net.in_mv_channels = n_particles
                 self.cfg.model.net.out_mv_channels = n_particles
                 self.cfg.model.net.in_s_channels = self.cfg.cfm.embed_t_dim
+                self.cfg.model.net.out_s_channels = n_particles * 4
             elif self.modelname == "MLP":
                 self.cfg.model.net.in_shape = 4 * n_particles + self.cfg.cfm.embed_t_dim
                 self.cfg.model.net.out_shape = 4 * n_particles

@@ -2,6 +2,7 @@ _target_: experiments.eventgen.wrappers.GAPCFM
 beam_reference: spacelike
 two_beams: false
 add_time_reference: true
+dims: [0, 3]
 
 net:
  _target_: gatr.nets.GAP
@@ -11,7 +12,7 @@ net:
  hidden_mv_channels: 4
 
  in_s_channels: 1
- out_s_channels: 1
+ out_s_channels: 4
  hidden_s_channels: 16
 
  num_blocks: 4
