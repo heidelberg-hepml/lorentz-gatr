@@ -13,6 +13,7 @@ from experiments.eventgen.coordinates import (
 
 
 def get_type_token(x_ref, type_token_channels):
+    # embed type_token
     type_token_raw = torch.arange(x_ref.shape[1], device=x_ref.device, dtype=torch.long)
     type_token = nn.functional.one_hot(type_token_raw, num_classes=type_token_channels)
     type_token = type_token.unsqueeze(0).expand(
@@ -22,6 +23,7 @@ def get_type_token(x_ref, type_token_channels):
 
 
 def get_process_token(x_ref, ijet, process_token_channels):
+    # embed process_token
     process_token_raw = torch.tensor([ijet], device=x_ref.device, dtype=torch.long)
     process_token = nn.functional.one_hot(
         process_token_raw, num_classes=process_token_channels
@@ -39,12 +41,17 @@ def get_process_token(x_ref, ijet, process_token_channels):
 
 
 class MLPCFM(EventCFM):
+    """
+    Baseline MLP velocity network
+    """
+
     def __init__(
         self,
         net,
         cfm,
         odeint,
     ):
+        # See GATrCFM.__init__ for documentation
         super().__init__(
             cfm,
             odeint,
@@ -62,6 +69,10 @@ class MLPCFM(EventCFM):
 
 
 class GAPCFM(EventCFM):
+    """
+    Baseline GAP velocity network
+    """
+
     def __init__(
         self,
         net,
@@ -72,6 +83,7 @@ class GAPCFM(EventCFM):
         dims,
         odeint,
     ):
+        # See GATrCFM.__init__ for documentation
         super().__init__(
             cfm,
             odeint=odeint,
@@ -129,6 +141,10 @@ class GAPCFM(EventCFM):
 
 
 class TransformerCFM(EventCFM):
+    """
+    Baseline Transformer velocity network
+    """
+
     def __init__(
         self,
         net,
@@ -137,6 +153,7 @@ class TransformerCFM(EventCFM):
         process_token_channels,
         odeint,
     ):
+        # See GATrCFM.__init__ for documentation
         super().__init__(
             cfm,
             odeint,
@@ -158,8 +175,7 @@ class TransformerCFM(EventCFM):
 
 class GATrCFM(EventCFM):
     """
-    Abstract base class for all GATrCFM's
-    Add GATr-specific parameters
+    GATr velocity network
     """
 
     def __init__(
@@ -174,6 +190,39 @@ class GATrCFM(EventCFM):
         dims,
         odeint,
     ):
+        """
+        Parameters
+        ----------
+        net : torch.nn.Module
+        cfm : Dict
+            Information about how to set up CFM
+            technical keys: embed_t_dim, embed_t_scale, hutchinson, transforms_float64, eps1_pt, eps1_m2
+            conceptional keys: coordinates_straight, coordinates_network, coordinates_sampling
+        type_token_channels : int
+            Number of different particle id's
+            Used for one-hot encoding to break permutation symmetry
+        process_token_channels : int
+            Number of different process id's
+            Used for one-hot encoding to break permutation symmetry
+        beam_reference : str
+            Type of beam reference used to break the Lorentz symmetry
+            Options: [None, "xyplane", "spacelike", "lightlike", "timelike"]
+            See experiments.toptagging.dataset.py::embed_beam_reference for details
+        two_beams : bool
+            If beam_reference in ["spacelike", "lightlike", "timelike"],
+            decide whether only (alpha,0,0,1) or both (alpha,0,0,+/-1) are included
+        add_time_reference : bool
+            Whether time direction (1,0,0,0) is included to break Lorentz group down to SO(3)
+            This is formally required, because equivariant generation on non-compact groups is not possible
+        dims : List[int]
+            Components within the used parametrization
+            for which the equivariantly predicted velocity (using multivector channels)
+            is overwritten by a scalar network output (using scalar channels)
+            This is required whenever coordinates_network != coordinates_sampling,
+            and the transformation between the two contains e.g. log transforms
+        odeint : Dict
+            ODE solver settings to be passed to torchdiffeq.odeint
+        """
         super().__init__(
             cfm,
             odeint,
