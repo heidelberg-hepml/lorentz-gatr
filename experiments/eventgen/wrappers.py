@@ -1,5 +1,6 @@
 import math
 import torch
+import numpy as np
 from torch import nn
 
 from gatr.interface import embed_vector, extract_vector, extract_scalar
@@ -234,6 +235,7 @@ class GATrCFM(EventCFM):
         self.two_beams = two_beams
         self.add_time_reference = add_time_reference
         self.dims = dims
+        assert (np.array(dims) < 4).all() and (np.array(dims) >= 0).all()
         assert (
             self.cfm.coordinates_network == "Fourmomenta"
         ), f"GA-networks require coordinates_network=Fourmomenta"
@@ -253,7 +255,7 @@ class GATrCFM(EventCFM):
 
         # Overwrite transformed velocities with scalar outputs of GATr
         # (this is specific to GATr to avoid large jacobians from from log-transforms)
-        vp_sampling[..., self.dims] = vp_scalar
+        vp_sampling[..., self.dims] = vp_scalar[..., self.dims]
         return vp_sampling, xt_sampling
 
     def embed_into_ga(self, x, t, ijet):
@@ -280,5 +282,4 @@ class GATrCFM(EventCFM):
 
     def extract_from_ga(self, mv, s):
         v = extract_vector(mv).squeeze(dim=-2)
-        v_s = s[..., self.dims]
-        return v, v_s
+        return v, s
