@@ -10,8 +10,7 @@ from experiments.eventgen.helpers import (
 
 # log(x) -> log(x+EPS1)
 # in (invertible) preprocessing functions to avoid being close to log(0)
-EPS1_pt = 1e-3
-EPS1_m2 = 1e-3
+EPS1 = 1e-3
 
 
 class BaseTransform(nn.Module):
@@ -335,12 +334,12 @@ class M2_to_LogM2(BaseTransform):
     def _forward(self, xm2):
         x1, x2, x3, m2 = unpack_last(xm2)
         m2 = m2.clamp(min=EPS2)
-        logm2 = torch.log(m2 + EPS1_m2)
+        logm2 = torch.log(m2 + EPS1)
         return torch.stack((x1, x2, x3, logm2), dim=-1)
 
     def _inverse(self, xlogm2):
         x1, x2, x3, logm2 = unpack_last(xlogm2)
-        m2 = logm2.clamp(max=CUTOFF).exp() - EPS1_m2
+        m2 = logm2.clamp(max=CUTOFF).exp() - EPS1
         return torch.stack((x1, x2, x3, m2), dim=-1)
 
     def _jac_forward(self, xm2, logxm2):
@@ -351,7 +350,7 @@ class M2_to_LogM2(BaseTransform):
         jac_x1 = torch.stack((one, zero, zero, zero), dim=-1)
         jac_x2 = torch.stack((zero, one, zero, zero), dim=-1)
         jac_x3 = torch.stack((zero, zero, one, zero), dim=-1)
-        jac_m2 = torch.stack((zero, zero, zero, 1 / (m2 + EPS1_m2 + EPS2)), dim=-1)
+        jac_m2 = torch.stack((zero, zero, zero, 1 / (m2 + EPS1 + EPS2)), dim=-1)
         return torch.stack((jac_x1, jac_x2, jac_x3, jac_m2), dim=-1)
 
     def _jac_inverse(self, logxm2, xm2):
@@ -362,12 +361,12 @@ class M2_to_LogM2(BaseTransform):
         jac_x1 = torch.stack((one, zero, zero, zero), dim=-1)
         jac_x2 = torch.stack((zero, one, zero, zero), dim=-1)
         jac_x3 = torch.stack((zero, zero, one, zero), dim=-1)
-        jac_logm2 = torch.stack((zero, zero, zero, m2 + EPS1_m2), dim=-1)
+        jac_logm2 = torch.stack((zero, zero, zero, m2 + EPS1), dim=-1)
         return torch.stack((jac_x1, jac_x2, jac_x3, jac_logm2), dim=-1)
 
     def _detjac_forward(self, xm2, logxm2):
         x1, x2, x3, m2 = unpack_last(xm2)
-        return 1 / (m2 + EPS1_m2 + EPS2)
+        return 1 / (m2 + EPS1 + EPS2)
 
 
 class Pt_to_LogPt(BaseTransform):
@@ -380,7 +379,7 @@ class Pt_to_LogPt(BaseTransform):
     def _forward(self, ptx):
         pt, x1, x2, x3 = unpack_last(ptx)
         dpt = self.get_dpt(pt)
-        logpt = torch.log(dpt + EPS1_pt)
+        logpt = torch.log(dpt + EPS1)
         return torch.stack((logpt, x1, x2, x3), dim=-1)
 
     def _inverse(self, logptx):
@@ -388,7 +387,7 @@ class Pt_to_LogPt(BaseTransform):
         pt = (
             logpt.clamp(max=CUTOFF).exp()
             + self.pt_min[: logpt.shape[-1]].to(logpt.device)
-            - EPS1_pt
+            - EPS1
         )
         return torch.stack((pt, x1, x2, x3), dim=-1)
 
@@ -400,7 +399,7 @@ class Pt_to_LogPt(BaseTransform):
         dpt = self.get_dpt(pt)
         jac_pt = torch.stack(
             (
-                1 / (dpt + EPS1_pt + EPS2),
+                1 / (dpt + EPS1 + EPS2),
                 zero,
                 zero,
                 zero,
@@ -418,7 +417,7 @@ class Pt_to_LogPt(BaseTransform):
         # jac_ij = dptx_i / dlogptx_j
         zero, one = torch.zeros_like(pt), torch.ones_like(pt)
         dpt = self.get_dpt(pt)
-        jac_logpt = torch.stack((dpt + EPS1_pt, zero, zero, zero), dim=-1)
+        jac_logpt = torch.stack((dpt + EPS1, zero, zero, zero), dim=-1)
         jac_x1 = torch.stack((zero, one, zero, zero), dim=-1)
         jac_x2 = torch.stack((zero, zero, one, zero), dim=-1)
         jac_x3 = torch.stack((zero, zero, zero, one), dim=-1)
@@ -427,7 +426,7 @@ class Pt_to_LogPt(BaseTransform):
     def _detjac_forward(self, ptx, logptx):
         pt, x1, x2, x3 = unpack_last(ptx)
         dpt = self.get_dpt(pt)
-        return 1 / (dpt + EPS1_pt + EPS2)
+        return 1 / (dpt + EPS1 + EPS2)
 
 
 class FitNormal(BaseTransform):

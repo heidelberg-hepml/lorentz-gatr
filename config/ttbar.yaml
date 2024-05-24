@@ -29,9 +29,7 @@ cfm:
  coordinates_straight: ${cfm.coordinates_sampling}
  coordinates_network: Fourmomenta
  coordinates_sampling: FittedLogPtPhiEtaLogM2
- transforms_float64: true
- eps1_pt: 1e-3
- eps1_m2: 1e-3
+ transforms_float64: false
 
 training:
  iterations: 50

@@ -12,10 +12,7 @@ import experiments.eventgen.coordinates as c
 # sample a few extra events to speed up rejection sampling
 SAMPLING_FACTOR = 10  # typically acceptance_rate > 0.5
 
-# log(x) -> log(x+EPS1)
-# in (invertible) preprocessing functions to avoid being close to log(0)
-EPS1_pt = 1e-3
-EPS1_m2 = 1e-3
+from experiments.eventgen.transforms import EPS1
 
 
 class BaseDistribution:
@@ -160,7 +157,7 @@ class StandardPPPLogM2(Distribution):
         eps = torch.randn(shape, device=device, dtype=dtype, generator=generator)
         onshell_mass = self.onshell_mass.to(device, dtype=dtype).unsqueeze(0)
         eps[..., self.onshell_list, 3] = torch.log(
-            (onshell_mass / self.units) ** 2 + EPS1_m2
+            (onshell_mass / self.units) ** 2 + EPS1
         )
         fourmomenta = self.coordinates.x_to_fourmomenta(eps)
         return fourmomenta
@@ -191,7 +188,7 @@ class FittedPPPLogM2(Distribution):
         eps = self.coordinates.transforms[-1].inverse(eps)
         onshell_mass = self.onshell_mass.to(device, dtype=dtype).unsqueeze(0)
         eps[..., self.onshell_list, 3] = torch.log(
-            (onshell_mass / self.units) ** 2 + EPS1_m2
+            (onshell_mass / self.units) ** 2 + EPS1
         )
 
         for t in self.coordinates.transforms[:-1][::-1]:
@@ -229,7 +226,7 @@ class FittedLogPtPhiEtaLogM2(Distribution):
         eps = self.coordinates.transforms[-1].inverse(eps)
         onshell_mass = self.onshell_mass.to(device, dtype=dtype).unsqueeze(0)
         eps[..., self.onshell_list, 3] = torch.log(
-            (onshell_mass / self.units) ** 2 + EPS1_m2
+            (onshell_mass / self.units) ** 2 + EPS1
         )
 
         # be careful with phi and eta

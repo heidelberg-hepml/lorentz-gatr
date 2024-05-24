@@ -97,10 +97,6 @@ class CFM(nn.Module):
             c.DTYPE = torch.float64
         else:
             c.DTYPE = torch.float32
-        t.EPS1_pt = cfm.eps1_pt
-        t.EPS1_m2 = cfm.eps1_m2
-        d.EPS1_pt = cfm.eps1_pt
-        d.EPS1_m2 = cfm.eps1_m2
 
     def init_distribution(self):
         raise NotImplementedError
