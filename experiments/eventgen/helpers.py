@@ -11,6 +11,9 @@ EPS2 = 1e-10
 # exp(x) -> exp(x.clamp(max=CUTOFF))
 CUTOFF = 10
 
+# these functions are not optimized and only used for plotting,
+# with the exception of delta_r_fast
+
 
 def unpack_last(x):
     # unpack along the last dimension
@@ -48,20 +51,17 @@ def stay_positive(x):
     return x
 
 
-def get_pt(particle):
-    # particle in fourmomenta format
-    return torch.sqrt(particle[..., 1] ** 2 + particle[..., 2] ** 2)
+def get_pt(fourmomenta):
+    return torch.sqrt(fourmomenta[..., 1] ** 2 + fourmomenta[..., 2] ** 2)
 
 
-def get_phi(particle):
-    # particle in fourmomenta format
-    return torch.arctan2(particle[..., 2], particle[..., 1])
+def get_phi(fourmomenta):
+    return torch.arctan2(fourmomenta[..., 2], fourmomenta[..., 1])
 
 
-def get_eta(particle):
-    # particle in fourmomenta format
-    p_abs = torch.sqrt(torch.sum(particle[..., 1:] ** 2, dim=-1))
-    eta = stable_arctanh(particle[..., 3] / p_abs, eps=EPS2)
+def get_eta(fourmomenta):
+    p_abs = torch.sqrt(torch.sum(fourmomenta[..., 1:] ** 2, dim=-1))
+    eta = stable_arctanh(fourmomenta[..., 3] / p_abs, eps=EPS2)
     return eta
 
 
@@ -70,8 +70,8 @@ def stable_arctanh(x, eps=EPS2):
     return 0.5 * (torch.log((1 + x).clamp(min=eps)) - torch.log((1 - x).clamp(min=eps)))
 
 
-def get_mass(particle, eps=EPS2):
-    m2 = particle[..., 0] ** 2 - torch.sum(particle[..., 1:] ** 2, dim=-1)
+def get_mass(fourmomenta, eps=EPS2):
+    m2 = fourmomenta[..., 0] ** 2 - torch.sum(fourmomenta[..., 1:] ** 2, dim=-1)
     m2 = stay_positive(m2)
     m = torch.sqrt(m2.clamp(min=EPS2))
     return m
@@ -94,30 +94,26 @@ def ensure_onshell(fourmomenta, onshell_list, onshell_mass):
     return fourmomenta
 
 
-def delta_phi(event, idx1, idx2, abs=False):
-    # event in jetmomenta format
-    dphi = event[..., idx1, 1] - event[..., idx2, 1]
+def delta_phi(jetmomenta, idx1, idx2, abs=False):
+    dphi = jetmomenta[..., idx1, 1] - jetmomenta[..., idx2, 1]
     dphi = ensure_angle(dphi)
     return torch.abs(dphi) if abs else dphi
 
 
-def delta_eta(event, idx1, idx2, abs=False):
-    # event in jetmomenta format
-    deta = event[..., idx1, 2] - event[..., idx2, 2]
+def delta_eta(jetmomenta, idx1, idx2, abs=False):
+    deta = jetmomenta[..., idx1, 2] - jetmomenta[..., idx2, 2]
     return torch.abs(deta) if abs else deta
 
 
-def delta_r(event, idx1, idx2):
-    # event in jetmomenta format
+def delta_r(jetmomenta, idx1, idx2):
     return (
-        delta_phi(event, idx1, idx2) ** 2 + delta_eta(event, idx1, idx2) ** 2
+        delta_phi(jetmomenta, idx1, idx2) ** 2 + delta_eta(jetmomenta, idx1, idx2) ** 2
     ) ** 0.5
 
 
-def delta_r_fast(particle1, particle2):
-    # particle1, particle2 in jetmomenta format
-    dphi = ensure_angle(particle1[..., 1] - particle2[..., 1])
-    deta = particle1[..., 2] - particle2[..., 2]
+def delta_r_fast(jetmomenta1, jetmomenta2):
+    dphi = ensure_angle(jetmomenta1[..., 1] - jetmomenta2[..., 1])
+    deta = jetmomenta1[..., 2] - jetmomenta2[..., 2]
     return (dphi**2 + deta**2) ** 0.5
 
 

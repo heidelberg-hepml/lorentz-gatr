@@ -29,7 +29,7 @@ class BaseDistribution:
         raise NotImplementedError
 
 
-class Distribution(BaseDistribution):
+class RejectionDistribution(BaseDistribution):
     """
     Implement rejection sampling based on delta_r and pt
     This class is still abstract,
@@ -97,7 +97,7 @@ class Distribution(BaseDistribution):
 
         We do p_actual = 1/normalization * p_naive,
         where p_naive is only normalized when also defined on the rejected regions
-        The 'normalization' factor is estimated by the acceptance rate of rejection sampling
+        The 'normalization' factor is estimated using the acceptance rate of rejection sampling
         """
         fourmomenta = self.propose(shape, device, dtype, generator=None)
         mask = self.create_cut_mask(fourmomenta)
@@ -118,7 +118,7 @@ class Distribution(BaseDistribution):
         raise NotImplementedError
 
 
-class StandardPPPM2(Distribution):
+class StandardPPPM2(RejectionDistribution):
     """Base distribution 1: 3-momentum from standard normal, mass from standard half-normal"""
 
     def __init__(self, *args, **kwargs):
@@ -145,7 +145,7 @@ class StandardPPPM2(Distribution):
         return log_prob
 
 
-class StandardPPPLogM2(Distribution):
+class StandardPPPLogM2(RejectionDistribution):
     """Base distribution 2: 3-momentum from standard normal, log(mass) from standard normal"""
 
     def __init__(self, *args, **kwargs):
@@ -172,7 +172,7 @@ class StandardPPPLogM2(Distribution):
         return log_prob
 
 
-class FittedPPPLogM2(Distribution):
+class FittedPPPLogM2(RejectionDistribution):
     """Base distribution 3: 3-momentum and mass from fitted normal"""
 
     def __init__(self, *args, **kwargs):
@@ -205,7 +205,7 @@ class FittedPPPLogM2(Distribution):
         return log_prob
 
 
-class FittedLogPtPhiEtaLogM2(Distribution):
+class FittedLogPtPhiEtaLogM2(RejectionDistribution):
     """Base distribution 4: phi uniform; eta, log(pt) and log(mass) from fitted normal"""
 
     def __init__(self, *args, **kwargs):

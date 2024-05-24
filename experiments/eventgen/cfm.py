@@ -61,8 +61,8 @@ def autograd_trace(x_out, x_in):
 class CFM(nn.Module):
     """
     Base class for all CFM models
-    - get_velocity, init_distribution and init_coordinates should be implemented by subclasses
-    - get_distance, get_trajectory might be overwritten or extended by subclasses
+    - event-generation-specific features are implemented in EventCFM
+    - get_velocity is implemented by architecture-specific subclasses
     """
 
     def __init__(
@@ -110,8 +110,26 @@ class CFM(nn.Module):
         )
         return fourmomenta
 
+    def get_velocity(self, x, t, ijet):
+        """
+        Parameters
+        ----------
+        x : torch.tensor with shape (batchsize, n_particles, 4)
+        t : torch.tensor with shape (batchsize, 1, 1)
+        ijet: int
+        """
+        # implemented by architecture-specific subclasses
+        raise NotImplementedError
+
     def get_velocity_sampling(self, xt_network, t, ijet):
-        # This method is only overwritten by GATrCFM
+        """
+        Parameters
+        ----------
+        xt_network : torch.tensor with shape (batchsize, n_particles, 4)
+        t : torch.tensor with shape (batchsize, 1, 1)
+        ijet: int
+        """
+        # This method is only overwritten by GATrCFM and GAPCFM
         vp_network = self.get_velocity(xt_network, t, ijet=ijet)
         vp_sampling, xt_sampling = convert_velocity(
             vp_network, xt_network, self.coordinates_network, self.coordinates_sampling
@@ -120,7 +138,7 @@ class CFM(nn.Module):
 
     def batch_loss(self, x0_fourmomenta, ijet):
         """
-        Construct the flow matching MSE (CFM training objective)
+        Construct the conditional flow matching objective
 
         Parameters
         ----------
@@ -164,7 +182,7 @@ class CFM(nn.Module):
         )
         vp_sampling = self.get_velocity_sampling(xt_network, t, ijet=ijet)[0]
 
-        # evaluate loss
+        # evaluate conditional flow matching objective
         loss = self.loss(vp_sampling, vt_sampling)
         return loss, [
             self.loss(vp_sampling[..., i], vt_sampling[..., i]) for i in range(4)
@@ -174,9 +192,8 @@ class CFM(nn.Module):
         self, ijet, shape, device, dtype, trajectory_path=None, n_trajectories=100
     ):
         """
-        Sample from CFM model:
-        Have to solve an ODE using a NN-parametrized velocity field
-        Option to save trajectories for manual inspection.
+        Sample from CFM model
+        Solve an ODE using a NN-parametrized velocity field
 
         Parameters
         ----------
@@ -189,7 +206,7 @@ class CFM(nn.Module):
         dtype : torch.dtype
         trajectory_path : str
             path where trajectories should be saved
-            no trajectories will be saved if (trajectory_path is None)
+            no trajectories will be saved if 'trajectory_path is None'
         n_trajectories: int
             Number of trajectories to keep, out of the full batchsize trajectories
 
@@ -291,17 +308,14 @@ class CFM(nn.Module):
 
         return x0_fourmomenta
 
-    def get_velocity(self, x, t, ijet):
-        raise NotImplementedError
-
     def log_prob(self, x0_fourmomenta, ijet):
         """
         Evaluate log_prob for existing target samples in a CFM model
-        Have to solve an ODE involving the trace of the velocity field, which is more expensive than plain sampling
+        Solve ODE involving the trace of the velocity field, this is more expensive than normal sampling
         The 'self.hutchinson' parameter controls if the trace should be evaluated
         with the hutchinson trace estimator that needs O(1) calls to the network,
         as opposed to the exact autograd trace that needs O(n_particles) calls to the network
-        Note: We could also have a sample_and_logprob method, but we have no use case for this
+        Note: Could also have a sample_and_log_prob method, but we have no use case for this
 
         Parameters
         ----------
@@ -336,7 +350,7 @@ class CFM(nn.Module):
                 )
             return vt_sampling, dlogp_dt_sampling
 
-        # solve ODE in sampling space
+        # solve ODE in coordinates_sampling
         x0_sampling = self.coordinates_sampling.fourmomenta_to_x(x0_fourmomenta)
         logdetjac0_cfm_sampling = torch.zeros(
             (x0_sampling.shape[0], 1),
@@ -390,7 +404,9 @@ class CFM(nn.Module):
 class EventCFM(CFM):
     """
     Add event-generation-specific methods to CFM classes:
-    Save information at the wrapper level, have wrapper-specific preprocessing and undo_preprocessing
+    - Save information at the wrapper level
+    - Handle base distribution and coordinates for RFM
+    - Wrapper-specific preprocessing and undo_preprocessing
     """
 
     def __init__(self, *args, **kwargs):
