@@ -12,7 +12,7 @@ import experiments.eventgen.coordinates as c
 # sample a few extra events to speed up rejection sampling
 SAMPLING_FACTOR = 10  # typically acceptance_rate > 0.5
 
-from experiments.eventgen.transforms import EPS1
+from experiments.eventgen.helpers import EPS1
 
 
 class BaseDistribution:

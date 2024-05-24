@@ -2,15 +2,12 @@ import torch
 from torch import nn
 from experiments.eventgen.helpers import (
     unpack_last,
+    EPS1,
     EPS2,
     CUTOFF,
     stable_arctanh,
     stay_positive,
 )
-
-# log(x) -> log(x+EPS1)
-# in (invertible) preprocessing functions to avoid being close to log(0)
-EPS1 = 1e-3
 
 
 class BaseTransform(nn.Module):

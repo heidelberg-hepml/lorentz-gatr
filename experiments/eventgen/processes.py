@@ -4,11 +4,12 @@ from experiments.eventgen.experiment import EventGenerationExperiment
 
 
 class ttbarExperiment(EventGenerationExperiment):
-    '''
+    """
     Process: p p > t t~ at reco-level with hadronic top decays and 0-4 extra jets
     Main experiment, used for the paper
     Dataset will be published at the ITP website
-    '''
+    """
+
     def define_process_specifics(self):
         self.plot_title = r"t\bar t"
         self.n_hard_particles = 6
@@ -75,12 +76,14 @@ class ttbarExperiment(EventGenerationExperiment):
             [30, 150],
         ]
 
+
 class zmumuExperiment(EventGenerationExperiment):
-    '''
+    """
     Process: p p > z > mu+ mu- at reco-level with 1-3 extra jets
     For comparison with our previous paper https://arxiv.org/abs/2305.10475
     Dataset available upon request
-    '''
+    """
+
     def define_process_specifics(self):
         self.plot_title = r"Z"
         self.n_hard_particles = 2
@@ -104,12 +107,14 @@ class zmumuExperiment(EventGenerationExperiment):
             r"m_{\mu\mu}",
         ]
 
+
 class z5gExperiment(EventGenerationExperiment):
-    '''
+    """
     Process: p p > z g g g g g at parton level
     Enhance statistics on Z+5g dataset for amplitude regression
     Dataset available upon request
-    '''
+    """
+
     def define_process_specifics(self):
         self.plot_title = r"Z"
         self.n_hard_particles = 1
