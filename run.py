@@ -1,9 +1,11 @@
 import hydra
 from experiments.amplitudes.experiment import AmplitudeExperiment
 from experiments.toptagging.experiment import TopTaggingExperiment
-from experiments.eventgen.ttbarexperiment import ttbarExperiment
-from experiments.eventgen.zmumuexperiment import zmumuExperiment
-from experiments.eventgen.z5gexperiment import z5gExperiment
+from experiments.eventgen.processes import (
+    ttbarExperiment,
+    zmumuExperiment,
+    z5gExperiment,
+)
 from experiments.toptagging.experiment import QGTaggingExperiment
 
 
