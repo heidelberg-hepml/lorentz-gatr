@@ -8,8 +8,7 @@ from experiments.eventgen.distributions import (
     FittedPPPLogM2,
     FittedLogPtPhiEtaLogM2,
 )
-from experiments.eventgen.ttbarexperiment import ttbarExperiment
-from experiments.eventgen.zmumuexperiment import zmumuExperiment
+from experiments.eventgen.processes import ttbarExperiment, zmumuExperiment
 from experiments.eventgen.transforms import EPPP_to_PPPM2
 from tests.helpers import MILD_TOLERANCES as TOLERANCES
 

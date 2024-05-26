@@ -9,8 +9,7 @@ from experiments.eventgen.distributions import (
     FittedPPPLogM2,
     FittedLogPtPhiEtaLogM2,
 )
-from experiments.eventgen.ttbarexperiment import ttbarExperiment
-from experiments.eventgen.zmumuexperiment import zmumuExperiment
+from experiments.eventgen.processes import ttbarExperiment, zmumuExperiment
 from tests.helpers import STRICT_TOLERANCES as TOLERANCES
 
 
@@ -30,7 +29,7 @@ def test_simple():
 @pytest.mark.parametrize(
     "transforms",
     [
-        [tr.FitNormal],
+        [tr.StandardNormal],
         [tr.EPPP_to_PPPM2],
         [tr.EPPP_to_EPhiPtPz],
         [tr.EPPP_to_PtPhiEtaE],
@@ -50,7 +49,7 @@ def test_simple():
             tr.PtPhiEtaE_to_PtPhiEtaM2,
             tr.M2_to_LogM2,
             tr.Pt_to_LogPt,
-            tr.FitNormal,
+            tr.StandardNormal,
         ],
     ],
 )
@@ -86,7 +85,7 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
     for tra in transforms:
         if tra == tr.Pt_to_LogPt:
             ts.append(tra(exp.pt_min, exp.units))
-        elif tra == tr.FitNormal:
+        elif tra == tr.StandardNormal:
             local = tra([0, 1, 2, 3])
             local.init_unit([nparticles])
             ts.append(local)
@@ -98,7 +97,7 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
     x = fourmomenta_original.clone()
 
     # init_fit (has to be done manually in this case
-    # this does nothing, except for FitNormal
+    # this does nothing, except for StandardNormal
     x_fit = x.clone()
     for t in ts[:-1]:
         x_fit = t.forward(x)
@@ -123,7 +122,7 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
 @pytest.mark.parametrize(
     "transforms",
     [
-        [tr.FitNormal],
+        [tr.StandardNormal],
         [tr.EPPP_to_PPPM2],
         [tr.EPPP_to_EPhiPtPz],
         [tr.EPPP_to_PtPhiEtaE],
@@ -143,7 +142,7 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
             tr.PtPhiEtaE_to_PtPhiEtaM2,
             tr.M2_to_LogM2,
             tr.Pt_to_LogPt,
-            tr.FitNormal,
+            tr.StandardNormal,
         ],
     ],
 )
@@ -179,7 +178,7 @@ def test_jacobians(transforms, distribution, experiment_np, nevents):
     for tra in transforms:
         if tra == tr.Pt_to_LogPt:
             ts.append(tra(exp.pt_min, exp.units))
-        elif tra == tr.FitNormal:
+        elif tra == tr.StandardNormal:
             local = tra([0, 1, 2, 3])
             local.init_unit([nparticles])
             ts.append(local)
@@ -191,7 +190,7 @@ def test_jacobians(transforms, distribution, experiment_np, nevents):
     x = fourmomenta_original.clone()
 
     # init_fit (has to be done manually in this case
-    # this does nothing, except for FitNormal
+    # this does nothing, except for StandardNormal
     x_fit = x.clone()
     for t in ts[:-1]:
         x_fit = t.forward(x)
@@ -251,7 +250,7 @@ def test_jacobians(transforms, distribution, experiment_np, nevents):
 @pytest.mark.parametrize(
     "transforms",
     [
-        [tr.FitNormal],
+        [tr.StandardNormal],
         [tr.EPPP_to_PPPM2],
         [tr.EPPP_to_EPhiPtPz],
         [tr.EPPP_to_PtPhiEtaE],
@@ -271,7 +270,7 @@ def test_jacobians(transforms, distribution, experiment_np, nevents):
             tr.PtPhiEtaE_to_PtPhiEtaM2,
             tr.M2_to_LogM2,
             tr.Pt_to_LogPt,
-            tr.FitNormal,
+            tr.StandardNormal,
         ],
     ],
 )
@@ -307,7 +306,7 @@ def test_logdetjac(transforms, distribution, experiment_np, nevents):
     for tra in transforms:
         if tra == tr.Pt_to_LogPt:
             ts.append(tra(exp.pt_min, exp.units))
-        elif tra == tr.FitNormal:
+        elif tra == tr.StandardNormal:
             local = tra([0, 1, 2, 3])
             local.init_unit([nparticles])
             ts.append(local)
@@ -319,7 +318,7 @@ def test_logdetjac(transforms, distribution, experiment_np, nevents):
     x = fourmomenta_original.clone()
 
     # init_fit (has to be done manually in this case
-    # this does nothing, except for FitNormal
+    # this does nothing, except for StandardNormal
     x_fit = x.clone()
     for t in ts[:-1]:
         x_fit = t.forward(x)

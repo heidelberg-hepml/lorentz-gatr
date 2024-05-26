@@ -9,8 +9,7 @@ from experiments.eventgen.distributions import (
     FittedPPPLogM2,
     FittedLogPtPhiEtaLogM2,
 )
-from experiments.eventgen.ttbarexperiment import ttbarExperiment
-from experiments.eventgen.zmumuexperiment import zmumuExperiment
+from experiments.eventgen.processes import ttbarExperiment, zmumuExperiment
 from tests.helpers import STRICT_TOLERANCES as TOLERANCES
 
 
@@ -23,12 +22,10 @@ from tests.helpers import STRICT_TOLERANCES as TOLERANCES
         c.PtPhiEtaE,
         c.PtPhiEtaM2,
         c.PPPLogM2,
-        c.FittedPPPLogM2,
         c.LogPtPhiEtaE,
         c.PtPhiEtaLogM2,
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaLogM2,
-        c.FittedLogPtPhiEtaLogM2,
     ],
 )
 @pytest.mark.parametrize(
@@ -60,7 +57,6 @@ def test_invertibility(coordinates, distribution, experiment_np, nevents):
     device = torch.device("cpu")
     dtype = torch.float64  # sometimes fails with float32
     if coordinates in [
-        c.FittedLogPtPhiEtaLogM2,
         c.LogPtPhiEtaLogM2,
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaM2,
@@ -96,12 +92,10 @@ def test_invertibility(coordinates, distribution, experiment_np, nevents):
         c.PtPhiEtaE,
         c.PtPhiEtaM2,
         c.PPPLogM2,
-        c.FittedPPPLogM2,
         c.LogPtPhiEtaE,
         c.PtPhiEtaLogM2,
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaLogM2,
-        c.FittedLogPtPhiEtaLogM2,
     ],
 )
 @pytest.mark.parametrize(
@@ -133,7 +127,6 @@ def test_velocity(coordinates, distribution, experiment_np, nevents):
     device = torch.device("cpu")
     dtype = torch.float64  # sometimes fails with float32
     if coordinates in [
-        c.FittedLogPtPhiEtaLogM2,
         c.LogPtPhiEtaLogM2,
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaM2,
@@ -146,7 +139,7 @@ def test_velocity(coordinates, distribution, experiment_np, nevents):
     shape = (nevents, nparticles, 4)
     x = d.sample(shape, device, dtype)
 
-    # init_fit (this does nothing, except for FitNormal)
+    # init_fit (this does nothing, except for StandardNormal)
     coord.init_fit([x])
 
     x.requires_grad_()
@@ -197,12 +190,10 @@ def test_velocity(coordinates, distribution, experiment_np, nevents):
         c.PtPhiEtaE,
         c.PtPhiEtaM2,
         c.PPPLogM2,
-        c.FittedPPPLogM2,
         c.LogPtPhiEtaE,
         c.PtPhiEtaLogM2,
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaLogM2,
-        c.FittedLogPtPhiEtaLogM2,
     ],
 )
 @pytest.mark.parametrize(
@@ -234,7 +225,6 @@ def test_logdetjac(coordinates, distribution, experiment_np, nevents):
     device = torch.device("cpu")
     dtype = torch.float64  # sometimes fails with float32
     if coordinates in [
-        c.FittedLogPtPhiEtaLogM2,
         c.LogPtPhiEtaLogM2,
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaM2,

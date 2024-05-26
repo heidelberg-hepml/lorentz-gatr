@@ -28,8 +28,8 @@ cfm:
  hutchinson: true
  coordinates_straight: ${cfm.coordinates_sampling}
  coordinates_network: Fourmomenta
- coordinates_sampling: FittedLogPtPhiEtaLogM2
- transforms_float64: false
+ coordinates_sampling: LogPtPhiEtaLogM2
+ transforms_float64: true
 
 training:
  iterations: 50

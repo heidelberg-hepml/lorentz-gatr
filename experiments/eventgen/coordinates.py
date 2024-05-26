@@ -39,8 +39,8 @@ class BaseCoordinates:
         self.transforms = []
 
     def init_fit(self, fourmomenta_list):
-        # only does something for FitNormal()
-        # requires that FitNormal() comes last in self.transforms
+        # only does something for StandardNormal()
+        # requires that StandardNormal() comes last in self.transforms
         x_list = [fourmomenta.clone() for fourmomenta in fourmomenta_list]
         for transform in self.transforms[:-1]:
             x_list = [transform.forward(x) for x in x_list]
@@ -118,12 +118,22 @@ class Fourmomenta(BaseCoordinates):
     # this class effectively does nothing,
     # because fourmomenta are already the baseline representation
     def __init__(self):
-        self.transforms = [tr.EmptyTransform()]
+        self.transforms = [tr.StandardNormal([])]
 
 
 class PPPM2(BaseCoordinates):
     def __init__(self):
-        self.transforms = [tr.EPPP_to_PPPM2()]
+        self.transforms = [tr.EPPP_to_PPPM2(), tr.StandardNormal([])]
+
+
+class PPPLogM2(BaseCoordinates):
+    # (px, py, pz, log(m^2))
+    def __init__(self):
+        self.transforms = [
+            tr.EPPP_to_PPPM2(),
+            tr.M2_to_LogM2(),
+            tr.StandardNormal([]),
+        ]
 
 
 class PhiCoordinates(BaseCoordinates):
@@ -139,13 +149,13 @@ class PhiCoordinates(BaseCoordinates):
 class EPhiPtPz(PhiCoordinates):
     # (E, phi, pt, pz)
     def __init__(self):
-        self.transforms = [tr.EPPP_to_EPhiPtPz()]
+        self.transforms = [tr.EPPP_to_EPhiPtPz(), tr.StandardNormal([1])]
 
 
 class PtPhiEtaE(PhiCoordinates):
     # (pt, phi, eta, E)
     def __init__(self):
-        self.transforms = [tr.EPPP_to_PtPhiEtaE()]
+        self.transforms = [tr.EPPP_to_PtPhiEtaE(), tr.StandardNormal([1])]
 
 
 class PtPhiEtaM2(PhiCoordinates):
@@ -153,32 +163,18 @@ class PtPhiEtaM2(PhiCoordinates):
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
-        ]
-
-
-class PPPLogM2(BaseCoordinates):
-    # (px, py, pz, log(m^2))
-    def __init__(self):
-        self.transforms = [
-            tr.EPPP_to_PPPM2(),
-            tr.M2_to_LogM2(),
-        ]
-
-
-class FittedPPPLogM2(BaseCoordinates):
-    # fitted (px, py, pz, log(m^2))
-    def __init__(self):
-        self.transforms = [
-            tr.EPPP_to_PPPM2(),
-            tr.M2_to_LogM2(),
-            tr.FitNormal([]),
+            tr.StandardNormal([1]),
         ]
 
 
 class LogPtPhiEtaE(PhiCoordinates):
     # (log(pt), phi, eta, E)
     def __init__(self, pt_min, units):
-        self.transforms = [tr.EPPP_to_PtPhiEtaE(), tr.Pt_to_LogPt(pt_min, units)]
+        self.transforms = [
+            tr.EPPP_to_PtPhiEtaE(),
+            tr.Pt_to_LogPt(pt_min, units),
+            tr.StandardNormal([1]),
+        ]
 
 
 class PtPhiEtaLogM2(PhiCoordinates):
@@ -188,6 +184,7 @@ class PtPhiEtaLogM2(PhiCoordinates):
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
             tr.M2_to_LogM2(),
+            tr.StandardNormal([1]),
         ]
 
 
@@ -198,27 +195,17 @@ class LogPtPhiEtaM2(PhiCoordinates):
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
             tr.Pt_to_LogPt(pt_min, units),
+            tr.StandardNormal([1]),
         ]
 
 
 class LogPtPhiEtaLogM2(PhiCoordinates):
-    # (log(pt), phi, eta, log(m^2)
+    # Standardized (log(pt), phi, eta, log(m^2)
     def __init__(self, pt_min, units):
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
             tr.Pt_to_LogPt(pt_min, units),
             tr.M2_to_LogM2(),
-        ]
-
-
-class FittedLogPtPhiEtaLogM2(PhiCoordinates):
-    # Fitted (log(pt), phi, eta, log(m^2)
-    def __init__(self, pt_min, units):
-        self.transforms = [
-            tr.EPPP_to_PtPhiEtaE(),
-            tr.PtPhiEtaE_to_PtPhiEtaM2(),
-            tr.Pt_to_LogPt(pt_min, units),
-            tr.M2_to_LogM2(),
-            tr.FitNormal([1]),
+            tr.StandardNormal([1]),
         ]

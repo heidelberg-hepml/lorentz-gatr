@@ -76,7 +76,7 @@ class BaseTransform(nn.Module):
         raise NotImplementedError
 
     def init_fit(self, xs):
-        # currently only needed for FitNormal()
+        # currently only needed for StandardNormal()
         # default: do nothing
         pass
 
@@ -426,8 +426,8 @@ class Pt_to_LogPt(BaseTransform):
         return 1 / (dpt + EPS1 + EPS2)
 
 
-class FitNormal(BaseTransform):
-    # rescale to unit normal distribution
+class StandardNormal(BaseTransform):
+    # standardize to unit normal distribution
     # particle- and process-wise mean and std are determined by initial_fit
     # note: this transform will always come last in the self.transforms list of a coordinates class
     def __init__(self, dims_fixed):

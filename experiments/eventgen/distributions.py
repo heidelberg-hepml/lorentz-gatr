@@ -177,7 +177,7 @@ class FittedPPPLogM2(RejectionDistribution):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.coordinates = c.FittedPPPLogM2()
+        self.coordinates = c.PPPLogM2()
 
     def propose(self, shape, device, dtype, generator=None):
         shape = list(shape)
@@ -213,7 +213,7 @@ class FittedLogPtPhiEtaLogM2(RejectionDistribution):
         assert (
             self.use_pt_min
         ), f"use_pt_min=False not implemented for distribution FittedLogPtPhiEtaLogM2"
-        self.coordinates = c.FittedLogPtPhiEtaLogM2(self.pt_min, self.units)
+        self.coordinates = c.LogPtPhiEtaLogM2(self.pt_min, self.units)
 
     def propose(self, shape, device, dtype, generator=None):
         """Base distribution for precisesiast: pt, eta gaussian; phi uniform; mass shifted gaussian"""

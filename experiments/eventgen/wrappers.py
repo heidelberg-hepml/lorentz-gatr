@@ -81,7 +81,7 @@ class GAPCFM(EventCFM):
         beam_reference,
         two_beams,
         add_time_reference,
-        dims,
+        scalar_dims,
         odeint,
     ):
         # See GATrCFM.__init__ for documentation
@@ -93,7 +93,7 @@ class GAPCFM(EventCFM):
         self.beam_reference = beam_reference
         self.two_beams = two_beams
         self.add_time_reference = add_time_reference
-        self.dims = dims
+        self.scalar_dims = scalar_dims
         assert (
             self.cfm.coordinates_network == "Fourmomenta"
         ), f"GA-networks require coordinates_network=Fourmomenta"
@@ -113,7 +113,7 @@ class GAPCFM(EventCFM):
 
         # Overwrite transformed velocities with scalar outputs of GATr
         # (this is specific to GATr to avoid large jacobians from from log-transforms)
-        vp_sampling[..., self.dims] = vp_scalar
+        vp_sampling[..., self.scalar_dims] = vp_scalar[..., self.scalar_dims]
         return vp_sampling, xt_sampling
 
     def embed_into_ga(self, x, t, ijet):
@@ -137,8 +137,7 @@ class GAPCFM(EventCFM):
     def extract_from_ga(self, mv, s):
         v = extract_vector(mv).squeeze(dim=-2)
         s = s.reshape(*s.shape[:-1], s.shape[-1] // 4, 4)
-        v_s = s[..., self.dims]
-        return v, v_s
+        return v, s
 
 
 class TransformerCFM(EventCFM):
@@ -188,7 +187,7 @@ class GATrCFM(EventCFM):
         beam_reference,
         two_beams,
         add_time_reference,
-        dims,
+        scalar_dims,
         odeint,
     ):
         """
@@ -215,7 +214,7 @@ class GATrCFM(EventCFM):
         add_time_reference : bool
             Whether time direction (1,0,0,0) is included to break Lorentz group down to SO(3)
             This is formally required, because equivariant generation on non-compact groups is not possible
-        dims : List[int]
+        scalar_dims : List[int]
             Components within the used parametrization
             for which the equivariantly predicted velocity (using multivector channels)
             is overwritten by a scalar network output (using scalar channels)
@@ -234,8 +233,8 @@ class GATrCFM(EventCFM):
         self.beam_reference = beam_reference
         self.two_beams = two_beams
         self.add_time_reference = add_time_reference
-        self.dims = dims
-        assert (np.array(dims) < 4).all() and (np.array(dims) >= 0).all()
+        self.scalar_dims = scalar_dims
+        assert (np.array(scalar_dims) < 4).all() and (np.array(scalar_dims) >= 0).all()
         assert (
             self.cfm.coordinates_network == "Fourmomenta"
         ), f"GA-networks require coordinates_network=Fourmomenta"
@@ -255,7 +254,7 @@ class GATrCFM(EventCFM):
 
         # Overwrite transformed velocities with scalar outputs of GATr
         # (this is specific to GATr to avoid large jacobians from from log-transforms)
-        vp_sampling[..., self.dims] = vp_scalar[..., self.dims]
+        vp_sampling[..., self.scalar_dims] = vp_scalar[..., self.scalar_dims]
         return vp_sampling, xt_sampling
 
     def embed_into_ga(self, x, t, ijet):
