@@ -157,7 +157,7 @@ class StandardPPPLogM2(RejectionDistribution):
         eps = torch.randn(shape, device=device, dtype=dtype, generator=generator)
         onshell_mass = self.onshell_mass.to(device, dtype=dtype).unsqueeze(0)
         eps[..., self.onshell_list, 3] = torch.log(
-            (onshell_mass / self.units) ** 2 + EPS1
+            (onshell_mass / self.units) ** 2 + EPS1**2
         )
         fourmomenta = self.coordinates.x_to_fourmomenta(eps)
         return fourmomenta
@@ -188,7 +188,7 @@ class FittedPPPLogM2(RejectionDistribution):
         eps = self.coordinates.transforms[-1].inverse(eps)
         onshell_mass = self.onshell_mass.to(device, dtype=dtype).unsqueeze(0)
         eps[..., self.onshell_list, 3] = torch.log(
-            (onshell_mass / self.units) ** 2 + EPS1
+            (onshell_mass / self.units) ** 2 + EPS1**2
         )
 
         for t in self.coordinates.transforms[:-1][::-1]:
@@ -226,7 +226,7 @@ class FittedLogPtPhiEtaLogM2(RejectionDistribution):
         eps = self.coordinates.transforms[-1].inverse(eps)
         onshell_mass = self.onshell_mass.to(device, dtype=dtype).unsqueeze(0)
         eps[..., self.onshell_list, 3] = torch.log(
-            (onshell_mass / self.units) ** 2 + EPS1
+            (onshell_mass / self.units) ** 2 + EPS1**2
         )
 
         # be careful with phi and eta
