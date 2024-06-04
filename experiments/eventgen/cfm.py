@@ -487,11 +487,15 @@ class EventCFM(CFM):
 
     def init_coordinates(self):
         self.coordinates_straight = self._init_coordinates(
-            self.cfm.coordinates_straight
+            self.cfm.coordinates_straight,
+            self.cfm.coordinates_straight_standardize,
         )
-        self.coordinates_network = self._init_coordinates(self.cfm.coordinates_network)
+        self.coordinates_network = self._init_coordinates(
+            self.cfm.coordinates_network, self.cfm.coordinates_network_standardize
+        )
         self.coordinates_sampling = self._init_coordinates(
-            self.cfm.coordinates_sampling
+            self.cfm.coordinates_sampling,
+            self.cfm.coordinates_sampling_standardize,
         )
         self.coordinates = [
             self.coordinates_straight,
@@ -499,27 +503,33 @@ class EventCFM(CFM):
             self.coordinates_sampling,
         ]
 
-    def _init_coordinates(self, coordinates_label):
+    def _init_coordinates(self, coordinates_label, coordinates_standardize):
         if coordinates_label == "Fourmomenta":
-            coordinates = c.Fourmomenta()
+            coordinates = c.Fourmomenta(coordinates_standardize)
         elif coordinates_label == "PPPM2":
-            coordinates = c.PPPM2()
+            coordinates = c.PPPM2(coordinates_standardize)
         elif coordinates_label == "PPPLogM2":
-            coordinates = c.PPPLogM2()
+            coordinates = c.PPPLogM2(coordinates_standardize)
         elif coordinates_label == "EPhiPtPz":
-            coordinates = c.EPhiPtPz()
+            coordinates = c.EPhiPtPz(coordinates_standardize)
         elif coordinates_label == "PtPhiEtaE":
-            coordinates = c.PtPhiEtaE()
+            coordinates = c.PtPhiEtaE(coordinates_standardize)
         elif coordinates_label == "PtPhiEtaM2":
-            coordinates = c.PtPhiEtaM2()
+            coordinates = c.PtPhiEtaM2(coordinates_standardize)
         elif coordinates_label == "LogPtPhiEtaE":
-            coordinates = c.LogPtPhiEtaE(self.pt_min, self.units)
+            coordinates = c.LogPtPhiEtaE(
+                self.pt_min, self.units, coordinates_standardize
+            )
         elif coordinates_label == "LogPtPhiEtaM2":
-            coordinates = c.LogPtPhiEtaM2(self.pt_min, self.units)
+            coordinates = c.LogPtPhiEtaM2(
+                self.pt_min, self.units, coordinates_standardize
+            )
         elif coordinates_label == "PtPhiEtaLogM2":
-            coordinates = c.PtPhiEtaLogM2()
+            coordinates = c.PtPhiEtaLogM2(coordinates_standardize)
         elif coordinates_label == "LogPtPhiEtaLogM2":
-            coordinates = c.LogPtPhiEtaLogM2(self.pt_min, self.units)
+            coordinates = c.LogPtPhiEtaLogM2(
+                self.pt_min, self.units, coordinates_standardize
+            )
         else:
             raise ValueError(f"coordinates={coordinates_label} not implemented")
         return coordinates
