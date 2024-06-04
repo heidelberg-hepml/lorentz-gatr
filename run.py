@@ -3,6 +3,7 @@ from experiments.amplitudes.experiment import AmplitudeExperiment
 from experiments.toptagging.experiment import TopTaggingExperiment
 from experiments.toptagging.experiment import QGTaggingExperiment
 
+
 @hydra.main(config_path="config", config_name="toptagging", version_base=None)
 def main(cfg):
     if cfg.exp_type == "amplitudes":
@@ -13,6 +14,7 @@ def main(cfg):
         exp = QGTaggingExperiment(cfg)
 
     exp()
+
 
 if __name__ == "__main__":
     main()

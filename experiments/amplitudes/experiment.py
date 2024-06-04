@@ -234,7 +234,6 @@ class AmplitudeExperiment(BaseExperiment):
 
     def evaluate(self):
         with torch.no_grad():
-            # this is a bit ugly, but it does the job
             if self.ema is not None:
                 with self.ema.average_parameters():
                     self.results_train = self._evaluate_single(
@@ -263,6 +262,8 @@ class AmplitudeExperiment(BaseExperiment):
             std_pred_prepd = [[] for _ in range(self.n_datasets)]
         LOGGER.info(f"### Starting to evaluate model on {title} dataset ###")
         self.model.eval()
+        if self.cfg.training.optimizer == "ScheduleFree":
+            self.optimizer.eval()
         t0 = time.time()
         for data in loader:
             for idataset, data_onedataset in enumerate(data):

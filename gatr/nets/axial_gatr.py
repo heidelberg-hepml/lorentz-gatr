@@ -19,11 +19,9 @@ _S_REARRANGE_PATTERN = "... i j c -> ... j i c"
 
 
 class AxialGATr(nn.Module):  # pylint: disable=duplicate-code
-    """Axial GATr network for two token dimensions.
+    """Axial L-GATr network for two token dimensions.
 
-    This, together with gatr.nets.gatr.GATr, is the main architecture proposed in our paper.
-
-    It combines `num_blocks` GATr transformer blocks, each consisting of geometric self-attention
+    It combines `num_blocks` L-GATr transformer blocks, each consisting of geometric self-attention
     layers, a geometric MLP, residual connections, and normalization layers. In addition, there
     are initial and final equivariant linear layers.
 

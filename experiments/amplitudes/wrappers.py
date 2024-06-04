@@ -1,6 +1,5 @@
 # Copyright (c) 2023 Qualcomm Technologies, Inc.
 # All rights reserved.
-# import dgl
 import numpy as np
 import torch
 from torch import nn
@@ -18,7 +17,7 @@ def encode_tokens(type_token, global_token, token_size, isgatr, batchsize, devic
         list with type_tokens for each particle in the event
     global_token: int
     isgatr: bool
-        whether the encoded tokens will be used within GATr or within the baseline Transformer
+        whether the encoded tokens will be used within L-GATr or within the baseline Transformer
         This affects how many zeroes have to be padded to the global_token (4 more for the baseline Transformer)
     batchsize: int
     device: torch.device
@@ -27,7 +26,7 @@ def encode_tokens(type_token, global_token, token_size, isgatr, batchsize, devic
     Returns:
     type_token: torch.Tensor with shape (batchsize, num_particles, type_token_max)
         one-hot-encoded type tokens, to be appended to each encoded 4-momenta in case of the
-        baseline transformer / make up the full scalar channel for GATr
+        baseline transformer / make up the full scalar channel for L-GATr
     global_token: torch.Tensor with shape (batchsize, 1, type_token_max+4)
         ont-hot-encoded dataset token, this will be the global_token and appended to the individual particles
     """

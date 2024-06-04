@@ -11,7 +11,7 @@ from xformers.ops.fmha import BlockDiagonalMask
 
 def attention_mask(batch, force_xformers=True):
     """
-    Construct attention mask that makes sure that objects only attend to each other
+    Construct attention mask that makes surfe that objects only attend to each other
     within the same batch element, and not across batch elements
 
     Parameters
@@ -59,7 +59,7 @@ class TopTaggingTransformerWrapper(nn.Module):
 
 class TopTaggingGATrWrapper(nn.Module):
     """
-    GATr for toptagging
+    L-GATr for toptagging
     including all kinds of options to play with
     """
 

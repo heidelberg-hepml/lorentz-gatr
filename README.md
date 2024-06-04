@@ -38,24 +38,24 @@ python run.py -cn config -cp runs/amplitudes/hello_world train=false warm_start_
 ```
 The warm_start_idx specifies which model in the models folder should be loaded and defaults to 0. 
 
-## Using GATr (copied from the original GATr)
+## Using L-GATr 
 
-To use GATr on your own problem, you will at least need two components from this repository:
-GATr networks, which act on multivector data, and interface functions that embed various geometric
+To use L-GATr on your own problem, you will at least need two components from this repository:
+L-GATr networks, which act on multivector data, and interface functions that embed various geometric
 objects into this multivector representations.
 
 Here is an example code snippet that illustrates the recipe:
 
 ```python
 from gatr import GATr, SelfAttentionConfig, MLPConfig
-from gatr.interface import embed_point, extract_scalar
+from gatr.interface import embed_vector, extract_scalar
 import torch
 
 
 class ExampleWrapper(torch.nn.Module):
-    """Example wrapper around a GATr model.
+    """Example wrapper around a L-GATr model.
     
-    Expects input data that consists of a point cloud: one 3D point for each item in the data.
+    Expects input data that consists of a point cloud: one 4-momentum point for each item in the data.
     Returns outputs that consists of one scalar number for the whole dataset.
     
     Parameters
@@ -87,8 +87,8 @@ class ExampleWrapper(torch.nn.Module):
         
         Parameters
         ----------
-        inputs : torch.Tensor with shape (*batch_dimensions, num_points, 3)
-            Point cloud input data
+        inputs : torch.Tensor with shape (*batch_dimensions, num_points, 4)
+            4-momentum point cloud input data
         
         Returns
         -------
@@ -96,16 +96,15 @@ class ExampleWrapper(torch.nn.Module):
             Model prediction: a single scalar for the whole point cloud.
         """
         
-        # Embed point cloud in PGA
-        embedded_inputs = embed_point(inputs).unsqueeze(-2)  # (..., num_points, 1, 16)
+        # Embed 4-momentum point cloud inputs in GA
+        embedded_inputs = embed_vector(inputs).unsqueeze(-2)  # (..., num_points, 1, 16)
         
         # Pass data through GATr
         embedded_outputs, _ = self.gatr(embedded_inputs, scalars=None)  # (..., num_points, 1, 16)
         
-        # Extract scalar and aggregate outputs from point cloud
-        nodewise_outputs = extract_scalar(embedded_outputs)  # (..., num_points, 1, 1)
-        outputs = torch.mean(nodewise_outputs, dim=(-3, -2))  # (..., 1)
-        
+        # Extract scalar outputs 
+        outputs = extract_scalar(embedded_outputs)  # (..., 1)
+
         return outputs
 ```
 
@@ -114,10 +113,10 @@ structure of the repository.
 
 ### Design choices
 
-**Representations**: GATr operates with two kind of representations: geometric algebra multivectors
+**Representations**: L-GATr operates with two kind of representations: geometric algebra multivectors
 and auxiliary scalar representations. Both are simply represented as `torch.Tensor` instances.
 
-The multivectors are based on the projective geometric algebra G(3, 0, 1). They are tensors of the
+The multivectors are based on the geometric algebra G(1, 3). They are tensors of the
 shape `(..., 16)`, for instance `(batchsize, items, channels, 16)`. The sixteen multivector
 components are sorted as in the
 [`clifford` library](https://clifford.readthedocs.io/en/latest/), as follows:
@@ -127,14 +126,8 @@ x_0123]`.
 Scalar representations have free shapes, but should match the multivector representations they
 accompany in batchsize and number of items. The number of channels may be different.
 
-**Interface to the real world**: To map the multivector representations to physical objects, we
-use the plane-based convention presented in
-[Roelfs and De Keninck, "Graded symmetry groups: Plane and simple"](https://arxiv.org/abs/2107.03771).
-3D points are thus represented as trivectors, planes as vectors, and so on. We provide these
-these interface functions in the `gatr.interface` submodule.
-
 **Functions**: We distinguish between primitives (functions) and layers (often stateful
-`torch.nn.Module` instances). Almost all primitives and layers are Pin(3, 0, 1)-equivariant,
+`torch.nn.Module` instances). Almost all primitives and layers are Pin(1, 3)-equivariant,
 see docstrings for exceptions.
 
 ### Repository structure
@@ -156,16 +149,16 @@ lorentz-gatr
 |   |   └───attention: self-attention layer, its components, and the corresponding configuration
 |   |   └───mlp: geometric MLP, its components, and the corresponding configuration
 |   |   |   dropout.py: multivector dropout
-|   |   |   gatr_block.py: GATr transformer block, the main layer that GATr networks consist of
+|   |   |   gatr_block.py: L-GATr transformer block, the main layer that L-GATr networks consist of
 |   |   |   layer_norm.py: geometric LayerNorm
 |   |   |   linear.py: equivariant linear layer between multivectors
 |   |
 |   └───nets: complete network architectures
-|   |   |   axial_gatr.py: axial-attention version of GATr for two token dimensions
-|   |   |   gatr.py: GATr architecture for a single token dimension
+|   |   |   axial_gatr.py: axial-attention version of L-GATr for two token dimensions
+|   |   |   gatr.py: L-GATr architecture for a single token dimension
+|   |   |   gap.py: L-GATr architecture without the transformer module
 |   |
-|   └───primitives: core functional building blocks of GATr
-|   |   └───data: pre-computed basis stored in `.pt` files
+|   └───primitives: core functional building blocks of L-GATr
 |   |   |   attention.py: geometric attention mechanism
 |   |   |   bilinear.py: bilinear equivariant functions like the geometric product
 |   |   |   dropout.py: geometric dropout
@@ -177,21 +170,27 @@ lorentz-gatr
 |   └───utils: utility functions
 |       |   clifford.py: non-differentiable GA functions based on the clifford library
 |       |   einsum.py: optimized einsum function
-|       |   misc.py: various utility functions
 |       |   tensors.py: various tensor operations
 |
 └───experiments: experiments that use gatr
 |   └───baselines: baseline layers and architectures
 |   |   |   mlp.py: MLP baseline
 |   |   |   transformer.py: Transformer baseline
+|   |   |   dsi.py: Deep Sets with Lorentz invariants baseline
 |   |
 |   └───amplitudes: amplitude experiment
+|   └───toptagging: top tagging experiment
+|   └───eventgen: event generation experiment
 |   |
 |   |   misc.py: various utility functions
+|   |   logger.py: Logger setup
+|   |   mlflow.py: MLFlow logger 
+|   |   base_experiment.py: Base class for all experiments 
+|   |   base_plots.py: Example plot functions (not used)
+|   |   base_wrapper.py: Example wrapper for L-GATr (not used) 
 │
 └───tests: unit tests (e.g. for self-consistency and Pin equivariance)
 |   └───gatr
-|   |   └───baselines: unit tests for gatr.baselines
 |   |   └───interface: unit tests for gatr.interface
 |   |   └───layers: unit tests for gatr.layers
 |   |   └───nets: unit tests for gatr.nets

@@ -16,12 +16,9 @@ from gatr.layers.mlp.config import MLPConfig
 
 
 class GATr(nn.Module):
-    """GATr network for a data with a single token dimension.
+    """L-GATr network for a data with a single token dimension.
 
-    This, together with gatr.nets.axial_gatr.AxialGATr, is the main architecture proposed in our
-    paper.
-
-    It combines `num_blocks` GATr transformer blocks, each consisting of geometric self-attention
+    It combines `num_blocks` L-GATr transformer blocks, each consisting of geometric self-attention
     layers, a geometric MLP, residual connections, and normalization layers. In addition, there
     are initial and final equivariant linear layers.
 
@@ -78,7 +75,7 @@ class GATr(nn.Module):
             out_s_channels=hidden_s_channels,
         )
         attention = replace(
-            SelfAttentionConfig.cast(attention),  # convert duck typing to actual class
+            SelfAttentionConfig.cast(attention),
             additional_qk_mv_channels=0
             if reinsert_mv_channels is None
             else len(reinsert_mv_channels),
