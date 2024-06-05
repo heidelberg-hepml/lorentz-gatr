@@ -23,9 +23,9 @@ pip install -r requirements.txt
 
 You can run any of our experiments with the following commands:
 ```
-python run.py model=gatr_amplitudes exp_type=amplitudes exp_name=amplitudes run_name=hello_world_1
-python run.py model=gatr_toptagging exp_type=toptagging exp_name=toptagging run_name=hello_world_2
-python run.py model=gatr_eventgen exp_type=ttbar exp_name=eventgen run_name=hello_world_3
+python run.py model=gatr_amplitudes ++exp_type=amplitudes ++exp_name=amplitudes run_name=hello_world_1
+python run.py model=gatr_toptagging ++exp_type=toptagging ++exp_name=toptagging run_name=hello_world_2
+python run.py model=gatr_eventgen ++exp_type=ttbar ++exp_name=eventgen run_name=hello_world_3
 ```
 
 We use hydra for configuration management, allowing to quickly override parameters in config/amplitudes.yaml with the ++ operator. Further, we use mlflow for tracking. You can start a mlflow server based on the saved results in runs/tracking/mlflow.db on port 4242 of your machine with the following command
