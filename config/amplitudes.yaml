@@ -9,8 +9,6 @@ data:
  include_permsym: true
  train_test_val: [.4, .5, .1]
 
-heteroscedastic: false
-
 train: true
 training:
  lr: 3e-4

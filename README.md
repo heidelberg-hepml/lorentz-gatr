@@ -21,9 +21,11 @@ pip install -r requirements.txt
 
 ## 2. Running experiments
 
-You can run an experiment with the following command
+You can run any of our experiments with the following commands:
 ```
-python run.py model=gatr_amplitudes exp_name=amplitudes run_name=hello_world
+python run.py model=gatr_amplitudes exp_type=amplitudes exp_name=amplitudes run_name=hello_world_1
+python run.py model=gatr_toptagging exp_type=toptagging exp_name=toptagging run_name=hello_world_2
+python run.py model=gatr_eventgen exp_type=ttbar exp_name=eventgen run_name=hello_world_3
 ```
 
 We use hydra for configuration management, allowing to quickly override parameters in config/amplitudes.yaml with the ++ operator. Further, we use mlflow for tracking. You can start a mlflow server based on the saved results in runs/tracking/mlflow.db on port 4242 of your machine with the following command
@@ -32,9 +34,9 @@ We use hydra for configuration management, allowing to quickly override paramete
 mlflow ui --port 4242 --backend-store-uri sqlite:///runs/tracking/mlflow.db
 ```
 
-An existing run can be reloaded to perform additional tests with the trained model. For a previous run with exp_name=amplitudes and run_name=hello_world, one can run for example. 
+An existing run can be reloaded to perform additional tests with the trained model. For a previous run with exp_name=amplitudes and run_name=hello_world_1, one can run for example. 
 ```
-python run.py -cn config -cp runs/amplitudes/hello_world train=false warm_start_idx=0
+python run.py -cn config -cp runs/amplitudes/hello_world_1 train=false warm_start_idx=0
 ```
 The warm_start_idx specifies which model in the models folder should be loaded and defaults to 0. 
 
@@ -179,13 +181,34 @@ lorentz-gatr
 |   |   |   dsi.py: Deep Sets with Lorentz invariants baseline
 |   |
 |   └───amplitudes: amplitude experiment
+|   |   └───dataset.py: data class builder
+|   |   └───experiment.py: experiment class including dataloader definition, loss function and model evaluation
+|   |   └───plots.py: plot builder
+|   |   └───preprocessing.py: preprocessing functions for inputs and outputs
+|   |   └───wrappers.py: wrapper classes for all baselines
 |   └───toptagging: top tagging experiment
+|   |   └───dataset.py: data class builder
+|   |   └───experiment.py: experiment class including dataloader definition, loss function and model evaluation
+|   |   └───plots.py: plot builder
+|   |   └───wrappers.py: wrapper classes for all baselines
 |   └───eventgen: event generation experiment
+|   |   └───cfm.py: CFM base class for event generation
+|   |   └───clasifier.py: MLP clasifier for evaluating generation quality
+|   |   └───coordinates.py: trajectory definitions and full transformation functions between coordinate spaces
+|   |   └───distributions.py: base density distributions
+|   |   └───dataset.py: data class builder
+|   |   └───experiment.py: experiment class including dataloader definition, loss function and model evaluation
+|   |   └───helpers.py: helper functions for plotting
+|   |   └───plots.py: plot builder
+|   |   └───plots.py: base plot settings
+|   |   └───processes.py: experiment settings for different physical processes
+|   |   └───transforms.py: list of transformation functions between coordinate spaces
+|   |   └───wrappers.py: wrapper classes for all baselines
 |   |
 |   |   misc.py: various utility functions
 |   |   logger.py: Logger setup
 |   |   mlflow.py: MLFlow logger 
-|   |   base_experiment.py: Base class for all experiments 
+|   |   base_experiment.py: Base class for all experiments including model, optimizer and scheduler initialization, logging protocol and training/validation loops
 |   |   base_plots.py: Example plot functions (not used)
 |   |   base_wrapper.py: Example wrapper for L-GATr (not used) 
 │
@@ -208,3 +231,13 @@ lorentz-gatr
 │   README.md: this README file
 |   requirements.txt: external dependencies
 ```
+
+### Extra features in this repository
+
+Here we list some additional functional elements of the code that are not explicitly mentioned in the paper:
+
+1. Axial transformer and axial L-GATr build
+2. Tagging experiment for a quark gluon dataset containing extra scalar features
+3. Extra options in the tagging experiment to include more scalar variables and particle pair information encoded as extra channels
+4. Extra base distributions and variable parametrizations for event generation
+5. Event generation experiments for Z + jets and Z + 5 gluons datasets
