@@ -1,6 +1,6 @@
 # Lorentz' Geometric Algebra Transformers
 
-This repository contains an adapted version of the official implementation of the original Geometric Algebra Transformer of https://github.com/Qualcomm-AI-research/geometric-algebra-transformer for the Lorentz Group. 
+This repository contains the official implementation of the [**Lorentz-Equivariant Geometric Algebra Transformer**](https://arxiv.org/abs/2305.18415) by [Jonas Spinner](mailto:j.spinner@thphys.uni-heidelberg.de), [Víctor Bresó](mailto:breso@thphys.uni-heidelberg.de), Pim de Haan, Tilman Plehn, Jesse Thaler, and Johann Brehmer.
 
 ## 1. Getting started
 
@@ -40,7 +40,7 @@ python run.py -cn config -cp runs/amplitudes/hello_world_1 train=false warm_star
 ```
 The warm_start_idx specifies which model in the models folder should be loaded and defaults to 0. 
 
-## Using L-GATr 
+## 3. Using L-GATr 
 
 To use L-GATr on your own problem, you will at least need two components from this repository:
 L-GATr networks, which act on multivector data, and interface functions that embed various geometric
@@ -232,7 +232,7 @@ lorentz-gatr
 |   requirements.txt: external dependencies
 ```
 
-### Extra features in this repository
+## 4. Extra features in this repository
 
 Here we list some additional functional elements of the code that are not explicitly mentioned in the paper:
 
@@ -241,3 +241,20 @@ Here we list some additional functional elements of the code that are not explic
 3. Extra options in the tagging experiment to include more scalar variables and particle pair information encoded as extra channels
 4. Extra base distributions and variable parametrizations for event generation
 5. Event generation experiments for Z + jets and Z + 5 gluons datasets
+
+## 5. Citation
+
+If you find our code useful, please cite:
+
+```text
+@article{Spinner:2024hjm,
+    author = "Spinner, Jonas and Bres\'o, Victor and de Haan, Pim and Plehn, Tilman and Thaler, Jesse and Brehmer, Johann",
+    title = "{Lorentz-Equivariant Geometric Algebra Transformers for High-Energy Physics}",
+    eprint = "2405.14806",
+    archivePrefix = "arXiv",
+    primaryClass = "physics.data-an",
+    reportNumber = "MIT-CTP/5723",
+    month = "5",
+    year = "2024"
+}
+```
