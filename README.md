@@ -1,6 +1,6 @@
 # Lorentz' Geometric Algebra Transformers
 
-This repository contains the official implementation of the [**Lorentz-Equivariant Geometric Algebra Transformer**](https://arxiv.org/abs/2305.18415) by [Jonas Spinner](mailto:j.spinner@thphys.uni-heidelberg.de), [Víctor Bresó](mailto:breso@thphys.uni-heidelberg.de), Pim de Haan, Tilman Plehn, Jesse Thaler, and Johann Brehmer.
+This repository contains the official implementation of the [**Lorentz-Equivariant Geometric Algebra Transformer**](https://arxiv.org/abs/2405.14806) by [Jonas Spinner](mailto:j.spinner@thphys.uni-heidelberg.de), [Víctor Bresó](mailto:breso@thphys.uni-heidelberg.de), Pim de Haan, Tilman Plehn, Jesse Thaler, and Johann Brehmer.
 
 ## 1. Getting started
 
@@ -23,20 +23,20 @@ pip install -r requirements.txt
 
 You can run any of our experiments with the following commands:
 ```
-python run.py model=gatr_amplitudes ++exp_type=amplitudes ++exp_name=amplitudes run_name=hello_world_1
-python run.py model=gatr_toptagging ++exp_type=toptagging ++exp_name=toptagging run_name=hello_world_2
-python run.py model=gatr_eventgen ++exp_type=ttbar ++exp_name=eventgen run_name=hello_world_3
+python run.py model=gatr_amplitudes exp_type=amplitudes exp_name=amplitudes run_name=hello_world_amplitudes
+python run.py model=gatr_toptagging exp_type=toptagging exp_name=toptagging run_name=hello_world_toptagging
+python run.py model=gatr_eventgen exp_type=ttbar exp_name=eventgen run_name=hello_world_eventgen
 ```
 
-We use hydra for configuration management, allowing to quickly override parameters in config/amplitudes.yaml with the ++ operator. Further, we use mlflow for tracking. You can start a mlflow server based on the saved results in runs/tracking/mlflow.db on port 4242 of your machine with the following command
+We use hydra for configuration management, allowing to quickly override parameters in config/amplitudes.yaml. Further, we use mlflow for tracking. You can start a mlflow server based on the saved results in runs/tracking/mlflow.db on port 4242 of your machine with the following command
 
 ```
 mlflow ui --port 4242 --backend-store-uri sqlite:///runs/tracking/mlflow.db
 ```
 
-An existing run can be reloaded to perform additional tests with the trained model. For a previous run with exp_name=amplitudes and run_name=hello_world_1, one can run for example. 
+An existing run can be reloaded to perform additional tests with the trained model. For a previous run with exp_name=amplitudes and run_name=hello_world_amplitudes, one can run for example. 
 ```
-python run.py -cn config -cp runs/amplitudes/hello_world_1 train=false warm_start_idx=0
+python run.py -cn config -cp runs/amplitudes/hello_world_amplitudes train=false warm_start_idx=0
 ```
 The warm_start_idx specifies which model in the models folder should be loaded and defaults to 0. 
 
@@ -118,7 +118,7 @@ structure of the repository.
 **Representations**: L-GATr operates with two kind of representations: geometric algebra multivectors
 and auxiliary scalar representations. Both are simply represented as `torch.Tensor` instances.
 
-The multivectors are based on the geometric algebra G(1, 3). They are tensors of the
+The multivectors are based on the geometric algebra Cl(1, 3). They are tensors of the
 shape `(..., 16)`, for instance `(batchsize, items, channels, 16)`. The sixteen multivector
 components are sorted as in the
 [`clifford` library](https://clifford.readthedocs.io/en/latest/), as follows:
@@ -144,7 +144,7 @@ lorentz-gatr
 └───gatr: core library
 |   └───interface: embedding of geometric quantities into projective geometric algebra
 |   |   |   vector.py: Lorentz vector
-|   |   |   pseudoscalar.py: pseudoscalars
+|   |   |   pseudoscalar.py: pseudoscalars (not used)
 |   |   |   scalar.py: scalars
 |   |
 |   └───layers: network layers
@@ -193,7 +193,7 @@ lorentz-gatr
 |   |   └───wrappers.py: wrapper classes for all baselines
 |   └───eventgen: event generation experiment
 |   |   └───cfm.py: CFM base class for event generation
-|   |   └───clasifier.py: MLP clasifier for evaluating generation quality
+|   |   └───classifier.py: MLP classifier for evaluating generation quality
 |   |   └───coordinates.py: trajectory definitions and full transformation functions between coordinate spaces
 |   |   └───distributions.py: base density distributions
 |   |   └───dataset.py: data class builder
