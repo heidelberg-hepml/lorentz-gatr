@@ -11,7 +11,7 @@ EPS2 = 1e-10
 # exp(x) -> exp(x.clamp(max=CUTOFF))
 CUTOFF = 10
 
-# these functions are not optimized and only used for plotting,
+# these functions are only used for plotting,
 # with the exception of delta_r_fast
 
 
@@ -66,7 +66,7 @@ def get_eta(fourmomenta):
 
 
 def stable_arctanh(x, eps=EPS2):
-    # numerically stable implementation of arctanh that avoids log(0) issues
+    # implementation of arctanh that avoids log(0) issues
     return 0.5 * (torch.log((1 + x).clamp(min=eps)) - torch.log((1 - x).clamp(min=eps)))
 
 

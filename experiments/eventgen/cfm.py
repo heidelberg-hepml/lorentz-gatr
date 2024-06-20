@@ -7,13 +7,12 @@ from torch.autograd import grad
 from torchdiffeq import odeint
 from experiments.eventgen.distributions import (
     BaseDistribution,
-    StandardPPPM2,
+    NaivePPPM2,
+    NaivePPPLogM2,
     StandardPPPLogM2,
-    FittedPPPLogM2,
-    FittedLogPtPhiEtaLogM2,
+    StandardLogPtPhiEtaLogM2,
 )
 import experiments.eventgen.coordinates as c
-import experiments.eventgen.transforms as t
 import experiments.eventgen.distributions as d
 from experiments.eventgen.coordinates import (
     convert_coordinates,
@@ -371,7 +370,6 @@ class CFM(nn.Module):
 
         # the infamous nan remover
         # (MLP sometimes returns nan for single events,
-        # and all components of the event are nan...
         # just remove these events from the log_prob computation)
         mask = torch.isfinite(x1_sampling).all(dim=[1, 2])
         logdetjac_cfm_sampling = logdetjac_cfm_sampling[mask, ...]
@@ -475,27 +473,23 @@ class EventCFM(CFM):
             self.use_pt_min,
         ]
         if self.base_type == 1:
-            self.distribution = StandardPPPM2(*args)
+            self.distribution = NaivePPPM2(*args)
         elif self.base_type == 2:
-            self.distribution = StandardPPPLogM2(*args)
+            self.distribution = NaivePPPLogM2(*args)
         elif self.base_type == 3:
-            self.distribution = FittedPPPLogM2(*args)
+            self.distribution = StandardPPPLogM2(*args)
         elif self.base_type == 4:
-            self.distribution = FittedLogPtPhiEtaLogM2(*args)
+            self.distribution = StandardLogPtPhiEtaLogM2(*args)
         else:
             raise ValueError(f"base_type={self.base_type} not implemented")
 
     def init_coordinates(self):
         self.coordinates_straight = self._init_coordinates(
-            self.cfm.coordinates_straight,
-            self.cfm.coordinates_straight_standardize,
+            self.cfm.coordinates_straight
         )
-        self.coordinates_network = self._init_coordinates(
-            self.cfm.coordinates_network, self.cfm.coordinates_network_standardize
-        )
+        self.coordinates_network = self._init_coordinates(self.cfm.coordinates_network)
         self.coordinates_sampling = self._init_coordinates(
-            self.cfm.coordinates_sampling,
-            self.cfm.coordinates_sampling_standardize,
+            self.cfm.coordinates_sampling
         )
         self.coordinates = [
             self.coordinates_straight,
@@ -503,33 +497,31 @@ class EventCFM(CFM):
             self.coordinates_sampling,
         ]
 
-    def _init_coordinates(self, coordinates_label, coordinates_standardize):
+    def _init_coordinates(self, coordinates_label):
         if coordinates_label == "Fourmomenta":
-            coordinates = c.Fourmomenta(coordinates_standardize)
+            coordinates = c.Fourmomenta()
         elif coordinates_label == "PPPM2":
-            coordinates = c.PPPM2(coordinates_standardize)
+            coordinates = c.PPPM2()
         elif coordinates_label == "PPPLogM2":
-            coordinates = c.PPPLogM2(coordinates_standardize)
+            coordinates = c.PPPLogM2()
+        elif coordinates_label == "StandardPPPLogM2":
+            coordinates = c.StandardPPPLogM2()
         elif coordinates_label == "EPhiPtPz":
-            coordinates = c.EPhiPtPz(coordinates_standardize)
+            coordinates = c.EPhiPtPz()
         elif coordinates_label == "PtPhiEtaE":
-            coordinates = c.PtPhiEtaE(coordinates_standardize)
+            coordinates = c.PtPhiEtaE()
         elif coordinates_label == "PtPhiEtaM2":
-            coordinates = c.PtPhiEtaM2(coordinates_standardize)
+            coordinates = c.PtPhiEtaM2()
         elif coordinates_label == "LogPtPhiEtaE":
-            coordinates = c.LogPtPhiEtaE(
-                self.pt_min, self.units, coordinates_standardize
-            )
+            coordinates = c.LogPtPhiEtaE(self.pt_min, self.units)
         elif coordinates_label == "LogPtPhiEtaM2":
-            coordinates = c.LogPtPhiEtaM2(
-                self.pt_min, self.units, coordinates_standardize
-            )
+            coordinates = c.LogPtPhiEtaM2(self.pt_min, self.units)
         elif coordinates_label == "PtPhiEtaLogM2":
-            coordinates = c.PtPhiEtaLogM2(coordinates_standardize)
+            coordinates = c.PtPhiEtaLogM2()
         elif coordinates_label == "LogPtPhiEtaLogM2":
-            coordinates = c.LogPtPhiEtaLogM2(
-                self.pt_min, self.units, coordinates_standardize
-            )
+            coordinates = c.LogPtPhiEtaLogM2(self.pt_min, self.units)
+        elif coordinates_label == "StandardLogPtPhiEtaLogM2":
+            coordinates = c.StandardLogPtPhiEtaLogM2(self.pt_min, self.units)
         else:
             raise ValueError(f"coordinates={coordinates_label} not implemented")
         return coordinates

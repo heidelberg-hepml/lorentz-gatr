@@ -3,27 +3,27 @@ import torch
 
 import experiments.eventgen.coordinates as c
 from experiments.eventgen.distributions import (
-    StandardPPPM2,
+    NaivePPPM2,
+    NaivePPPLogM2,
     StandardPPPLogM2,
-    FittedPPPLogM2,
-    FittedLogPtPhiEtaLogM2,
+    StandardLogPtPhiEtaLogM2,
 )
 from experiments.eventgen.processes import ttbarExperiment, zmumuExperiment
 from experiments.eventgen.transforms import EPPP_to_PPPM2
-from tests.helpers import TOLERANCES as TOLERANCES
+from tests.helpers import MILD_TOLERANCES as TOLERANCES
 
 
 @pytest.mark.parametrize(
     "distribution",
     [
-        StandardPPPM2,
+        NaivePPPM2,
+        NaivePPPLogM2,
         StandardPPPLogM2,
-        FittedPPPLogM2,
-        FittedLogPtPhiEtaLogM2,
+        StandardLogPtPhiEtaLogM2,
     ],
 )
 @pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
-@pytest.mark.parametrize("nevents", [1000])
+@pytest.mark.parametrize("nevents", [10000])
 @pytest.mark.parametrize("use_delta_r_min", [False, True])
 @pytest.mark.parametrize("use_pt_min", [False, True])
 def test_cuts(
@@ -34,7 +34,7 @@ def test_cuts(
     use_pt_min,
 ):
     """Test that the base distribution satisfies phase space cuts."""
-    if distribution == FittedLogPtPhiEtaLogM2 and not use_pt_min:
+    if distribution == StandardLogPtPhiEtaLogM2 and not use_pt_min:
         # this combination is not implemented
         return
     experiment, nparticles = experiment_np
@@ -62,14 +62,14 @@ def test_cuts(
 @pytest.mark.parametrize(
     "distribution",
     [
-        StandardPPPM2,
+        NaivePPPM2,
+        NaivePPPLogM2,
         StandardPPPLogM2,
-        FittedPPPLogM2,
-        FittedLogPtPhiEtaLogM2,
+        StandardLogPtPhiEtaLogM2,
     ],
 )
 @pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
-@pytest.mark.parametrize("nevents", [1000])
+@pytest.mark.parametrize("nevents", [10000])
 @pytest.mark.parametrize("use_delta_r_min", [False, True])
 @pytest.mark.parametrize("use_pt_min", [False, True])
 def test_onshell(
@@ -80,7 +80,7 @@ def test_onshell(
     use_pt_min,
 ):
     """Test that the events that should be on-shell are on-shell."""
-    if distribution == FittedLogPtPhiEtaLogM2 and not use_pt_min:
+    if distribution == StandardLogPtPhiEtaLogM2 and not use_pt_min:
         # this combination is not implemented
         return
     experiment, nparticles = experiment_np

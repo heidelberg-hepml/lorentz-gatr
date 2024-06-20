@@ -4,13 +4,13 @@ import numpy as np
 
 import experiments.eventgen.transforms as tr
 from experiments.eventgen.distributions import (
-    StandardPPPM2,
+    NaivePPPM2,
+    NaivePPPLogM2,
     StandardPPPLogM2,
-    FittedPPPLogM2,
-    FittedLogPtPhiEtaLogM2,
+    StandardLogPtPhiEtaLogM2,
 )
 from experiments.eventgen.processes import ttbarExperiment, zmumuExperiment
-from tests.helpers import TOLERANCES as TOLERANCES
+from tests.helpers import STRICT_TOLERANCES as TOLERANCES
 
 
 def test_simple():
@@ -56,14 +56,14 @@ def test_simple():
 @pytest.mark.parametrize(
     "distribution",
     [
-        StandardPPPM2,
+        NaivePPPM2,
+        NaivePPPLogM2,
         StandardPPPLogM2,
-        FittedPPPLogM2,
-        FittedLogPtPhiEtaLogM2,
+        StandardLogPtPhiEtaLogM2,
     ],
 )
 @pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
-@pytest.mark.parametrize("nevents", [1000])
+@pytest.mark.parametrize("nevents", [10000])
 def test_invertibility(transforms, distribution, experiment_np, nevents):
     """test invertibility of forward() and inverse() methods"""
     experiment, nparticles = experiment_np
@@ -149,14 +149,14 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
 @pytest.mark.parametrize(
     "distribution",
     [
-        StandardPPPM2,
+        NaivePPPM2,
+        NaivePPPLogM2,
         StandardPPPLogM2,
-        FittedPPPLogM2,
-        FittedLogPtPhiEtaLogM2,
+        StandardLogPtPhiEtaLogM2,
     ],
 )
 @pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
-@pytest.mark.parametrize("nevents", [1000])
+@pytest.mark.parametrize("nevents", [10000])
 def test_jacobians(transforms, distribution, experiment_np, nevents):
     """test correctness of jacobians from _jac_forward() and _jac_inverse() methods, and their invertibility"""
     experiment, nparticles = experiment_np
@@ -277,14 +277,14 @@ def test_jacobians(transforms, distribution, experiment_np, nevents):
 @pytest.mark.parametrize(
     "distribution",
     [
-        StandardPPPM2,
+        NaivePPPM2,
+        NaivePPPLogM2,
         StandardPPPLogM2,
-        FittedPPPLogM2,
-        FittedLogPtPhiEtaLogM2,
+        StandardLogPtPhiEtaLogM2,
     ],
 )
 @pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
-@pytest.mark.parametrize("nevents", [1000])
+@pytest.mark.parametrize("nevents", [10000])
 def test_logdetjac(transforms, distribution, experiment_np, nevents):
     """compare logdetjac_forward and logdetjac_inverse methods to autograd"""
     experiment, nparticles = experiment_np

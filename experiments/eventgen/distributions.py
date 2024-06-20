@@ -118,12 +118,12 @@ class RejectionDistribution(BaseDistribution):
         raise NotImplementedError
 
 
-class StandardPPPM2(RejectionDistribution):
+class NaivePPPM2(RejectionDistribution):
     """Base distribution 1: 3-momentum from standard normal, mass from standard half-normal"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.coordinates = c.PPPM2(standardize=False)
+        self.coordinates = c.PPPM2()
 
     def propose(self, shape, device, dtype, generator=None):
         eps = torch.randn(shape, device=device, dtype=dtype, generator=generator)
@@ -145,19 +145,19 @@ class StandardPPPM2(RejectionDistribution):
         return log_prob
 
 
-class StandardPPPLogM2(RejectionDistribution):
+class NaivePPPLogM2(RejectionDistribution):
     """Base distribution 2: 3-momentum from standard normal, log(mass) from standard normal"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.coordinates = c.PPPLogM2(standardize=False)
+        self.coordinates = c.PPPLogM2()
 
     def propose(self, shape, device, dtype, generator=None):
         """Base distribution for 4-momenta: 3-momentum and log-mass from standard normal"""
         eps = torch.randn(shape, device=device, dtype=dtype, generator=generator)
         onshell_mass = self.onshell_mass.to(device, dtype=dtype).unsqueeze(0)
         eps[..., self.onshell_list, 3] = torch.log(
-            (onshell_mass / self.units) ** 2 + EPS1**2
+            (onshell_mass / self.units) ** 2 + EPS1
         )
         fourmomenta = self.coordinates.x_to_fourmomenta(eps)
         return fourmomenta
@@ -172,12 +172,12 @@ class StandardPPPLogM2(RejectionDistribution):
         return log_prob
 
 
-class FittedPPPLogM2(RejectionDistribution):
+class StandardPPPLogM2(RejectionDistribution):
     """Base distribution 3: 3-momentum and mass from fitted normal"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.coordinates = c.PPPLogM2(standardize=True)
+        self.coordinates = c.StandardPPPLogM2()
 
     def propose(self, shape, device, dtype, generator=None):
         shape = list(shape)
@@ -188,7 +188,7 @@ class FittedPPPLogM2(RejectionDistribution):
         eps = self.coordinates.transforms[-1].inverse(eps)
         onshell_mass = self.onshell_mass.to(device, dtype=dtype).unsqueeze(0)
         eps[..., self.onshell_list, 3] = torch.log(
-            (onshell_mass / self.units) ** 2 + EPS1**2
+            (onshell_mass / self.units) ** 2 + EPS1
         )
 
         for t in self.coordinates.transforms[:-1][::-1]:
@@ -205,15 +205,15 @@ class FittedPPPLogM2(RejectionDistribution):
         return log_prob
 
 
-class FittedLogPtPhiEtaLogM2(RejectionDistribution):
+class StandardLogPtPhiEtaLogM2(RejectionDistribution):
     """Base distribution 4: phi uniform; eta, log(pt) and log(mass) from fitted normal"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         assert (
             self.use_pt_min
-        ), f"use_pt_min=False not implemented for distribution FittedLogPtPhiEtaLogM2"
-        self.coordinates = c.LogPtPhiEtaLogM2(self.pt_min, self.units, standardize=True)
+        ), f"use_pt_min=False not implemented for distribution StandardLogPtPhiEtaLogM2"
+        self.coordinates = c.StandardLogPtPhiEtaLogM2(self.pt_min, self.units)
 
     def propose(self, shape, device, dtype, generator=None):
         """Base distribution for precisesiast: pt, eta gaussian; phi uniform; mass shifted gaussian"""
@@ -226,7 +226,7 @@ class FittedLogPtPhiEtaLogM2(RejectionDistribution):
         eps = self.coordinates.transforms[-1].inverse(eps)
         onshell_mass = self.onshell_mass.to(device, dtype=dtype).unsqueeze(0)
         eps[..., self.onshell_list, 3] = torch.log(
-            (onshell_mass / self.units) ** 2 + EPS1**2
+            (onshell_mass / self.units) ** 2 + EPS1
         )
 
         # be careful with phi and eta

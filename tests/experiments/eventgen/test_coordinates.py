@@ -4,13 +4,13 @@ import numpy as np
 
 import experiments.eventgen.coordinates as c
 from experiments.eventgen.distributions import (
-    StandardPPPM2,
+    NaivePPPM2,
+    NaivePPPLogM2,
     StandardPPPLogM2,
-    FittedPPPLogM2,
-    FittedLogPtPhiEtaLogM2,
+    StandardLogPtPhiEtaLogM2,
 )
 from experiments.eventgen.processes import ttbarExperiment, zmumuExperiment
-from tests.helpers import TOLERANCES as TOLERANCES
+from tests.helpers import STRICT_TOLERANCES as TOLERANCES
 
 
 @pytest.mark.parametrize(
@@ -22,25 +22,26 @@ from tests.helpers import TOLERANCES as TOLERANCES
         c.PtPhiEtaE,
         c.PtPhiEtaM2,
         c.PPPLogM2,
+        c.StandardPPPLogM2,
         c.LogPtPhiEtaE,
         c.PtPhiEtaLogM2,
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaLogM2,
+        c.StandardLogPtPhiEtaLogM2,
     ],
 )
-@pytest.mark.parametrize("standardize", [False, True])
 @pytest.mark.parametrize(
     "distribution",
     [
-        StandardPPPM2,
+        NaivePPPM2,
+        NaivePPPLogM2,
         StandardPPPLogM2,
-        FittedPPPLogM2,
-        FittedLogPtPhiEtaLogM2,
+        StandardLogPtPhiEtaLogM2,
     ],
 )
 @pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
-@pytest.mark.parametrize("nevents", [1000])
-def test_invertibility(coordinates, distribution, experiment_np, nevents, standardize):
+@pytest.mark.parametrize("nevents", [10000])
+def test_invertibility(coordinates, distribution, experiment_np, nevents):
     """test invertibility of forward() and inverse() methods"""
     experiment, nparticles = experiment_np
     exp = experiment(None)
@@ -58,14 +59,15 @@ def test_invertibility(coordinates, distribution, experiment_np, nevents, standa
     device = torch.device("cpu")
     dtype = torch.float64  # sometimes fails with float32
     if coordinates in [
+        c.StandardLogPtPhiEtaLogM2,
         c.LogPtPhiEtaLogM2,
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaE,
     ]:
-        coord = coordinates(exp.pt_min, exp.units, standardize)
+        coord = coordinates(exp.pt_min, exp.units)
     else:
-        coord = coordinates(standardize)
+        coord = coordinates()
 
     shape = (nevents, nparticles, 4)
     fourmomenta_original = d.sample(shape, device, dtype)
@@ -93,25 +95,26 @@ def test_invertibility(coordinates, distribution, experiment_np, nevents, standa
         c.PtPhiEtaE,
         c.PtPhiEtaM2,
         c.PPPLogM2,
+        c.StandardPPPLogM2,
         c.LogPtPhiEtaE,
         c.PtPhiEtaLogM2,
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaLogM2,
+        c.StandardLogPtPhiEtaLogM2,
     ],
 )
-@pytest.mark.parametrize("standardize", [False, True])
 @pytest.mark.parametrize(
     "distribution",
     [
-        StandardPPPM2,
+        NaivePPPM2,
+        NaivePPPLogM2,
         StandardPPPLogM2,
-        FittedPPPLogM2,
-        FittedLogPtPhiEtaLogM2,
+        StandardLogPtPhiEtaLogM2,
     ],
 )
 @pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
-@pytest.mark.parametrize("nevents", [1000])
-def test_velocity(coordinates, distribution, experiment_np, nevents, standardize):
+@pytest.mark.parametrize("nevents", [10000])
+def test_velocity(coordinates, distribution, experiment_np, nevents):
     """test correctness of jacobians from _jac_forward() and _jac_inverse() methods, and their invertibility"""
     experiment, nparticles = experiment_np
     exp = experiment(None)
@@ -129,19 +132,20 @@ def test_velocity(coordinates, distribution, experiment_np, nevents, standardize
     device = torch.device("cpu")
     dtype = torch.float64  # sometimes fails with float32
     if coordinates in [
+        c.StandardLogPtPhiEtaLogM2,
         c.LogPtPhiEtaLogM2,
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaE,
     ]:
-        coord = coordinates(exp.pt_min, exp.units, standardize)
+        coord = coordinates(exp.pt_min, exp.units)
     else:
-        coord = coordinates(standardize)
+        coord = coordinates()
 
     shape = (nevents, nparticles, 4)
     x = d.sample(shape, device, dtype)
 
-    # init_fit (this does nothing, except for StandardNormal)
+    # init_fit (this does nothing, except for FitNormal)
     coord.init_fit([x])
 
     x.requires_grad_()
@@ -186,31 +190,31 @@ def test_velocity(coordinates, distribution, experiment_np, nevents, standardize
 @pytest.mark.parametrize(
     "coordinates",
     [
-        # c.Fourmomenta,
         c.PPPM2,
         c.EPhiPtPz,
         c.PtPhiEtaE,
         c.PtPhiEtaM2,
         c.PPPLogM2,
+        c.StandardPPPLogM2,
         c.LogPtPhiEtaE,
         c.PtPhiEtaLogM2,
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaLogM2,
+        c.StandardLogPtPhiEtaLogM2,
     ],
 )
-@pytest.mark.parametrize("standardize", [False, True])
 @pytest.mark.parametrize(
     "distribution",
     [
-        StandardPPPM2,
+        NaivePPPM2,
+        NaivePPPLogM2,
         StandardPPPLogM2,
-        FittedPPPLogM2,
-        FittedLogPtPhiEtaLogM2,
+        StandardLogPtPhiEtaLogM2,
     ],
 )
 @pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
-@pytest.mark.parametrize("nevents", [1000])
-def test_logdetjac(coordinates, distribution, experiment_np, nevents, standardize):
+@pytest.mark.parametrize("nevents", [10000])
+def test_logdetjac(coordinates, distribution, experiment_np, nevents):
     """test correctness of jacobians from logdetjac_fourmomenta_to_x() and logdetjac_x_to_fourmomenta() methods, and their invertibility"""
     experiment, nparticles = experiment_np
     exp = experiment(None)
@@ -228,14 +232,15 @@ def test_logdetjac(coordinates, distribution, experiment_np, nevents, standardiz
     device = torch.device("cpu")
     dtype = torch.float64  # sometimes fails with float32
     if coordinates in [
+        c.StandardLogPtPhiEtaLogM2,
         c.LogPtPhiEtaLogM2,
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaE,
     ]:
-        coord = coordinates(exp.pt_min, exp.units, standardize)
+        coord = coordinates(exp.pt_min, exp.units)
     else:
-        coord = coordinates(standardize)
+        coord = coordinates()
 
     shape = (nevents, nparticles, 4)
     x = d.sample(shape, device, dtype)
