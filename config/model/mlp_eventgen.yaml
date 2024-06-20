@@ -1,0 +1,10 @@
+_target_: experiments.eventgen.wrappers.MLPCFM
+
+net:
+ _target_: experiments.baselines.MLP
+
+ in_shape: null
+ out_shape: null
+ hidden_channels: 64
+
+ hidden_layers: 2
