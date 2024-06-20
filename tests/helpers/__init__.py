@@ -1,6 +1,6 @@
 # Copyright (c) 2023 Qualcomm Technologies, Inc.
 # All rights reserved.
-from .constants import BATCH_DIMS, MILD_TOLERANCES, TOLERANCES
+from .constants import BATCH_DIMS, MILD_TOLERANCES, TOLERANCES, STRICT_TOLERANCES
 from .equivariance import check_pin_equivariance, check_pin_invariance
 from .geometric_algebra import (
     check_consistence_with_geometric_product,

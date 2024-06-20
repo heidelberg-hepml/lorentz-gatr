@@ -19,7 +19,7 @@ training:
  subsample: null
  es_patience: 100
  es_load_best_model: true
- validate_every_n_steps: 10
+ validate_every_n_steps: 100
 
  clip_grad_norm: 5
  clip_grad_value: null
@@ -30,6 +30,7 @@ training:
  batchsize: 256
  betas: [.9, .999]
  eps: 1.e-8
+ weight_decay: 0.
  
  scheduler: null
  scheduler_scale: 1

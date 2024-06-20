@@ -1,0 +1,13 @@
+_target_: experiments.eventgen.wrappers.TransformerCFM
+
+net:
+ _target_: experiments.baselines.Transformer
+
+ in_channels: null
+ out_channels: 4
+ hidden_channels: 32
+
+ num_blocks: 1
+ num_heads: 4
+
+ pos_encoding: false

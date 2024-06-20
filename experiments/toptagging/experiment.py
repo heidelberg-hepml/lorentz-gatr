@@ -51,7 +51,7 @@ class TaggingExperiment(BaseExperiment):
                     self.cfg.model.net.in_mv_channels = 1
 
                 elif self.cfg.exp_type == "qgtagging":
-                    # We add 7 scalar channels, 1 for the global token and 6 for the particle id features 
+                    # We add 7 scalar channels, 1 for the global token and 6 for the particle id features
                     # (charge, electron, muon, photon, charged hadron and neutral hadron)
                     self.cfg.model.net.in_s_channels = 7
                     self.cfg.model.net.in_mv_channels = 1
@@ -304,5 +304,7 @@ class TopTaggingExperiment(TaggingExperiment):
 
 class QGTaggingExperiment(TaggingExperiment):
     def init_data(self):
-        data_path = os.path.join(self.cfg.data.data_dir, f"qg_tagging_{self.cfg.data.dataset}.npz")
+        data_path = os.path.join(
+            self.cfg.data.data_dir, f"qg_tagging_{self.cfg.data.dataset}.npz"
+        )
         self._init_data(QGTaggingDataset, data_path)
