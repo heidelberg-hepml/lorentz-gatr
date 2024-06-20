@@ -1,0 +1,21 @@
+exp_type: z5g
+exp_name: z5g_local_debug
+base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
+
+data:
+ n_jets: [5]
+ data_path_5j: /media/jspinner/shared/Studium/project3/data/z5g_prepd.npy
+ subsample: null
+ train_test_val: [.9, .09, .01]
+
+plot: true
+plotting:
+ fourmomenta: true
+ jetmomenta: true
+ preprocessed: true
+ virtual: true
+ delta: true
+ deta_dphi: true
+
+defaults:
+- ttbar

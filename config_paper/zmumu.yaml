@@ -1,0 +1,23 @@
+exp_type: zmumu
+exp_name: zmumu_local_debug
+base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
+
+data:
+ n_jets: [1]
+ data_path_1j: /media/jspinner/shared/Studium/project3/data/Z_1.npy
+ data_path_2j: /media/jspinner/shared/Studium/project3/data/Z_2.npy
+ data_path_3j: /media/jspinner/shared/Studium/project3/data/Z_3.npy
+ subsample: 100000
+ train_test_val: [.5, .4, .01]
+
+plot: true
+plotting:
+ fourmomenta: true
+ jetmomenta: true
+ preprocessed: true
+ virtual: true
+ delta: true
+ deta_dphi: true
+
+defaults:
+- ttbar

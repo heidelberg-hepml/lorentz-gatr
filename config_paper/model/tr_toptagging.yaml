@@ -1,0 +1,14 @@
+_target_: experiments.toptagging.wrappers.TopTaggingTransformerWrapper
+force_xformers: '${training.force_xformers}'
+
+net:
+  _target_: experiments.baselines.Transformer
+
+  in_channels: 4
+  out_channels: 1
+  hidden_channels: 32
+
+  num_blocks: 4
+  num_heads: 4
+
+  pos_encoding: false

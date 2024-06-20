@@ -1,0 +1,26 @@
+_target_: experiments.eventgen.classifier.MLPClassifier
+
+cfg_preprocessing:
+ add_virtual: true
+ add_delta_r: true
+
+cfg_training:
+ batchsize: 1024
+ nepochs: 500
+ train_test_val: [0.8, 0.1, 0.1]
+ es_patience: 10
+ es_load_best_model: true
+ lr: 3e-4
+ scheduler: ReduceLROnPlateau
+ lr_factor: 0.1
+ lr_patience: 5
+
+net:
+ _target_: experiments.baselines.MLP
+
+ in_shape: null
+ out_shape: 1
+ hidden_channels: 256
+
+ hidden_layers: 3
+ dropout_prob: 0.1
