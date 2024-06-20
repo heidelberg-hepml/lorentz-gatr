@@ -104,15 +104,6 @@ class AmplitudeExperiment(BaseExperiment):
             if modelname == "GATr" and self.cfg.model.reinsert_type_token:
                 self.cfg.model.net.reinsert_s_channels = list(range(n_type_tokens))
 
-            # extra outputs for heteroscedastic loss
-            if self.cfg.heteroscedastic:
-                if modelname in ["MLP", "DSI"]:
-                    self.cfg.model.net.out_shape = 2
-                elif modelname == "Transformer":
-                    self.cfg.model.net.out_channels = 2
-                elif modelname in ["GATr", "GAP"]:
-                    self.cfg.model.net.out_mv_channels = 2
-
     def init_data(self):
         LOGGER.info(
             f"Working with dataset {self.cfg.data.dataset} "
@@ -234,7 +225,6 @@ class AmplitudeExperiment(BaseExperiment):
 
     def evaluate(self):
         with torch.no_grad():
-            # this is a bit ugly, but it does the job
             if self.ema is not None:
                 with self.ema.average_parameters():
                     self.results_train = self._evaluate_single(
@@ -259,10 +249,10 @@ class AmplitudeExperiment(BaseExperiment):
         amplitudes_truth_prepd, amplitudes_pred_prepd = [
             [] for _ in range(self.n_datasets)
         ], [[] for _ in range(self.n_datasets)]
-        if self.cfg.heteroscedastic:  # also save predicted uncertainties
-            std_pred_prepd = [[] for _ in range(self.n_datasets)]
         LOGGER.info(f"### Starting to evaluate model on {title} dataset ###")
         self.model.eval()
+        if self.cfg.training.optimizer == "ScheduleFree":
+            self.optimizer.eval()
         t0 = time.time()
         for data in loader:
             for idataset, data_onedataset in enumerate(data):
@@ -274,11 +264,6 @@ class AmplitudeExperiment(BaseExperiment):
                 )
 
                 y_pred = pred[..., 0]
-                if self.cfg.heteroscedastic:
-                    std_prepd = torch.exp(
-                        pred[..., 1] / 2
-                    )  # extract sigma from log(sigma^2)
-                    std_pred_prepd[idataset].append(std_prepd.cpu().float().numpy())
 
                 amplitudes_pred_prepd[idataset].append(y_pred.cpu().float().numpy())
                 amplitudes_truth_prepd[idataset].append(
@@ -290,10 +275,6 @@ class AmplitudeExperiment(BaseExperiment):
         amplitudes_truth_prepd = [
             np.concatenate(individual) for individual in amplitudes_truth_prepd
         ]
-        if self.cfg.heteroscedastic:
-            std_pred_prepd = [
-                np.concatenate(individual) for individual in std_pred_prepd
-            ]
         dt = (
             (time.time() - t0)
             * 1e6
@@ -336,30 +317,12 @@ class AmplitudeExperiment(BaseExperiment):
                 f"{[f'{delta_rates[i]:.4f} ({delta_maxs[i]})' for i in range(len(delta_maxs))]}"
             )
 
-            # compute pulls
-            if self.cfg.heteroscedastic:
-                std_pred = (
-                    std_pred_prepd[idataset] * self.prepd_std[idataset] * amp_pred
-                )
-
-                pull_prepd = (amp_pred_prepd - amp_truth_prepd) / std_pred_prepd[
-                    idataset
-                ]
-                pull = (amp_pred - amp_truth) / std_pred
-            else:
-                pull_prepd, pull = None, None
-
             # log to mlflow
             if self.cfg.use_mlflow:
                 log_dict = {
                     f"eval.{title}.{dataset}.mse": mse_prepd,
                     f"eval.{title}.{dataset}.mse_raw": mse,
                 }
-                if self.cfg.heteroscedastic:
-                    log_dict[f"eval.{title}.{dataset}.pull_mean"] = np.mean(pull_prepd)
-                    log_dict[f"eval.{title}.{dataset}.pull_std"] = np.std(pull_prepd)
-                    log_dict[f"eval.{title}.{dataset}.pull_mean_raw"] = np.mean(pull)
-                    log_dict[f"eval.{title}.{dataset}.pull_std_raw"] = np.std(pull)
                 for key, value in log_dict.items():
                     log_mlflow(key, value)
 
@@ -368,13 +331,11 @@ class AmplitudeExperiment(BaseExperiment):
                     "truth": amp_truth,
                     "prediction": amp_pred,
                     "mse": mse,
-                    "pull": pull,
                 },
                 "preprocessed": {
                     "truth": amp_truth_prepd,
                     "prediction": amp_pred_prepd,
                     "mse": mse_prepd,
-                    "pull": pull_prepd,
                 },
             }
             results[dataset] = amp
@@ -401,23 +362,7 @@ class AmplitudeExperiment(BaseExperiment):
         plot_mixer(self.cfg, plot_path, title, plot_dict)
 
     def _init_loss(self):
-        if self.cfg.heteroscedastic:
-
-            def heteroscedastic_loss(y_true, pred):
-                # extract log(sigma^2) instead of just sigma to improve numerical stability
-                y_pred, logsigma2 = pred[..., [0]], pred[..., [1]]
-
-                logsigma2 = torch.clamp(logsigma2, min=-16)
-
-                # drop constant term log(2 pi)/2 because it does not affect optimization
-                expression = (y_pred - y_true) ** 2 / (
-                    2 * logsigma2.exp()
-                ) + logsigma2 / 2
-                return expression.mean()
-
-            self.loss = heteroscedastic_loss
-        else:
-            self.loss = torch.nn.MSELoss()
+        self.loss = torch.nn.MSELoss()
 
     def _batch_loss(self, data):
         # average over contributions from different datasets

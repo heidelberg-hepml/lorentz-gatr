@@ -184,6 +184,8 @@ class TaggingExperiment(BaseExperiment):
         # predictions
         labels_true, labels_predict = [], []
         self.model.eval()
+        if self.cfg.training.optimizer == "ScheduleFree":
+            self.optimizer.eval()
         with torch.no_grad():
             for batch in loader:
                 batch = batch.to(self.device)

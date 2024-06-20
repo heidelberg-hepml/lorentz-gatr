@@ -1,6 +1,6 @@
 # Lorentz' Geometric Algebra Transformers
 
-This repository contains an adapted version of the official implementation of the original Geometric Algebra Transformer of https://github.com/Qualcomm-AI-research/geometric-algebra-transformer for the Lorentz Group. 
+This repository contains the official implementation of the [**Lorentz-Equivariant Geometric Algebra Transformer**](https://arxiv.org/abs/2405.14806) by [Jonas Spinner](mailto:j.spinner@thphys.uni-heidelberg.de), [Víctor Bresó](mailto:breso@thphys.uni-heidelberg.de), Pim de Haan, Tilman Plehn, Jesse Thaler, and Johann Brehmer.
 
 ## 1. Getting started
 
@@ -21,41 +21,43 @@ pip install -r requirements.txt
 
 ## 2. Running experiments
 
-You can run an experiment with the following command
+You can run any of our experiments with the following commands:
 ```
-python run.py model=gatr_amplitudes exp_name=amplitudes run_name=hello_world
+python run.py model=gatr_amplitudes exp_type=amplitudes exp_name=amplitudes run_name=hello_world_amplitudes
+python run.py model=gatr_toptagging exp_type=toptagging exp_name=toptagging run_name=hello_world_toptagging
+python run.py model=gatr_eventgen exp_type=ttbar exp_name=eventgen run_name=hello_world_eventgen
 ```
 
-We use hydra for configuration management, allowing to quickly override parameters in config/amplitudes.yaml with the ++ operator. Further, we use mlflow for tracking. You can start a mlflow server based on the saved results in runs/tracking/mlflow.db on port 4242 of your machine with the following command
+We use hydra for configuration management, allowing to quickly override parameters in config/amplitudes.yaml. Further, we use mlflow for tracking. You can start a mlflow server based on the saved results in runs/tracking/mlflow.db on port 4242 of your machine with the following command
 
 ```
 mlflow ui --port 4242 --backend-store-uri sqlite:///runs/tracking/mlflow.db
 ```
 
-An existing run can be reloaded to perform additional tests with the trained model. For a previous run with exp_name=amplitudes and run_name=hello_world, one can run for example. 
+An existing run can be reloaded to perform additional tests with the trained model. For a previous run with exp_name=amplitudes and run_name=hello_world_amplitudes, one can run for example. 
 ```
-python run.py -cn config -cp runs/amplitudes/hello_world train=false warm_start_idx=0
+python run.py -cn config -cp runs/amplitudes/hello_world_amplitudes train=false warm_start_idx=0
 ```
 The warm_start_idx specifies which model in the models folder should be loaded and defaults to 0. 
 
-## Using GATr (copied from the original GATr)
+## 3. Using L-GATr 
 
-To use GATr on your own problem, you will at least need two components from this repository:
-GATr networks, which act on multivector data, and interface functions that embed various geometric
+To use L-GATr on your own problem, you will at least need two components from this repository:
+L-GATr networks, which act on multivector data, and interface functions that embed various geometric
 objects into this multivector representations.
 
 Here is an example code snippet that illustrates the recipe:
 
 ```python
 from gatr import GATr, SelfAttentionConfig, MLPConfig
-from gatr.interface import embed_point, extract_scalar
+from gatr.interface import embed_vector, extract_scalar
 import torch
 
 
 class ExampleWrapper(torch.nn.Module):
-    """Example wrapper around a GATr model.
+    """Example wrapper around a L-GATr model.
     
-    Expects input data that consists of a point cloud: one 3D point for each item in the data.
+    Expects input data that consists of a point cloud: one 4-momentum point for each item in the data.
     Returns outputs that consists of one scalar number for the whole dataset.
     
     Parameters
@@ -87,8 +89,8 @@ class ExampleWrapper(torch.nn.Module):
         
         Parameters
         ----------
-        inputs : torch.Tensor with shape (*batch_dimensions, num_points, 3)
-            Point cloud input data
+        inputs : torch.Tensor with shape (*batch_dimensions, num_points, 4)
+            4-momentum point cloud input data
         
         Returns
         -------
@@ -96,16 +98,15 @@ class ExampleWrapper(torch.nn.Module):
             Model prediction: a single scalar for the whole point cloud.
         """
         
-        # Embed point cloud in PGA
-        embedded_inputs = embed_point(inputs).unsqueeze(-2)  # (..., num_points, 1, 16)
+        # Embed 4-momentum point cloud inputs in GA
+        embedded_inputs = embed_vector(inputs).unsqueeze(-2)  # (..., num_points, 1, 16)
         
         # Pass data through GATr
         embedded_outputs, _ = self.gatr(embedded_inputs, scalars=None)  # (..., num_points, 1, 16)
         
-        # Extract scalar and aggregate outputs from point cloud
-        nodewise_outputs = extract_scalar(embedded_outputs)  # (..., num_points, 1, 1)
-        outputs = torch.mean(nodewise_outputs, dim=(-3, -2))  # (..., 1)
-        
+        # Extract scalar outputs 
+        outputs = extract_scalar(embedded_outputs)  # (..., 1)
+
         return outputs
 ```
 
@@ -114,10 +115,10 @@ structure of the repository.
 
 ### Design choices
 
-**Representations**: GATr operates with two kind of representations: geometric algebra multivectors
+**Representations**: L-GATr operates with two kind of representations: geometric algebra multivectors
 and auxiliary scalar representations. Both are simply represented as `torch.Tensor` instances.
 
-The multivectors are based on the projective geometric algebra G(3, 0, 1). They are tensors of the
+The multivectors are based on the geometric algebra Cl(1, 3). They are tensors of the
 shape `(..., 16)`, for instance `(batchsize, items, channels, 16)`. The sixteen multivector
 components are sorted as in the
 [`clifford` library](https://clifford.readthedocs.io/en/latest/), as follows:
@@ -127,14 +128,8 @@ x_0123]`.
 Scalar representations have free shapes, but should match the multivector representations they
 accompany in batchsize and number of items. The number of channels may be different.
 
-**Interface to the real world**: To map the multivector representations to physical objects, we
-use the plane-based convention presented in
-[Roelfs and De Keninck, "Graded symmetry groups: Plane and simple"](https://arxiv.org/abs/2107.03771).
-3D points are thus represented as trivectors, planes as vectors, and so on. We provide these
-these interface functions in the `gatr.interface` submodule.
-
 **Functions**: We distinguish between primitives (functions) and layers (often stateful
-`torch.nn.Module` instances). Almost all primitives and layers are Pin(3, 0, 1)-equivariant,
+`torch.nn.Module` instances). Almost all primitives and layers are Pin(1, 3)-equivariant,
 see docstrings for exceptions.
 
 ### Repository structure
@@ -149,23 +144,23 @@ lorentz-gatr
 └───gatr: core library
 |   └───interface: embedding of geometric quantities into projective geometric algebra
 |   |   |   vector.py: Lorentz vector
-|   |   |   pseudoscalar.py: pseudoscalars
+|   |   |   pseudoscalar.py: pseudoscalars (not used)
 |   |   |   scalar.py: scalars
 |   |
 |   └───layers: network layers
 |   |   └───attention: self-attention layer, its components, and the corresponding configuration
 |   |   └───mlp: geometric MLP, its components, and the corresponding configuration
 |   |   |   dropout.py: multivector dropout
-|   |   |   gatr_block.py: GATr transformer block, the main layer that GATr networks consist of
+|   |   |   gatr_block.py: L-GATr transformer block, the main layer that L-GATr networks consist of
 |   |   |   layer_norm.py: geometric LayerNorm
 |   |   |   linear.py: equivariant linear layer between multivectors
 |   |
 |   └───nets: complete network architectures
-|   |   |   axial_gatr.py: axial-attention version of GATr for two token dimensions
-|   |   |   gatr.py: GATr architecture for a single token dimension
+|   |   |   axial_gatr.py: axial-attention version of L-GATr for two token dimensions
+|   |   |   gatr.py: L-GATr architecture for a single token dimension
+|   |   |   gap.py: L-GATr architecture without the transformer module
 |   |
-|   └───primitives: core functional building blocks of GATr
-|   |   └───data: pre-computed basis stored in `.pt` files
+|   └───primitives: core functional building blocks of L-GATr
 |   |   |   attention.py: geometric attention mechanism
 |   |   |   bilinear.py: bilinear equivariant functions like the geometric product
 |   |   |   dropout.py: geometric dropout
@@ -177,21 +172,48 @@ lorentz-gatr
 |   └───utils: utility functions
 |       |   clifford.py: non-differentiable GA functions based on the clifford library
 |       |   einsum.py: optimized einsum function
-|       |   misc.py: various utility functions
 |       |   tensors.py: various tensor operations
 |
 └───experiments: experiments that use gatr
 |   └───baselines: baseline layers and architectures
 |   |   |   mlp.py: MLP baseline
 |   |   |   transformer.py: Transformer baseline
+|   |   |   dsi.py: Deep Sets with Lorentz invariants baseline
 |   |
 |   └───amplitudes: amplitude experiment
+|   |   └───dataset.py: data class builder
+|   |   └───experiment.py: experiment class including dataloader definition, loss function and model evaluation
+|   |   └───plots.py: plot builder
+|   |   └───preprocessing.py: preprocessing functions for inputs and outputs
+|   |   └───wrappers.py: wrapper classes for all baselines
+|   └───toptagging: top tagging experiment
+|   |   └───dataset.py: data class builder
+|   |   └───experiment.py: experiment class including dataloader definition, loss function and model evaluation
+|   |   └───plots.py: plot builder
+|   |   └───wrappers.py: wrapper classes for all baselines
+|   └───eventgen: event generation experiment
+|   |   └───cfm.py: CFM base class for event generation
+|   |   └───classifier.py: MLP classifier for evaluating generation quality
+|   |   └───coordinates.py: trajectory definitions and full transformation functions between coordinate spaces
+|   |   └───distributions.py: base density distributions
+|   |   └───dataset.py: data class builder
+|   |   └───experiment.py: experiment class including dataloader definition, loss function and model evaluation
+|   |   └───helpers.py: helper functions for plotting
+|   |   └───plots.py: plot builder
+|   |   └───plots.py: base plot settings
+|   |   └───processes.py: experiment settings for different physical processes
+|   |   └───transforms.py: list of transformation functions between coordinate spaces
+|   |   └───wrappers.py: wrapper classes for all baselines
 |   |
 |   |   misc.py: various utility functions
+|   |   logger.py: Logger setup
+|   |   mlflow.py: MLFlow logger 
+|   |   base_experiment.py: Base class for all experiments including model, optimizer and scheduler initialization, logging protocol and training/validation loops
+|   |   base_plots.py: Example plot functions (not used)
+|   |   base_wrapper.py: Example wrapper for L-GATr (not used) 
 │
 └───tests: unit tests (e.g. for self-consistency and Pin equivariance)
 |   └───gatr
-|   |   └───baselines: unit tests for gatr.baselines
 |   |   └───interface: unit tests for gatr.interface
 |   |   └───layers: unit tests for gatr.layers
 |   |   └───nets: unit tests for gatr.nets
@@ -208,4 +230,31 @@ lorentz-gatr
 │   LICENSE: license under which this code may be used
 │   README.md: this README file
 |   requirements.txt: external dependencies
+```
+
+## 4. Extra features in this repository
+
+Here we list some additional functional elements of the code that are not explicitly mentioned in the paper:
+
+1. Axial transformer and axial L-GATr build
+2. Tagging experiment for a quark gluon dataset containing extra scalar features
+3. Extra options in the tagging experiment to include more scalar variables and particle pair information encoded as extra channels
+4. Extra base distributions and variable parametrizations for event generation
+5. Event generation experiments for Z + jets and Z + 5 gluons datasets
+
+## 5. Citation
+
+If you find our code useful, please cite:
+
+```text
+@article{Spinner:2024hjm,
+    author = "Spinner, Jonas and Bres\'o, Victor and de Haan, Pim and Plehn, Tilman and Thaler, Jesse and Brehmer, Johann",
+    title = "{Lorentz-Equivariant Geometric Algebra Transformers for High-Energy Physics}",
+    eprint = "2405.14806",
+    archivePrefix = "arXiv",
+    primaryClass = "physics.data-an",
+    reportNumber = "MIT-CTP/5723",
+    month = "5",
+    year = "2024"
+}
 ```

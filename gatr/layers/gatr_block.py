@@ -13,9 +13,9 @@ from gatr.layers.mlp.mlp import GeoMLP
 
 
 class GATrBlock(nn.Module):
-    """Equivariant transformer block for GATr.
+    """Equivariant transformer block for L-GATr.
 
-    This is the biggest building block of GATr.
+    This is the biggest building block of L-GATr.
 
     Inputs are first processed by a block consisting of LayerNorm, multi-head geometric
     self-attention, and a residual connection. Then the data is processed by a block consisting of

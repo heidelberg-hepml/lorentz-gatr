@@ -21,6 +21,9 @@ from experiments.mlflow import log_mlflow
 
 from gatr.layers import MLPConfig, SelfAttentionConfig
 
+from lion_pytorch import Lion
+import schedulefree
+
 cs = ConfigStore.instance()
 cs.store(name="base_attention", node=SelfAttentionConfig)
 cs.store(name="base_mlp", node=MLPConfig)
@@ -102,7 +105,7 @@ class BaseExperiment:
         gatr.layers.linear.MIX_DUALS = True if self.cfg.gatr_mix_duals else False
 
         # initialize model
-        self.model = instantiate(self.cfg.model)  # hydra magic
+        self.model = instantiate(self.cfg.model)
         num_parameters = sum(
             p.numel() for p in self.model.parameters() if p.requires_grad
         )
@@ -209,7 +212,7 @@ class BaseExperiment:
         Path(self.cfg.mlflow.artifacts).mkdir(exist_ok=True)
         try:
             # artifacts not supported
-            # mlflow call triggers alembic.runtime.migration logger to shout -> shut it down (happy for suggestions on how to do this nicer)
+            # mlflow call triggers alembic.runtime.migration logger to shout -> shut it down
             logging.disable(logging.WARNING)
             experiment_id = mlflow.create_experiment(
                 self.cfg.exp_name,
@@ -360,6 +363,28 @@ class BaseExperiment:
                 betas=self.cfg.training.betas,
                 eps=self.cfg.training.eps,
             )
+        elif self.cfg.training.optimizer == "AdamW":
+            self.optimizer = torch.optim.AdamW(
+                self.model.parameters(),
+                lr=self.cfg.training.lr,
+                betas=self.cfg.training.betas,
+                eps=self.cfg.training.eps,
+                weight_decay=self.cfg.training.weight_decay,
+            )
+        elif self.cfg.training.optimizer == "Lion":
+            self.optimizer = Lion(
+                self.model.parameters(),
+                lr=self.cfg.training.lr,
+                betas=self.cfg.training.betas,
+                weight_decay=self.cfg.training.weight_decay,
+            )
+        elif self.cfg.training.optimizer == "ScheduleFree":
+            self.optimizer = schedulefree.AdamWScheduleFree(
+                self.model.parameters(),
+                lr=self.cfg.training.lr,
+                betas=self.cfg.training.betas,
+                weight_decay=self.cfg.training.weight_decay,
+            )
         else:
             raise ValueError(f"Optimizer {self.cfg.training.optimizer} not implemented")
         LOGGER.debug(
@@ -443,16 +468,18 @@ class BaseExperiment:
         )
         self.training_start_time = time.time()
 
-        # recycle trainloader, thanks Pim :)
+        # recycle trainloader
         def cycle(iterable):
             while True:
                 for x in iterable:
                     yield x
 
         iterator = iter(cycle(self.train_loader))
-        for step in trange(self.cfg.training.iterations):
+        for step in range(self.cfg.training.iterations):
             # training
             self.model.train()
+            if self.cfg.training.optimizer == "ScheduleFree":
+                self.optimizer.train()
             data = next(iterator)
             self._step(data, step)
 
@@ -573,6 +600,8 @@ class BaseExperiment:
         metrics = self._init_metrics()
 
         self.model.eval()
+        if self.cfg.training.optimizer == "ScheduleFree":
+            self.optimizer.eval()
         with torch.no_grad():
             for data in self.val_loader:
                 # use EMA for validation if available
