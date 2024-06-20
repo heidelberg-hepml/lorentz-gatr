@@ -1,4 +1,4 @@
-# Lorentz' Geometric Algebra Transformers
+# Lorentz-Equivariant Geometric Algebra Transformer
 
 This repository contains the official implementation of the [**Lorentz-Equivariant Geometric Algebra Transformer**](https://arxiv.org/abs/2405.14806) by [Jonas Spinner](mailto:j.spinner@thphys.uni-heidelberg.de), [Víctor Bresó](mailto:breso@thphys.uni-heidelberg.de), Pim de Haan, Tilman Plehn, Jesse Thaler, and Johann Brehmer.
 
@@ -23,7 +23,7 @@ We will to publish the datasets soon. For now, contact [Jonas Spinner](mailto:j.
 ## 2. Running experiments
 
 You can run any of our experiments with the following commands:
-```
+```bash
 python run.py model=gatr_amplitudes exp_type=amplitudes exp_name=amplitudes run_name=hello_world_amplitudes
 python run.py model=gatr_toptagging exp_type=toptagging exp_name=toptagging run_name=hello_world_toptagging
 python run.py model=gatr_eventgen exp_type=ttbar exp_name=eventgen run_name=hello_world_eventgen
@@ -31,12 +31,12 @@ python run.py model=gatr_eventgen exp_type=ttbar exp_name=eventgen run_name=hell
 
 We use hydra for configuration management, allowing to quickly override parameters in e.g. config/amplitudes.yaml. Further, we use mlflow for tracking. You can start a mlflow server based on the saved results in runs/tracking/mlflow.db on port 4242 of your machine with the following command
 
-```
+```bash
 mlflow ui --port 4242 --backend-store-uri sqlite:///runs/tracking/mlflow.db
 ```
 
 An existing run can be reloaded to perform additional tests with the trained model. For a previous run with exp_name=amplitudes and run_name=hello_world_amplitudes, one can run for example. 
-```
+```bash
 python run.py -cn config -cp runs/amplitudes/hello_world_amplitudes train=false warm_start_idx=0
 ```
 The warm_start_idx specifies which model in the models folder should be loaded and defaults to 0. 
