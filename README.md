@@ -18,6 +18,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+We will to publish the datasets soon. For now, contact [Jonas Spinner](mailto:j.spinner@thphys.uni-heidelberg.de) or [Víctor Bresó](mailto:breso@thphys.uni-heidelberg.de) if you need early access.
 
 ## 2. Running experiments
 
@@ -28,7 +29,7 @@ python run.py model=gatr_toptagging exp_type=toptagging exp_name=toptagging run_
 python run.py model=gatr_eventgen exp_type=ttbar exp_name=eventgen run_name=hello_world_eventgen
 ```
 
-We use hydra for configuration management, allowing to quickly override parameters in config/amplitudes.yaml. Further, we use mlflow for tracking. You can start a mlflow server based on the saved results in runs/tracking/mlflow.db on port 4242 of your machine with the following command
+We use hydra for configuration management, allowing to quickly override parameters in e.g. config/amplitudes.yaml. Further, we use mlflow for tracking. You can start a mlflow server based on the saved results in runs/tracking/mlflow.db on port 4242 of your machine with the following command
 
 ```
 mlflow ui --port 4242 --backend-store-uri sqlite:///runs/tracking/mlflow.db
@@ -39,6 +40,8 @@ An existing run can be reloaded to perform additional tests with the trained mod
 python run.py -cn config -cp runs/amplitudes/hello_world_amplitudes train=false warm_start_idx=0
 ```
 The warm_start_idx specifies which model in the models folder should be loaded and defaults to 0. 
+
+The configuration files in this repository define small models to allow quick test runs, these are NOT the configuration files used for the paper. The hyperparameters used for the paper can be found there.
 
 ## 3. Using L-GATr 
 
@@ -139,7 +142,15 @@ lorentz-gatr
 |
 └───config: configuration YAML files for the experiments
 |   └───model: model configurations
-|   |   amplitudes.yaml: default configuration for the amplitude experiment
+|   └───classifier: classifier metric configuration (event generation experiment)
+|   |   amplitudes.yaml: configuration for the amplitude experiment
+|   |   default.yaml: default configuration
+|   |   hydra.yaml: hydra configuration
+|   |   qgtagging.yaml: configuration for the quark-gluon-tagging experiment
+|   |   toptagging.yaml: configuration for the toptagging experiment
+|   |   ttbar.yaml: configuration for the ttbar event-generation experiment
+|   |   z5g.yaml: configuration for the z+5g event-generation experiment
+|   |   zmumu.yaml: configuration for the z->mumu event-generation experiment
 |
 └───gatr: core library
 |   └───interface: embedding of geometric quantities into projective geometric algebra
@@ -181,29 +192,29 @@ lorentz-gatr
 |   |   |   dsi.py: Deep Sets with Lorentz invariants baseline
 |   |
 |   └───amplitudes: amplitude experiment
-|   |   └───dataset.py: data class builder
-|   |   └───experiment.py: experiment class including dataloader definition, loss function and model evaluation
-|   |   └───plots.py: plot builder
-|   |   └───preprocessing.py: preprocessing functions for inputs and outputs
-|   |   └───wrappers.py: wrapper classes for all baselines
+|   |   |   dataset.py: data class builder
+|   |   |   experiment.py: experiment class including dataloader definition, loss function and model evaluation
+|   |   |   plots.py: plot builder
+|   |   |   preprocessing.py: preprocessing functions for inputs and outputs
+|   |   |   wrappers.py: wrapper classes for all baselines
 |   └───toptagging: top tagging experiment
-|   |   └───dataset.py: data class builder
-|   |   └───experiment.py: experiment class including dataloader definition, loss function and model evaluation
-|   |   └───plots.py: plot builder
-|   |   └───wrappers.py: wrapper classes for all baselines
+|   |   |   dataset.py: data class builder
+|   |   |   experiment.py: experiment class including dataloader definition, loss function and model evaluation
+|   |   |   plots.py: plot builder
+|   |   |   wrappers.py: wrapper classes for all baselines
 |   └───eventgen: event generation experiment
-|   |   └───cfm.py: CFM base class for event generation
-|   |   └───classifier.py: MLP classifier for evaluating generation quality
-|   |   └───coordinates.py: trajectory definitions and full transformation functions between coordinate spaces
-|   |   └───distributions.py: base density distributions
-|   |   └───dataset.py: data class builder
-|   |   └───experiment.py: experiment class including dataloader definition, loss function and model evaluation
-|   |   └───helpers.py: helper functions for plotting
-|   |   └───plots.py: plot builder
-|   |   └───plots.py: base plot settings
-|   |   └───processes.py: experiment settings for different physical processes
-|   |   └───transforms.py: list of transformation functions between coordinate spaces
-|   |   └───wrappers.py: wrapper classes for all baselines
+|   |   |   cfm.py: CFM base class for event generation
+|   |   |   classifier.py: MLP classifier metric
+|   |   |   coordinates.py: trajectory definitions and full transformation functions between coordinate spaces
+|   |   |   distributions.py: base distributions
+|   |   |   dataset.py: data class builder
+|   |   |   experiment.py: experiment class including dataloader definition, loss function and model evaluation
+|   |   |   helpers.py: helper functions for plotting
+|   |   |   plots.py: base plotting functions
+|   |   |   plotter.py: plot builder
+|   |   |   processes.py: experiment settings for different physical processes
+|   |   |   transforms.py: list of transformation functions between coordinate spaces
+|   |   |   wrappers.py: wrapper class for a vector field networks
 |   |
 |   |   misc.py: various utility functions
 |   |   logger.py: Logger setup
@@ -224,6 +235,10 @@ lorentz-gatr
 |       |   constants.py: test settings (like tolerances)
 |       |   equivariance.py: helper functions to test Pin equivariance
 |       |   geometric_algebra.py: helper functions to test GA functionality
+│
+|   |
+|   └───experiments
+|   |   └───eventgen: units tests for base distributions and transforms/coordinates classes
 │
 └───tests_regression: regression tests
 │  
