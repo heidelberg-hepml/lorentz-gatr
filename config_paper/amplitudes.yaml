@@ -22,7 +22,6 @@ plotting:
  histograms: true
  delta: true
  delta_prepd: true
- pull: false
 
 defaults:
  - model: gatr_amplitudes

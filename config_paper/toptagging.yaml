@@ -4,7 +4,7 @@ base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
 
 data:
  data_dir : /media/jspinner/shared/Studium/project3/data
- dataset: mini
+ dataset: full
  pairs:
   use: false
   add_differences: true
@@ -28,8 +28,8 @@ training:
  batchsize: 128
  lr: 3e-4
  scheduler: CosineAnnealingLR
-
- force_xformers: false
+ weight_decay: 0.2
+ force_xformers: true # requires gpu (can run on cpu+slower with 'false')
 
 evaluation:
  batchsize: 128
@@ -39,11 +39,6 @@ plotting:
  roc: true
  loss: true
  score: true
-
-sweep: # only used for sweeps
- seed: null
- trials: 10
- optuna_db: '${base_dir}/runs/${exp_name}/optuna/optuna.db'
 
 defaults:
  - model: gatr_toptagging
