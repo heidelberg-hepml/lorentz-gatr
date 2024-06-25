@@ -5,20 +5,24 @@ base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
 data:
  dataset : [zgg]
  data_path : /media/jspinner/shared/Studium/project3/data/
- subsample : 10000
+ subsample : null
  include_permsym: true
  train_test_val: [.4, .5, .1]
 
 train: true
 training:
- lr: 3e-4
+ iterations: 250000
+ optimizer: Adam
+ lr: 1e-4
+ batchsize: 256
+ scheduler: null
 
 plot: true
 plotting:
  histograms: true
  delta: true
  delta_prepd: true
- pull: true
+ pull: false
 
 defaults:
  - model: gatr_amplitudes

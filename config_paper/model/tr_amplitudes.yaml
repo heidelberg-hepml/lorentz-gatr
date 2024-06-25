@@ -7,7 +7,7 @@ net:
   out_channels: 1
   hidden_channels: 128
 
-  num_blocks: 4
-  num_heads: 4
+  num_blocks: 8
+  num_heads: 8
 
   pos_encoding: false

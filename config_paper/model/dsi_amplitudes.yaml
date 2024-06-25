@@ -9,8 +9,8 @@ net:
   num_particles_boson: 1
   num_particles_glu: 3
   
-  hidden_channels_prenet: 384
-  hidden_layers_prenet: 2
-  out_dim_prenet_sep: 32
-  hidden_channels_net: 384
-  hidden_layers_net: 2
+  hidden_channels_prenet: 128
+  hidden_layers_prenet: 4
+  out_dim_prenet_sep: 64
+  hidden_channels_net: 128
+  hidden_layers_net: 4

@@ -9,13 +9,13 @@ data:
   use: false
   add_differences: true
   directed: true
-  top_k: 10
+  top_k: 50
   lowest_kt: false
   add_scalars: false
  beam_reference: spacelike
  two_beams: false
- beam_token: false
- add_time_reference: true
+ beam_token: true
+ add_time_reference: false
  add_pt: false
  add_jet_momentum: false
  reinsert_channels: true
@@ -23,9 +23,11 @@ data:
 
 train: true
 training:
- iterations: 10
+ iterations: 200000
+ optimizer: Lion
  batchsize: 128
- lr: 1e-3
+ lr: 3e-4
+ scheduler: CosineAnnealingLR
 
  force_xformers: false
 
