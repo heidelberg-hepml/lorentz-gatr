@@ -18,7 +18,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-We will to publish the datasets soon. For now, contact [Jonas Spinner](mailto:j.spinner@thphys.uni-heidelberg.de) or [Víctor Bresó](mailto:breso@thphys.uni-heidelberg.de) if you need early access.
+The datasets can be downloaded from the Heidelberg ITP website ([amplitudes](https://www.thphys.uni-heidelberg.de/~plehn/data/amplitudes.hdf5), [toptagging](https://www.thphys.uni-heidelberg.de/~plehn/data/toptagging_full.npz), [event-generation](https://www.thphys.uni-heidelberg.de/~plehn/data/event_generation_ttbar.hdf5)). hdf5 archives have to be unpacked into npy files for each key in the archive. The script lorentz-gatr/data/download_data.py can be used to download the data.
 
 ## 2. Running experiments
 
@@ -152,6 +152,8 @@ lorentz-gatr
 |   |   z5g.yaml: configuration for the z+5g event-generation experiment
 |   |   zmumu.yaml: configuration for the z->mumu event-generation experiment
 |
+└───data: space to store datasets
+|   |   download_data.py: download and unpack datasets
 └───gatr: core library
 |   └───interface: embedding of geometric quantities into projective geometric algebra
 |   |   |   vector.py: Lorentz vector
