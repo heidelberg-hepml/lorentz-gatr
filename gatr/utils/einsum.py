@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
 """This module provides efficiency improvements over torch's einsum through caching."""
 
 import functools

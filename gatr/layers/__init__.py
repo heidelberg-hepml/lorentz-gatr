@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
 from .attention.config import SelfAttentionConfig
 from .attention.positional_encoding import ApplyRotaryPositionalEncoding
 from .attention.self_attention import SelfAttention

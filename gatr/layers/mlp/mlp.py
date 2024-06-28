@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
 """Factory functions for simple MLPs for multivector data."""
 
 from typing import List, Tuple, Union

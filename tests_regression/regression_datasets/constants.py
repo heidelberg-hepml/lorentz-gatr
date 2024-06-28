@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
 from experiments.misc import get_device
 
 BATCHSIZE = 64

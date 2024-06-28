@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
 import torch
 
 from gatr.primitives.invariants import abs_squared_norm

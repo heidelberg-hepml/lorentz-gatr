@@ -1,6 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
-
 from collections.abc import Mapping
 import numpy as np
 import torch

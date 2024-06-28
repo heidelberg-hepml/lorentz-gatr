@@ -1,6 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
-
 """Adapted from the below.
 
 https://github.com/EleutherAI/gpt-neox/blob/737c9134bfaff7b58217d61f6619f1dcca6c484f/megatron/model/positional_embeddings.py

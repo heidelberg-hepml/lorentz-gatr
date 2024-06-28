@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
 import torch
 
 from experiments.base_wrapper import BaseWrapper
