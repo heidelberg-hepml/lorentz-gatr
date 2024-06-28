@@ -18,7 +18,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-The datasets can be downloaded from the Heidelberg ITP website ([amplitudes](https://www.thphys.uni-heidelberg.de/~plehn/data/amplitudes.hdf5), [toptagging](https://www.thphys.uni-heidelberg.de/~plehn/data/toptagging_full.npz), [event-generation](https://www.thphys.uni-heidelberg.de/~plehn/data/event_generation_ttbar.hdf5)). hdf5 archives have to be unpacked into npy files for each key in the archive. The script lorentz-gatr/data/download_data.py can be used to download the data.
+The datasets can be downloaded from the Heidelberg ITP website ([amplitudes](https://www.thphys.uni-heidelberg.de/~plehn/data/amplitudes.hdf5), [toptagging](https://www.thphys.uni-heidelberg.de/~plehn/data/toptagging_full.npz), [event-generation](https://www.thphys.uni-heidelberg.de/~plehn/data/event_generation_ttbar.hdf5)). hdf5 archives have to be unpacked into npy files for each key in the archive. The script lorentz-gatr/data/download_data.py can be used to download the data. Finally, adapt the keys in the `data` section of the config files to specify where the datasets are located on your machine (`data_path` or `data_dir` depending on the experiment).
 
 ## 2. Running experiments
 
@@ -41,7 +41,7 @@ python run.py -cn config -cp runs/amplitudes/hello_world_amplitudes train=false 
 ```
 The warm_start_idx specifies which model in the models folder should be loaded and defaults to 0. 
 
-The configuration files in this repository define small models to allow quick test runs, these are NOT the configuration files used for the paper. The hyperparameters used for the paper can be found there.
+The default configuration files in the `config` folder define small models to allow quick test runs. If you want to reproduce the longer experiments in the paper, you can use the configuration files in `config_paper`.
 
 ## 3. Using L-GATr 
 

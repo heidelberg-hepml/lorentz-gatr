@@ -21,6 +21,7 @@ data:
  reinsert_channels: true
  rescale_data: true
 
+ema: true
 train: true
 training:
  iterations: 200000
