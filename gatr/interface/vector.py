@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
 """Functions that embed Lorentz vector in the geometric algebra."""
 
 

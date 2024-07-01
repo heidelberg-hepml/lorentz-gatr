@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
 import time
 from typing import Optional, Union
 

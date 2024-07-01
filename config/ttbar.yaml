@@ -4,11 +4,11 @@ base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
 
 data:
  n_jets: [0]
- data_path_0j: /media/jspinner/shared/Studium/project3/data/ttbar_0j_200M.npy
- data_path_1j: /media/jspinner/shared/Studium/project3/data/ttbar_1j_200M.npy
- data_path_2j: /media/jspinner/shared/Studium/project3/data/ttbar_2j_200M.npy
- data_path_3j: /media/jspinner/shared/Studium/project3/data/ttbar_3j_200M.npy
- data_path_4j: /media/jspinner/shared/Studium/project3/data/ttbar_4j_200M.npy
+ data_path_0j: /media/jspinner/shared/Studium/project3/data/ttbar_0j.npy
+ data_path_1j: /media/jspinner/shared/Studium/project3/data/ttbar_1j.npy
+ data_path_2j: /media/jspinner/shared/Studium/project3/data/ttbar_2j.npy
+ data_path_3j: /media/jspinner/shared/Studium/project3/data/ttbar_3j.npy
+ data_path_4j: /media/jspinner/shared/Studium/project3/data/ttbar_4j.npy
  subsample: 100000
  train_test_val: [.5, .4, .1]
  base_type: 2

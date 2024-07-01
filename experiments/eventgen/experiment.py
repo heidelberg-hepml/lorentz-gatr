@@ -439,7 +439,11 @@ class EventGenerationExperiment(BaseExperiment):
                 filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
             )
 
-        if self.cfg.plotting.virtual and self.cfg.evaluation.sample:
+        if (
+            self.cfg.plotting.virtual
+            and len(self.virtual_components) > 0
+            and self.cfg.evaluation.sample
+        ):
             filename = os.path.join(path, "virtual.pdf")
             plotter.plot_virtual(
                 filename=filename, **kwargs, weights=weights, mask_dict=mask_dict

@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
 """Unit tests for gatr.utils.ga_clifford."""
 
 import pytest

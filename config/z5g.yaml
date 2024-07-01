@@ -11,14 +11,5 @@ data:
 evaluation:
  nsamples: 1000
 
-plot: true
-plotting:
- fourmomenta: true
- jetmomenta: true
- preprocessed: true
- virtual: true
- delta: true
- deta_dphi: true
-
 defaults:
 - ttbar

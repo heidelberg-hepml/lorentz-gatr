@@ -1,0 +1,48 @@
+exp_type: toptagging
+exp_name: topt_local_debug
+base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
+
+data:
+ data_dir : /media/jspinner/shared/Studium/project3/data
+ dataset: full
+ pairs:
+  use: false
+  add_differences: true
+  directed: true
+  top_k: 50
+  lowest_kt: false
+  add_scalars: false
+ beam_reference: spacelike
+ two_beams: false
+ beam_token: true
+ add_time_reference: false
+ add_pt: false
+ add_jet_momentum: false
+ reinsert_channels: true
+ rescale_data: true
+
+ema: true
+train: true
+training:
+ iterations: 200000
+ optimizer: Lion
+ batchsize: 128
+ lr: 3e-4
+ scheduler: CosineAnnealingLR
+ weight_decay: 0.2
+ force_xformers: true # requires gpu (can run on cpu+slower with 'false')
+
+evaluation:
+ batchsize: 128
+ save_roc: false
+
+plotting:
+ roc: true
+ loss: true
+ score: true
+
+defaults:
+ - model: gatr_toptagging
+ - default
+ - hydra
+ - _self_

@@ -1,0 +1,13 @@
+_target_: experiments.amplitudes.wrappers.AmplitudeTransformerWrapper
+
+net:
+  _target_: experiments.baselines.Transformer
+
+  in_channels: 4
+  out_channels: 1
+  hidden_channels: 128
+
+  num_blocks: 8
+  num_heads: 8
+
+  pos_encoding: false

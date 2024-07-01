@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
 from typing import Iterator, Tuple
 
 import opt_einsum

@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
 from typing import Optional, Tuple, Union
 
 import numpy as np

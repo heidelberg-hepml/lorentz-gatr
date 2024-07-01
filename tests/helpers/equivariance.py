@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
 """Utility functions to test callables for equivariance with respect to Pin(1,3)."""
 
 import torch

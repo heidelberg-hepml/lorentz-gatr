@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
 """Utility functions to test callables for consistency with clifford algebras."""
 
 import clifford

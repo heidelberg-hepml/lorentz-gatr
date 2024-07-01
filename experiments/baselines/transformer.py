@@ -1,7 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
-"""Baseline transformer."""
-
 from functools import partial
 from typing import Optional, Tuple
 

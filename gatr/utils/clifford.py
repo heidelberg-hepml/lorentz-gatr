@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
 """Geometric algebra operations based on the clifford library."""
 
 from typing import Optional

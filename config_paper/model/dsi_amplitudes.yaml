@@ -1,0 +1,16 @@
+_target_: experiments.amplitudes.wrappers.AmplitudeDSIWrapper
+
+net:
+  _target_: experiments.baselines.dsi.DSI
+
+  in_shape: 20
+  out_shape: 1
+  
+  num_particles_boson: 1
+  num_particles_glu: 3
+  
+  hidden_channels_prenet: 128
+  hidden_layers_prenet: 4
+  out_dim_prenet_sep: 64
+  hidden_channels_net: 128
+  hidden_layers_net: 4

@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
 """Equivariant transformer for multivector data."""
 
 from dataclasses import replace

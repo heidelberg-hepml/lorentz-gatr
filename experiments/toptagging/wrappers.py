@@ -1,6 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
-# import dgl
 import numpy as np
 import torch
 from torch import nn
@@ -33,28 +30,6 @@ def attention_mask(batch, force_xformers=True):
         # materialize mask to torch.tensor (only for testing purposes)
         mask = mask.materialize(shape=(len(batch.batch), len(batch.batch)))
     return mask
-
-
-class TopTaggingTransformerWrapper(nn.Module):
-    """
-    Baseline Transformer for top-tagging
-    This is mainly for debugging
-    """
-
-    def __init__(self, net, force_xformers=True):
-        super().__init__()
-        self.net = net
-        self.force_xformers = force_xformers
-
-    def forward(self, batch):
-        mask = attention_mask(batch, self.force_xformers)
-
-        # unsqueeze and squeeze to formally add the batch index (any better way of doing this?)
-        inputs = batch.x.unsqueeze(0)
-        outputs = self.net(inputs, attention_mask=mask)
-        logits = outputs.squeeze(0)[batch.is_global]
-
-        return logits
 
 
 class TopTaggingGATrWrapper(nn.Module):

@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Qualcomm Technologies, Inc.
-# All rights reserved.
 """Pin-equivariant geometric product layer between multivector tensors (torch.nn.Modules)."""
 
 from typing import Optional, Tuple

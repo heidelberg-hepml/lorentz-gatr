@@ -42,20 +42,21 @@ class MLPClassifier:
         dr = dr[:, rows, cols]  # extract only upper triangular part
 
         # mass of virtual particles
-        virtual = []
-        for idx in self.exp.virtual_components:
-            v = get_virtual_particle(naive_raw, idx)
-            virtual.append(v)
-        virtual = torch.stack(virtual, dim=-2)
-        virtual = virtual.reshape(
-            *virtual.shape[:-2], virtual.shape[-2] * virtual.shape[-1]
-        )
+        if len(self.exp.virtual_components) > 0:
+            virtual = []
+            for idx in self.exp.virtual_components:
+                v = get_virtual_particle(naive_raw, idx)
+                virtual.append(v)
+            virtual = torch.stack(virtual, dim=-2)
+            virtual = virtual.reshape(
+                *virtual.shape[:-2], virtual.shape[-2] * virtual.shape[-1]
+            )
 
         # combine everything and standardize
         x = naive
         if self.cfg_preprocessing.add_delta_r:
             x = torch.cat((x, dr), dim=-1)
-        if self.cfg_preprocessing.add_virtual:
+        if self.cfg_preprocessing.add_virtual and len(self.exp.virtual_components) > 0:
             x = torch.cat((x, virtual), dim=-1)
         if cls_params["mean"] is None or cls_params["std"] is None:
             cls_params["mean"] = x.mean(dim=0, keepdim=True)

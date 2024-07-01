@@ -13,3 +13,6 @@ mlruns/
 outputs/
 *~
 scripts/
+*.hdf5
+*.npy
+*.npz
