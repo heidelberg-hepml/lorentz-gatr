@@ -11,7 +11,7 @@ data:
 
 train: true
 training:
- iterations: 250000
+ iterations: 250000 # MLP, DSI: 2500000; Tr: 1000000; GAP: 250000
  optimizer: Adam
  lr: 1e-4
  batchsize: 256
