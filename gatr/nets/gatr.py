@@ -46,6 +46,8 @@ class GATr(nn.Module):
         Number of transformer blocks.
     dropout_prob : float or None
         Dropout probability
+    double_layernorm : bool
+        Whether to use double layer normalization
     """
 
     def __init__(
@@ -63,6 +65,7 @@ class GATr(nn.Module):
         reinsert_s_channels: Optional[Tuple[int]] = None,
         checkpoint_blocks: bool = False,
         dropout_prob: Optional[float] = None,
+        double_layernorm: bool = False,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -90,6 +93,7 @@ class GATr(nn.Module):
                     attention=attention,
                     mlp=mlp,
                     dropout_prob=dropout_prob,
+                    double_layernorm=double_layernorm,
                 )
                 for _ in range(num_blocks)
             ]
