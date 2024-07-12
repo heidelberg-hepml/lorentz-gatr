@@ -14,6 +14,7 @@ from tqdm import trange
 
 import gatr.primitives.attention
 import gatr.layers.linear
+import gatr.layers.mlp.geometric_bilinears
 from experiments.misc import get_device, flatten_dict
 import experiments.logger
 from experiments.logger import LOGGER, MEMORY_HANDLER, FORMATTER
@@ -102,7 +103,13 @@ class BaseExperiment:
         )
 
     def init_model(self):
-        gatr.layers.linear.MIX_DUALS = True if self.cfg.gatr_mix_duals else False
+        gatr.layers.linear.MIX_DUALS = self.cfg.ga_representations.mix_duals
+        gatr.layers.linear.INCLUDE_AXIALVECTOR = (
+            self.cfg.ga_representations.include_axialvector
+        )
+        gatr.layers.mlp.geometric_bilinears.INCLUDE_TENSOR = (
+            self.cfg.ga_representations.include_tensor
+        )
 
         # initialize model
         self.model = instantiate(self.cfg.model)

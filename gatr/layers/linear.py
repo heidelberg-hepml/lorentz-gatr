@@ -10,6 +10,7 @@ from gatr.interface import embed_scalar
 from gatr.primitives.linear import NUM_PIN_LINEAR_BASIS_ELEMENTS, equi_linear
 
 MIX_DUALS = False
+INCLUDE_AXIALVECTOR = True
 
 
 class EquiLinear(nn.Module):
@@ -180,6 +181,9 @@ class EquiLinear(nn.Module):
                 outputs_s = outputs_s + self.s2s(scalars)
         else:
             outputs_s = None
+
+        if not INCLUDE_AXIALVECTOR:
+            outputs_mv[..., 11:15] = 0.0
 
         return outputs_mv, outputs_s
 
