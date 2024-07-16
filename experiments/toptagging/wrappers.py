@@ -6,7 +6,7 @@ from gatr.interface import extract_scalar
 from xformers.ops.fmha import BlockDiagonalMask
 
 
-def attention_mask(batch, force_xformers=True):
+def attention_mask(batch, device, force_xformers=True):
     """
     Construct attention mask that makes surfe that objects only attend to each other
     within the same batch element, and not across batch elements
@@ -28,7 +28,7 @@ def attention_mask(batch, force_xformers=True):
     mask = BlockDiagonalMask.from_seqlens(bincounts)
     if not force_xformers:
         # materialize mask to torch.tensor (only for testing purposes)
-        mask = mask.materialize(shape=(len(batch.batch), len(batch.batch)))
+        mask = mask.materialize(shape=(len(batch.batch), len(batch.batch))).to(device)
     return mask
 
 
@@ -52,9 +52,8 @@ class TopTaggingGATrWrapper(nn.Module):
         self.force_xformers = force_xformers
 
     def forward(self, batch):
-        mask = attention_mask(batch, self.force_xformers)
-
         multivector, scalars = self.embed_into_ga(batch)
+        mask = attention_mask(batch, scalars.device, self.force_xformers)
         multivector_outputs, scalar_outputs = self.net(
             multivector, scalars=scalars, attention_mask=mask
         )
