@@ -363,21 +363,6 @@ class BaseExperiment:
                 eps=self.cfg.training.eps,
                 weight_decay=self.cfg.training.weight_decay,
             )
-        elif self.cfg.training.optimizer == "RAdam":
-            self.optimizer = torch.optim.RAdam(
-                self.model.parameters(),
-                lr=self.cfg.training.lr,
-                betas=self.cfg.training.betas,
-                eps=self.cfg.training.eps,
-            )
-        elif self.cfg.training.optimizer == "AdamW":
-            self.optimizer = torch.optim.AdamW(
-                self.model.parameters(),
-                lr=self.cfg.training.lr,
-                betas=self.cfg.training.betas,
-                eps=self.cfg.training.eps,
-                weight_decay=self.cfg.training.weight_decay,
-            )
         elif self.cfg.training.optimizer == "Lion":
             self.optimizer = Lion(
                 self.model.parameters(),
