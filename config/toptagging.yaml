@@ -1,9 +1,9 @@
 exp_type: toptagging
 exp_name: topt_local_debug
-base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
+base_dir: /remote/gpu02/breso/lorentz-gatr
 
 data:
- data_dir : /media/jspinner/shared/Studium/project3/data
+ data_dir : /remote/gpu02/breso/lorentz-gatr/data
  dataset: mini
  pairs:
   use: false

@@ -1,16 +1,16 @@
 exp_type: ttbar
 exp_name: ttbar_local_debug
-base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
+base_dir: /remote/gpu02/breso/lorentz-gatr
 
 data:
  n_jets: [0]
- data_path_0j: /media/jspinner/shared/Studium/project3/data/ttbar_0j.npy
- data_path_1j: /media/jspinner/shared/Studium/project3/data/ttbar_1j.npy
- data_path_2j: /media/jspinner/shared/Studium/project3/data/ttbar_2j.npy
- data_path_3j: /media/jspinner/shared/Studium/project3/data/ttbar_3j.npy
- data_path_4j: /media/jspinner/shared/Studium/project3/data/ttbar_4j.npy
- subsample: 100000
- train_test_val: [.5, .4, .1]
+ data_path_0j: /remote/gpu02/breso/lorentz-gatr/data/ttbar_0j.npy
+ data_path_1j: /remote/gpu02/breso/lorentz-gatr/data/ttbar_1j.npy
+ data_path_2j: /remote/gpu02/breso/lorentz-gatr/data/ttbar_2j.npy
+ data_path_3j: /remote/gpu02/breso/lorentz-gatr/data/ttbar_3j.npy
+ data_path_4j: /remote/gpu02/breso/lorentz-gatr/data/ttbar_4j.npy
+ subsample: null
+ train_test_val: [.5, .4, .01]
  base_type: 2
  use_delta_r_min: true
  use_pt_min: true
@@ -32,17 +32,17 @@ cfm:
  transforms_float64: true
 
 training:
- iterations: 50
- batchsize: 1024
+ iterations: 200000
+ batchsize: 2048
  scheduler: ReduceLROnPlateau
 
 evaluation:
  sample: true
  save_samples: false
- nsamples: 1000
- batchsize: 1024
- eval_loss: []
- eval_log_prob: [] # expensive
+ nsamples: 1000000
+ batchsize: 4096
+ eval_loss: [train, test, val, gen]
+ eval_log_prob: [val] # expensive
  classifier: true
 
 plot: true

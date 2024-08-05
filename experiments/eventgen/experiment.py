@@ -24,7 +24,7 @@ class EventGenerationExperiment(BaseExperiment):
         n_datasets = len(self.cfg.data.n_jets)
         with open_dict(self.cfg):
             # preparation for joint training
-            if self.modelname in ["GATr", "Transformer"]:
+            if self.modelname in ["GATr", "Transformer", "PGATr"]:
                 self.cfg.model.process_token_channels = n_datasets
                 self.cfg.model.type_token_channels = n_particles
             else:
@@ -35,6 +35,10 @@ class EventGenerationExperiment(BaseExperiment):
             if self.modelname == "GATr":
                 self.cfg.model.net.in_s_channels = (
                     n_particles + n_datasets + self.cfg.cfm.embed_t_dim
+                )
+            elif self.modelname == "PGATr":
+                self.cfg.model.net.in_s_channels = (
+                    n_particles + n_datasets
                 )
             elif self.modelname == "Transformer":
                 self.cfg.model.net.in_channels = (
@@ -50,7 +54,7 @@ class EventGenerationExperiment(BaseExperiment):
                 self.cfg.model.net.out_shape = 4 * n_particles
 
             # extra treatment for lorentz-symmetry breaking inputs in equivariant models
-            if self.modelname in ["GATr", "GAP"]:
+            if self.modelname in ["GATr", "GAP", "PGATr"]:
                 if self.cfg.model.beam_reference is not None:
                     self.cfg.model.net.in_mv_channels += (
                         2
