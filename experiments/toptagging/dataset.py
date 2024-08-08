@@ -180,6 +180,7 @@ class QGTaggingDataset(torch.utils.data.Dataset):
         label of the jet (0=quark, 1=gluon)
     is_global : torch.tensor of shape (num_elements), dtype torch.bool
         True for the global token (first element in constituent list), False otherwise
+        We set is_global=None if no global token is used
     """
 
     def __init__(
@@ -242,14 +243,14 @@ class QGTaggingDataset(torch.utils.data.Dataset):
             label = labels[i, ...]
 
             # construct global token
-            if self.cfg.data.add_jet_momentum:
-                global_token = x.sum(dim=0, keepdim=True)
-            else:
+            if self.cfg.data.include_global_token:
                 global_token = torch.zeros_like(x[[0], ...], dtype=self.dtype)
                 global_token[..., 0] = 1
-            x = torch.cat((global_token, x), dim=0)
-            is_global = torch.zeros(x.shape[0], 1, dtype=torch.bool)
-            is_global[0, 0] = True
+                x = torch.cat((global_token, x), dim=0)
+                is_global = torch.zeros(x.shape[0], 1, dtype=torch.bool)
+                is_global[0, 0] = True
+            else:
+                is_global = None
 
             global_token_pid = torch.zeros_like(pid[[0], ...], dtype=self.dtype)
             pid = torch.cat((global_token_pid, pid), dim=0)
@@ -264,14 +265,11 @@ class QGTaggingDataset(torch.utils.data.Dataset):
         batch = self.data_list[idx].to(self.device)
 
         # create embeddings
-        single = batch.x.unsqueeze(1)
-        single_scalars = batch.pid
+        x = batch.x.unsqueeze(1)
+        scalars = batch.pid
         if self.cfg.data.add_pt:
             single_scalars = torch.cat((single_scalars, get_pt(single)), dim=1)
-
-        x = single
-        scalars = single_scalars
-        is_global = batch.is_global
+        is_global = batch.is_global if self.cfg.data.include_global_token else None
 
         # beam reference
         x = embed_vector(x)
@@ -298,18 +296,19 @@ class QGTaggingDataset(torch.utils.data.Dataset):
                     ),
                     dim=-2,
                 )
-                is_global = torch.cat(
-                    (
-                        is_global,
-                        torch.zeros(
-                            beam.shape[0],
-                            1,
-                            device=beam.device,
-                            dtype=torch.bool,
+                if self.cfg.data.include_global_token:
+                    is_global = torch.cat(
+                        (
+                            is_global,
+                            torch.zeros(
+                                beam.shape[0],
+                                1,
+                                device=beam.device,
+                                dtype=torch.bool,
+                            ),
                         ),
-                    ),
-                    dim=-2,
-                )
+                        dim=-2,
+                    )
 
             else:
                 # embed beam as channel for each particle
