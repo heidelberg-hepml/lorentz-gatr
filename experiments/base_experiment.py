@@ -75,8 +75,8 @@ class BaseExperiment:
         self.init_physics()
         self.init_model()
         self.init_data()
-        self._init_dataloader()
-        self._init_loss()
+        self.init_dataloader()
+        self.init_loss()
 
         if self.cfg.train:
             self._init_optimizer()
@@ -459,6 +459,7 @@ class BaseExperiment:
         patience = 0
 
         # main train loop
+        """
         LOGGER.info(
             f"Starting to train for {self.cfg.training.iterations} iterations "
             f"= {self.cfg.training.iterations / len(self.train_loader):.1f} epochs "
@@ -466,6 +467,7 @@ class BaseExperiment:
             f"using early stopping with patience {self.cfg.training.es_patience} "
             f"while validating every {self.cfg.training.validate_every_n_steps} iterations"
         )
+        """
         self.training_start_time = time.time()
 
         # recycle trainloader

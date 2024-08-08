@@ -1,0 +1,36 @@
+_target_: experiments.toptagging.wrappers.TopTaggingPretrainGATrWrapper
+
+force_xformers: '${training.force_xformers}'
+mean_aggregation: false
+#add_jet_momentum: false
+#add_pt: false
+#add_jet_momentum: false
+#beam_reference: spacelike
+#add_time_reference: false
+#two_beams: false
+#beam_token: true
+
+net:
+ _target_: gatr.nets.GATr
+
+ in_mv_channels: 1
+ out_mv_channels: 10
+ hidden_mv_channels: 16
+
+ in_s_channels: 1
+ out_s_channels: 10
+ hidden_s_channels: 32
+
+ num_blocks: 12
+ reinsert_mv_channels: null
+ reinsert_s_channels: null
+ dropout_prob: null
+
+ attention:
+  num_heads: 8
+  multi_query: false
+  increase_hidden_channels: 2
+
+defaults:
+ - /base_attention@net.attention
+ - /base_mlp@net.mlp

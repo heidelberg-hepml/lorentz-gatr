@@ -1,6 +1,7 @@
 import numpy as np
 import torch
-from torch_geometric.loader import DataLoader
+#from torch_geometric.loader import DataLoader
+from torch.utils.data import DataLoader
 
 import os, time
 from omegaconf import OmegaConf, open_dict
@@ -15,6 +16,9 @@ from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
 
 import matplotlib.pyplot as plt
+
+from data.utils.dataset import SimpleIterDataset
+from data.utils.loader import to_filelist
 
 MODEL_TITLE_DICT = {"GATr": "GATr", "Transformer": "Tr", "MLP": "MLP"}
 
@@ -111,18 +115,70 @@ class TaggingExperiment(BaseExperiment):
         dt = time.time() - t0
         LOGGER.info(f"Finished creating datasets after {dt:.2f} s = {dt/60:.2f} min")
 
+    def _init_data_pretrain(self, Dataset):
+        LOGGER.info(f"Creating {Dataset.__name__}")
+        t0 = time.time()
+
+        train_file_dict, self.train_files = to_filelist(self.cfg.jc_params, 'train')
+        val_file_dict, self.val_files = to_filelist(self.cfg.jc_params, 'val')
+        test_file_dict, self.test_files = to_filelist(self.cfg.jc_params, 'test')
+        train_range = val_range = test_range = (0, 1)
+
+        LOGGER.info(f"Using {len(self.train_files)} files for training, range: {str(train_range)}")
+        LOGGER.info(f"Using {len(self.val_files)} files for validation, range: {str(val_range)}")
+        LOGGER.info(f"Using {len(self.test_files)} files for validation, range: {str(test_range)}")
+
+        self.data_train = Dataset(train_file_dict, self.cfg.jc_params.data_config, for_training=True,
+            extra_selection=self.cfg.jc_params.extra_selection,
+            remake_weights=not self.cfg.jc_params.not_remake_weights,
+            load_range_and_fraction=(train_range, self.cfg.jc_params.data_fraction),
+            file_fraction=self.cfg.jc_params.file_fraction,
+            fetch_by_files=self.cfg.jc_params.fetch_by_files,
+            fetch_step=self.cfg.jc_params.fetch_step,
+            infinity_mode=self.cfg.jc_params.steps_per_epoch is not None,
+            in_memory=self.cfg.jc_params.in_memory,
+            name='train')
+
+        self.data_val = Dataset(val_file_dict, self.cfg.jc_params.data_config, for_training=True,
+            extra_selection=self.cfg.jc_params.extra_selection,
+            remake_weights=not self.cfg.jc_params.not_remake_weights,
+            load_range_and_fraction=(val_range, self.cfg.jc_params.data_fraction),
+            file_fraction=self.cfg.jc_params.file_fraction,
+            fetch_by_files=self.cfg.jc_params.fetch_by_files,
+            fetch_step=self.cfg.jc_params.fetch_step,
+            infinity_mode=self.cfg.jc_params.steps_per_epoch is not None,
+            in_memory=self.cfg.jc_params.in_memory,
+            name='val')
+
+        self.data_test = Dataset(test_file_dict, self.cfg.jc_params.data_config, for_training=False,
+            extra_selection=self.cfg.jc_params.extra_selection,
+            remake_weights=not self.cfg.jc_params.not_remake_weights,
+            load_range_and_fraction=(test_range, self.cfg.jc_params.data_fraction),
+            file_fraction=self.cfg.jc_params.file_fraction,
+            fetch_by_files=self.cfg.jc_params.fetch_by_files,
+            fetch_step=self.cfg.jc_params.fetch_step,
+            infinity_mode=self.cfg.jc_params.steps_per_epoch is not None,
+            in_memory=self.cfg.jc_params.in_memory,
+            name='test')
+
+        dt = time.time() - t0
+        LOGGER.info(f"Finished creating datasets after {dt:.2f} s = {dt/60:.2f} min")
+
+    def init_dataloader(self):
+        raise NotImplementedError
+
     def _init_dataloader(self):
-        self.train_loader = DataLoader(
+        self.train_loader = torch_geometric.loader.DataLoader(
             dataset=self.data_train,
             batch_size=self.cfg.training.batchsize,
             shuffle=True,
         )
-        self.test_loader = DataLoader(
+        self.test_loader = torch_geometric.loader.DataLoader(
             dataset=self.data_test,
             batch_size=self.cfg.evaluation.batchsize,
             shuffle=False,
         )
-        self.val_loader = DataLoader(
+        self.val_loader = torch_geometric.loader.DataLoader(
             dataset=self.data_val,
             batch_size=self.cfg.evaluation.batchsize,
             shuffle=False,
@@ -133,6 +189,39 @@ class TaggingExperiment(BaseExperiment):
             f"train_batches={len(self.train_loader)}, test_batches={len(self.test_loader)}, val_batches={len(self.val_loader)}, "
             f"batch_size={self.cfg.training.batchsize} (training), {self.cfg.evaluation.batchsize} (evaluation)"
         )
+
+    def _init_dataloader_pretrain(self):
+        self.train_loader = torch.utils.data.DataLoader(
+            dataset=self.data_train,
+            batch_size=self.cfg.training.batchsize,
+            drop_last=True,
+            pin_memory=True,
+            num_workers=min(self.cfg.jc_params.num_workers, int(len(self.train_files) * self.cfg.jc_params.file_fraction)),
+            persistent_workers=self.cfg.jc_params.num_workers > 0 and self.cfg.jc_params.steps_per_epoch is not None,
+        )
+        self.val_loader = torch.utils.data.DataLoader(
+            dataset=self.data_val,
+            batch_size=self.cfg.evaluation.batchsize,
+            drop_last=True,
+            pin_memory=True,
+            num_workers=min(self.cfg.jc_params.num_workers, int(len(self.val_files) * int(self.cfg.jc_params.file_fraction))),
+            persistent_workers=self.cfg.jc_params.num_workers > 0 and self.cfg.jc_params.steps_per_epoch_val is not None,
+        )
+        self.test_loader = torch.utils.data.DataLoader(
+            dataset=self.data_test,
+            batch_size=self.cfg.evaluation.batchsize,
+            drop_last=False,
+            pin_memory=True,
+            num_workers=min(self.cfg.jc_params.num_workers, len(self.test_files)),
+        )
+
+        """
+        LOGGER.info(
+            f"Constructed dataloaders with "
+            f"train_batches={len(self.train_loader)}, test_batches={len(self.test_loader)}, val_batches={len(self.val_loader)}, "
+            f"batch_size={self.cfg.training.batchsize} (training), {self.cfg.evaluation.batchsize} (evaluation)"
+        )
+        """
 
     def evaluate(self):
         self.results = {}
@@ -270,6 +359,9 @@ class TaggingExperiment(BaseExperiment):
     def _init_loss(self):
         self.loss = torch.nn.BCEWithLogitsLoss()
 
+    def _init_loss_pretrain(self):
+        self.loss = torch.nn.CrossEntropyLoss()
+
     # overwrite _validate method to compute metrics over the full validation set
     def _validate(self, step):
         if self.ema is not None:
@@ -285,8 +377,15 @@ class TaggingExperiment(BaseExperiment):
         return metrics["bce"]
 
     def _batch_loss(self, batch):
-        y_pred = self.model(batch)
-        loss = self.loss(y_pred, batch.label.to(self.dtype))
+        LOGGER.info(f"The batch is {batch}")
+        if self.cfg.exp_type == "jctagging":
+            input = batch[0]['pf_vectors']
+            label = batch[1]['_label_']
+            y_pred = self.model(input)
+            loss = self.loss(y_pred, label.to(self.dtype))
+        elif self.cfg.exp_type == "toptagging":
+            y_pred = self.model(batch)
+            loss = self.loss(y_pred, batch.label.to(self.dtype))
         assert torch.isfinite(loss).all()
 
         metrics = {}
@@ -302,7 +401,10 @@ class TopTaggingExperiment(TaggingExperiment):
             self.cfg.data.data_dir, f"toptagging_{self.cfg.data.dataset}.npz"
         )
         self._init_data(TopTaggingDataset, data_path)
-
+    def init_dataloader(self):
+        self._init_dataloader()
+    def init_loss(self):
+        self._init_loss()
 
 class QGTaggingExperiment(TaggingExperiment):
     def init_data(self):
@@ -310,3 +412,15 @@ class QGTaggingExperiment(TaggingExperiment):
             self.cfg.data.data_dir, f"qg_tagging_{self.cfg.data.dataset}.npz"
         )
         self._init_data(QGTaggingDataset, data_path)
+    def init_dataloader(self):
+        self._init_dataloader()
+    def init_loss(self):
+        self._init_loss()
+
+class JetClassTaggingExperiment(TaggingExperiment):
+    def init_data(self):
+        self._init_data_pretrain(SimpleIterDataset)
+    def init_dataloader(self):
+        self._init_dataloader_pretrain()
+    def init_loss(self):
+        self._init_loss_pretrain()
