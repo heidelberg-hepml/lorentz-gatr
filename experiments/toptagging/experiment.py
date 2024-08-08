@@ -81,6 +81,9 @@ class TaggingExperiment(BaseExperiment):
                         range(self.cfg.model.net.in_s_channels)
                     )
 
+                # global token?
+                self.cfg.data.include_global_token = not self.cfg.model.mean_aggregation
+
     def init_data(self):
         raise NotImplementedError
 

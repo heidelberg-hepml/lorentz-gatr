@@ -22,6 +22,7 @@ class TopTaggingDataset(torch.utils.data.Dataset):
         label of the jet (0=QCD, 1=top)
     is_global : torch.tensor of shape (num_elements), dtype torch.bool
         True for the global token (first element in constituent list), False otherwise
+        We set is_global=None if no global token is used
     """
 
     def __init__(
@@ -81,12 +82,14 @@ class TopTaggingDataset(torch.utils.data.Dataset):
             label = labels[i, ...]
 
             # construct global token
-            global_token = torch.zeros_like(x[[0], ...], dtype=self.dtype)
-            global_token[..., 0] = 1
-            x = torch.cat((global_token, x), dim=0)
-            is_global = torch.zeros(x.shape[0], 1, dtype=torch.bool)
-            is_global[0, 0] = True
-
+            if self.cfg.data.include_global_token:
+                global_token = torch.zeros_like(x[[0], ...], dtype=self.dtype)
+                global_token[..., 0] = 1
+                x = torch.cat((global_token, x), dim=0)
+                is_global = torch.zeros(x.shape[0], 1, dtype=torch.bool)
+                is_global[0, 0] = True
+            else:
+                is_global = None
             data = Data(x=x, label=label, is_global=is_global)
             self.data_list.append(data)
 
@@ -97,16 +100,12 @@ class TopTaggingDataset(torch.utils.data.Dataset):
         batch = self.data_list[idx].to(self.device)
 
         # create embeddings
-        single = batch.x.unsqueeze(1)
+        x = batch.x.unsqueeze(1)
         if self.cfg.data.add_pt:
-            single_scalars = get_pt(single)
+            scalars = get_pt(single)
         else:
-            single_scalars = torch.zeros(
-                single.shape[0], 0, device=self.device, dtype=self.dtype
-            )
-        x = single
-        scalars = single_scalars
-        is_global = batch.is_global
+            scalars = torch.zeros(x.shape[0], 0, device=self.device, dtype=self.dtype)
+        is_global = batch.is_global if self.cfg.data.include_global_token else None
 
         # beam reference
         x = embed_vector(x)
@@ -133,18 +132,19 @@ class TopTaggingDataset(torch.utils.data.Dataset):
                     ),
                     dim=-2,
                 )
-                is_global = torch.cat(
-                    (
-                        is_global,
-                        torch.zeros(
-                            beam.shape[0],
-                            1,
-                            device=beam.device,
-                            dtype=torch.bool,
+                if self.cfg.data.include_global_token:
+                    is_global = torch.cat(
+                        (
+                            is_global,
+                            torch.zeros(
+                                beam.shape[0],
+                                1,
+                                device=beam.device,
+                                dtype=torch.bool,
+                            ),
                         ),
-                    ),
-                    dim=-2,
-                )
+                        dim=-2,
+                    )
 
             else:
                 # embed beam as channel for each particle
