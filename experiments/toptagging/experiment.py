@@ -72,14 +72,6 @@ class TaggingExperiment(BaseExperiment):
                     if self.cfg.data.add_time_reference:
                         self.cfg.model.net.in_mv_channels += 1
 
-                # extra mv and s channels for pairs
-                if self.cfg.data.pairs.use:
-                    self.cfg.model.net.in_mv_channels += 2
-                    if self.cfg.data.pairs.add_differences:
-                        self.cfg.model.net.in_mv_channels += 1
-                    if self.cfg.data.pairs.add_scalars:
-                        self.cfg.model.net.in_s_channels += 2
-
                 # reinsert channels
                 if self.cfg.data.reinsert_channels:
                     self.cfg.model.net.reinsert_mv_channels = list(
