@@ -57,7 +57,6 @@ class TaggingExperiment(BaseExperiment):
                     self.cfg.model.net.in_mv_channels = 1
 
                 # extra s channels for pt
-                self.cfg.model.add_pt = self.cfg.data.add_pt
                 if self.cfg.data.add_pt:
                     self.cfg.model.net.in_s_channels += 1
 

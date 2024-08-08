@@ -42,13 +42,11 @@ class TopTaggingGATrWrapper(nn.Module):
         self,
         net,
         mean_aggregation=False,
-        add_pt=False,
         force_xformers=True,
     ):
         super().__init__()
         self.net = net
         self.mean_aggregation = mean_aggregation
-        self.add_pt = add_pt
         self.force_xformers = force_xformers
 
     def forward(self, batch):
