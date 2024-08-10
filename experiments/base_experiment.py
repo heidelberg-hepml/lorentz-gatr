@@ -20,13 +20,14 @@ import experiments.logger
 from experiments.logger import LOGGER, MEMORY_HANDLER, FORMATTER
 from experiments.mlflow import log_mlflow
 
-from gatr.layers import MLPConfig, SelfAttentionConfig
+from gatr.layers import MLPConfig, SelfAttentionConfig, CrossAttentionConfig
 
 from lion_pytorch import Lion
 import schedulefree
 
 cs = ConfigStore.instance()
 cs.store(name="base_attention", node=SelfAttentionConfig)
+cs.store(name="base_crossattention", node=CrossAttentionConfig)
 cs.store(name="base_mlp", node=MLPConfig)
 
 

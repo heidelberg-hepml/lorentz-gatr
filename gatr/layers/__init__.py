@@ -1,6 +1,7 @@
-from .attention.config import SelfAttentionConfig
+from .attention.config import SelfAttentionConfig, CrossAttentionConfig
 from .attention.positional_encoding import ApplyRotaryPositionalEncoding
 from .attention.self_attention import SelfAttention
+from .attention.cross_attention import CrossAttention
 from .dropout import GradeDropout
 from .layer_norm import EquiLayerNorm
 from .linear import EquiLinear

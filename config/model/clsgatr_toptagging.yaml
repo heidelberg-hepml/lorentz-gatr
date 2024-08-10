@@ -1,0 +1,38 @@
+_target_: experiments.toptagging.wrappers.TopTaggingCLSGATrWrapper
+force_xformers: '${training.force_xformers}'
+
+net:
+ _target_: gatr.nets.CLSGATr
+
+ in_mv_channels: 1
+ out_mv_channels: 1
+ hidden_mv_channels: 8
+
+ in_s_channels: 0
+ out_s_channels: 1
+ hidden_s_channels: 8
+
+ num_sa_blocks: 4
+ num_ca_blocks: 2
+ reinsert_mv_channels: null
+ reinsert_s_channels: null
+ dropout_prob: null
+ double_layernorm: false
+ num_class_tokens: 1
+
+ attention:
+  num_heads: 4
+  multi_query: false
+  increase_hidden_channels: 2
+  head_scale: false
+
+ crossattention:
+  num_heads: ${model.net.attention.num_heads}
+  multi_query: ${model.net.attention.multi_query}
+  increase_hidden_channels: ${model.net.attention.increase_hidden_channels}
+  head_scale: ${model.net.attention.head_scale}
+
+defaults:
+ - /base_attention@net.attention
+ - /base_mlp@net.mlp
+ - /base_crossattention@net.crossattention
