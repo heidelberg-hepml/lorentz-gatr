@@ -16,6 +16,7 @@ class ttbarExperiment(EventGenerationExperiment):
         self.n_jets_max = 4
         self.onshell_list = []
         self.onshell_mass = []
+        self.onshell_mass_placeholder = []
         self.units = 206.6
         self.pt_min = [22.0] * 10
         self.delta_r_min = 0.5
@@ -91,6 +92,7 @@ class zmumuExperiment(EventGenerationExperiment):
         self.onshell_list = [0, 1]
         self.onshell_mass = [0.1, 0.1]
         self.units = 258.1108
+        self.onshell_mass_placeholder = [self.units for _ in self.onshell_mass]
         self.delta_r_min = 0.39
         self.pt_min = [0.0, 0.0, 20.0, 20.0, 20.0]
         self.obs_names_index = ["l1", "l2"]
@@ -122,6 +124,10 @@ class z5gExperiment(EventGenerationExperiment):
         self.onshell_list = [0, 1, 2, 3, 4, 5]
         self.onshell_mass = [91.188, 0.1, 0.1, 0.1, 0.1, 0.1]
         self.units = 275.69
+        self.onshell_mass_placeholder = [self.onshell_mass[0]]
+        self.onshell_mass_placeholder.extend(
+            [self.units for _ in self.onshell_mass[1:]]
+        )
         self.delta_r_min = 0.4
         self.pt_min = [0.0, 20.0, 20.0, 20.0, 20.0, 20.0]
         self.obs_names_index = ["Z"]

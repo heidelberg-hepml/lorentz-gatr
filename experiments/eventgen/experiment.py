@@ -99,6 +99,7 @@ class EventGenerationExperiment(BaseExperiment):
             self.delta_r_min,
             self.onshell_list,
             self.onshell_mass,
+            self.onshell_mass_placeholder,
             self.cfg.data.base_type,
             self.cfg.data.use_pt_min,
             self.cfg.data.use_delta_r_min,
@@ -117,7 +118,9 @@ class EventGenerationExperiment(BaseExperiment):
         for ijet in range(len(self.cfg.data.n_jets)):
             # preprocess data
             self.events_raw[ijet] = ensure_onshell(
-                self.events_raw[ijet], self.onshell_list, self.onshell_mass
+                self.events_raw[ijet],
+                self.onshell_list,
+                self.onshell_mass_placeholder,
             )
             data_prepd = self.model.preprocess(self.events_raw[ijet])
             self.events_prepd.append(data_prepd)
