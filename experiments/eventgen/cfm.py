@@ -513,7 +513,7 @@ class EventCFM(CFM):
         elif coordinates_label == "PPPLogM2":
             coordinates = c.PPPLogM2()
         elif coordinates_label == "StandardPPPLogM2":
-            coordinates = c.StandardPPPLogM2()
+            coordinates = c.StandardPPPLogM2(self.onshell_list)
         elif coordinates_label == "EPhiPtPz":
             coordinates = c.EPhiPtPz()
         elif coordinates_label == "PtPhiEtaE":
@@ -529,7 +529,9 @@ class EventCFM(CFM):
         elif coordinates_label == "LogPtPhiEtaLogM2":
             coordinates = c.LogPtPhiEtaLogM2(self.pt_min, self.units)
         elif coordinates_label == "StandardLogPtPhiEtaLogM2":
-            coordinates = c.StandardLogPtPhiEtaLogM2(self.pt_min, self.units)
+            coordinates = c.StandardLogPtPhiEtaLogM2(
+                self.pt_min, self.units, self.onshell_list
+            )
         else:
             raise ValueError(f"coordinates={coordinates_label} not implemented")
         return coordinates

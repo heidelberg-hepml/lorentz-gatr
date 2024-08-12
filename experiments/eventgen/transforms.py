@@ -430,10 +430,11 @@ class StandardNormal(BaseTransform):
     # standardize to unit normal distribution
     # particle- and process-wise mean and std are determined by initial_fit
     # note: this transform will always come last in the self.transforms list of a coordinates class
-    def __init__(self, dims_fixed):
+    def __init__(self, dims_fixed=[], onshell_list=None):
         self.dims_fixed = dims_fixed
+        self.onshell_list = onshell_list
 
-    def init_fit(self, xs, eps=1e-3):
+    def init_fit(self, xs):
         n_particles = [x.shape[-2] for x in xs]
         assert len(n_particles) == len(
             set(n_particles)
@@ -443,9 +444,8 @@ class StandardNormal(BaseTransform):
             assert len(xs[i].shape) == 3
             self.params[n_p]["mean"] = xs[i].mean(dim=0)
             std = xs[i].std(dim=0)
-            std[
-                std < eps
-            ] = 1.0  # in case we have std=0 in some components (happens for hard-coded masses)
+            if self.onshell_list is not None:
+                std[self.onshell_list, 3] = 1.0
             assert torch.isfinite(std).all()
             self.params[n_p]["std"] = std
 
