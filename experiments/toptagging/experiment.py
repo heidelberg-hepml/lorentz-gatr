@@ -40,18 +40,28 @@ class TaggingExperiment(BaseExperiment):
             gatr_name = "experiments.toptagging.wrappers.TopTaggingGATrWrapper"
             clsgatr_name = "experiments.toptagging.wrappers.TopTaggingCLSGATrWrapper"
             assert self.cfg.model._target_ in [gatr_name, clsgatr_name]
+
+            # global token?
+            if self.cfg.model._target_ == gatr_name:
+                self.cfg.data.include_global_token = not self.cfg.model.mean_aggregation
+            elif self.cfg.model._target_ == clsgatr_name:
+                self.cfg.data.include_global_token = False
+                self.cfg.model.num_class_tokens = 1  # not for jetclass!
+
             if self.cfg.exp_type == "toptagging":
                 # make sure we know where we start from
-                self.cfg.model.net.in_s_channels = 1
+                self.cfg.model.net.in_s_channels = 0
                 self.cfg.model.net.in_mv_channels = 1
             elif self.cfg.exp_type == "qgtagging":
                 # We add 7 scalar channels, 1 for the global token and 6 for the particle id features
                 # (charge, electron, muon, photon, charged hadron and neutral hadron)
-                self.cfg.model.net.in_s_channels = 7
+                self.cfg.model.net.in_s_channels = 6
                 self.cfg.model.net.in_mv_channels = 1
 
-            # extra s channels for pt
+            # extra scalar channels
             if self.cfg.data.add_pt:
+                self.cfg.model.net.in_s_channels += 1
+            if self.cfg.data.include_global_token:
                 self.cfg.model.net.in_s_channels += 1
 
             # extra mv channels for beam_reference and time_reference
@@ -74,13 +84,6 @@ class TaggingExperiment(BaseExperiment):
                 self.cfg.model.net.reinsert_s_channels = list(
                     range(self.cfg.model.net.in_s_channels)
                 )
-
-            # global token?
-            if self.cfg.model._target_ == gatr_name:
-                self.cfg.data.include_global_token = not self.cfg.model.mean_aggregation
-            elif self.cfg.model._target_ == clsgatr_name:
-                self.cfg.data.include_global_token = False
-                self.cfg.model.num_class_tokens = 1  # not for jetclass!
 
     def init_data(self):
         raise NotImplementedError

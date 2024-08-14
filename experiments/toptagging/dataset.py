@@ -152,11 +152,12 @@ class TopTaggingDataset(torch.utils.data.Dataset):
                 x = torch.cat((x, beam), dim=-2)
 
         # add information about which token is global
-        scalars_is_global = torch.zeros(
-            scalars.shape[0], 1, device=self.device, dtype=self.dtype
-        )
-        scalars_is_global[0, :] = 1.0
-        scalars = torch.cat([scalars_is_global, scalars], dim=-1)
+        if self.cfg.data.include_global_token:
+            scalars_is_global = torch.zeros(
+                scalars.shape[0], 1, device=self.device, dtype=self.dtype
+            )
+            scalars_is_global[0, :] = 1.0
+            scalars = torch.cat([scalars_is_global, scalars], dim=-1)
 
         return Data(x=x, scalars=scalars, label=batch.label, is_global=is_global)
 
