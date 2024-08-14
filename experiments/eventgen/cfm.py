@@ -423,7 +423,6 @@ class EventCFM(CFM):
         delta_r_min,
         onshell_list,
         onshell_mass,
-        onshell_mass_placeholder,
         base_type,
         use_pt_min,
         use_delta_r_min,
@@ -462,7 +461,6 @@ class EventCFM(CFM):
         self.delta_r_min = delta_r_min
         self.onshell_list = onshell_list
         self.onshell_mass = onshell_mass
-        self.onshell_mass_placeholder = onshell_mass_placeholder
         self.base_type = base_type
         self.use_delta_r_min = use_delta_r_min
         self.use_pt_min = use_pt_min
@@ -473,7 +471,7 @@ class EventCFM(CFM):
     def init_distribution(self):
         args = [
             self.onshell_list,
-            self.onshell_mass_placeholder,
+            self.onshell_mass,
             self.units,
             self.delta_r_min,
             self.pt_min,

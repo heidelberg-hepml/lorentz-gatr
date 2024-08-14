@@ -98,20 +98,11 @@ class EventGenerationExperiment(BaseExperiment):
             self.pt_min,
             self.delta_r_min,
             self.onshell_list,
-            self.onshell_mass,
             self.onshell_mass_placeholder,
             self.cfg.data.base_type,
             self.cfg.data.use_pt_min,
             self.cfg.data.use_delta_r_min,
         )
-
-        # initialize cfm (might require data)
-        self.model.init_distribution()
-        self.model.init_coordinates()
-        fit_data = [x / self.units for x in self.events_raw]
-        for coordinates in self.model.coordinates:
-            coordinates.init_fit(fit_data)
-        self.model.distribution.coordinates.init_fit(fit_data)
 
         # preprocessing
         self.events_prepd = []
@@ -124,6 +115,14 @@ class EventGenerationExperiment(BaseExperiment):
             )
             data_prepd = self.model.preprocess(self.events_raw[ijet])
             self.events_prepd.append(data_prepd)
+
+        # initialize cfm (might require data)
+        self.model.init_distribution()
+        self.model.init_coordinates()
+        fit_data = [x / self.units for x in self.events_raw]
+        for coordinates in self.model.coordinates:
+            coordinates.init_fit(fit_data)
+        self.model.distribution.coordinates.init_fit(fit_data)
 
     def _init_dataloader(self):
         assert sum(self.cfg.data.train_test_val) <= 1
@@ -391,6 +390,15 @@ class EventGenerationExperiment(BaseExperiment):
             "exp": self,
             "model_label": self.modelname,
         }
+
+        # set correct masses (not placeholder!)
+        for label in ["trn", "tst", "gen"]:
+            for ijet in range(len(self.cfg.data.n_jets)):
+                self.data_raw[ijet][label] = ensure_onshell(
+                    self.data_raw[ijet][label],
+                    self.onshell_list,
+                    self.onshell_mass,
+                )
 
         # If specified, collect weights from classifier
         if self.cfg.evaluation.classifier and self.cfg.plotting.reweighted:
