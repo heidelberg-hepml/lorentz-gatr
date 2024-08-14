@@ -14,8 +14,6 @@ from experiments.toptagging.plots import plot_mixer
 from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
 
-import matplotlib.pyplot as plt
-
 MODEL_TITLE_DICT = {
     "GATr": "GATr",
     "CLSGATr": "CLS-GATr",

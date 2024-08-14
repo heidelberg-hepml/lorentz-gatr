@@ -102,7 +102,7 @@ class TopTaggingDataset(torch.utils.data.Dataset):
         # create embeddings
         x = batch.x.unsqueeze(1)
         if self.cfg.data.add_pt:
-            scalars = get_pt(single)
+            scalars = get_pt(batch.x)
         else:
             scalars = torch.zeros(x.shape[0], 0, device=self.device, dtype=self.dtype)
         is_global = batch.is_global if self.cfg.data.include_global_token else None
