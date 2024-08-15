@@ -1,3 +1,5 @@
+# Copyright (c) 2023 Qualcomm Technologies, Inc.
+# All rights reserved.
 """Equivariant dropout layer."""
 
 from typing import Tuple

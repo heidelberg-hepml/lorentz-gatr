@@ -1,3 +1,5 @@
+# Copyright (c) 2023 Qualcomm Technologies, Inc.
+# All rights reserved.
 """Factory functions for simple MLPs for multivector data."""
 
 from typing import List, Tuple, Union
@@ -74,7 +76,10 @@ class GeoMLP(nn.Module):
         self.layers = nn.ModuleList(layers)
 
     def forward(
-        self, multivectors: torch.Tensor, scalars: torch.Tensor
+        self,
+        multivectors: torch.Tensor,
+        scalars: torch.Tensor,
+        reference_mv: torch.Tensor,
     ) -> Tuple[torch.Tensor, Union[torch.Tensor, None]]:
         """Forward pass.
 
@@ -84,6 +89,8 @@ class GeoMLP(nn.Module):
             Input multivectors.
         scalars : None or torch.Tensor with shape (..., in_s_channels)
             Optional input scalars.
+        reference_mv : torch.Tensor with shape (..., 16)
+            Reference multivector for equivariant join.
 
         Returns
         -------
@@ -96,6 +103,9 @@ class GeoMLP(nn.Module):
         mv, s = multivectors, scalars
 
         for i, layer in enumerate(self.layers):
-            mv, s = layer(mv, scalars=s)
+            if i == 0:
+                mv, s = layer(mv, scalars=s, reference_mv=reference_mv)
+            else:
+                mv, s = layer(mv, scalars=s)
 
         return mv, s

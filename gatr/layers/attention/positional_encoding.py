@@ -1,3 +1,6 @@
+# Copyright (c) 2023 Qualcomm Technologies, Inc.
+# All rights reserved.
+
 """Adapted from the below.
 
 https://github.com/EleutherAI/gpt-neox/blob/737c9134bfaff7b58217d61f6619f1dcca6c484f/megatron/model/positional_embeddings.py
@@ -19,8 +22,6 @@ limitations under the License.
 """
 
 import torch
-
-from gatr.utils.einsum import cached_einsum
 
 
 class ApplyRotaryPositionalEncoding(torch.nn.Module):
@@ -110,7 +111,7 @@ class ApplyRotaryPositionalEncoding(torch.nn.Module):
             t = torch.arange(inputs.shape[self.item_dim], device=inputs.device).type_as(
                 self.inv_freq
             )
-            freqs = cached_einsum("i,j->ij", t, self.inv_freq)
+            freqs = torch.einsum("i,j->ij", t, self.inv_freq)
             emb = torch.cat((freqs, freqs), dim=-1).to(inputs.device)
 
             self.cos_cached = emb.cos()

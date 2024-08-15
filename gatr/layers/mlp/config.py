@@ -1,3 +1,5 @@
+# Copyright (c) 2023 Qualcomm Technologies, Inc.
+# All rights reserved.
 from __future__ import annotations
 
 from dataclasses import dataclass

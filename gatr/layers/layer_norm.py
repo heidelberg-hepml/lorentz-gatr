@@ -1,3 +1,5 @@
+# Copyright (c) 2023 Qualcomm Technologies, Inc.
+# All rights reserved.
 """Equivariant normalization layers."""
 
 from typing import Tuple

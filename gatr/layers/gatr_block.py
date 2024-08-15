@@ -1,3 +1,5 @@
+# Copyright (c) 2023 Qualcomm Technologies, Inc.
+# All rights reserved.
 from dataclasses import replace
 from typing import Optional, Tuple
 
@@ -11,9 +13,9 @@ from gatr.layers.mlp.mlp import GeoMLP
 
 
 class GATrBlock(nn.Module):
-    """Equivariant transformer block for L-GATr.
+    """Equivariant transformer block for GATr.
 
-    This is the biggest building block of L-GATr.
+    This is the biggest building block of GATr.
 
     Inputs are first processed by a block consisting of LayerNorm, multi-head geometric
     self-attention, and a residual connection. Then the data is processed by a block consisting of
@@ -73,6 +75,7 @@ class GATrBlock(nn.Module):
         self,
         multivectors: torch.Tensor,
         scalars: torch.Tensor,
+        reference_mv=None,
         additional_qk_features_mv=None,
         additional_qk_features_s=None,
         attention_mask=None,
@@ -90,6 +93,8 @@ class GATrBlock(nn.Module):
             Input multivectors.
         scalars : torch.Tensor with shape (..., s_channels)
             Input scalars.
+        reference_mv : torch.Tensor with shape (..., 16) or None
+            Reference multivector for the equivariant join operation in the MLP.
         additional_qk_features_mv : None or torch.Tensor with shape
             (..., num_items, add_qk_mv_channels, 16)
             Additional Q/K features, multivector part.
@@ -127,7 +132,7 @@ class GATrBlock(nn.Module):
         h_mv, h_s = self.norm(outputs_mv, scalars=outputs_s)
 
         # MLP block: MLP
-        h_mv, h_s = self.mlp(h_mv, scalars=h_s)
+        h_mv, h_s = self.mlp(h_mv, scalars=h_s, reference_mv=reference_mv)
 
         # MLP block: skip connection
         outputs_mv = outputs_mv + h_mv

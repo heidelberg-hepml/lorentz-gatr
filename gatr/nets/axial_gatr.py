@@ -1,25 +1,30 @@
+# Copyright (c) 2023 Qualcomm Technologies, Inc.
+# All rights reserved.
 from dataclasses import replace
 from typing import Optional, Tuple, Union
 
 import torch
 from einops import rearrange
-from torch import nn
+from torch import Tensor, nn
 from torch.utils.checkpoint import checkpoint
 
 from gatr.layers.attention.config import SelfAttentionConfig
 from gatr.layers.gatr_block import GATrBlock
 from gatr.layers.linear import EquiLinear
 from gatr.layers.mlp.config import MLPConfig
+from gatr.utils.tensors import construct_reference_multivector
 
-# Default rearrange patterns
+# Default rearrange patterns for odd blocks
 _MV_REARRANGE_PATTERN = "... i j c x -> ... j i c x"
 _S_REARRANGE_PATTERN = "... i j c -> ... j i c"
 
 
 class AxialGATr(nn.Module):  # pylint: disable=duplicate-code
-    """Axial L-GATr network for two token dimensions.
+    """Axial GATr network for two token dimensions.
 
-    It combines `num_blocks` L-GATr transformer blocks, each consisting of geometric self-attention
+    This, together with gatr.nets.gatr.GATr, is the main architecture proposed in our paper.
+
+    It combines `num_blocks` GATr transformer blocks, each consisting of geometric self-attention
     layers, a geometric MLP, residual connections, and normalization layers. In addition, there
     are initial and final equivariant linear layers.
 
@@ -54,9 +59,10 @@ class AxialGATr(nn.Module):  # pylint: disable=duplicate-code
         and queries. The first element in the tuple determines whether positional embeddings
         are applied to the first item dimension, the second element the same for the second item
         dimension.
-    collapse_dims_for_odd_blocks : bool
-        Whether the batch dimensions will be collapsed in odd blocks (to support xformers block
-        attention)
+    collapse_dims : tuple of bool
+        Whether batch and token dimensions will be collapsed to support xformers block attention.
+        The first element of this tuple describes the behaviour in the 0th, 2nd, ... block, the
+        second element in the 1st, 3rd, ... block (where the axes are reversed).
     """
 
     def __init__(
@@ -72,7 +78,7 @@ class AxialGATr(nn.Module):  # pylint: disable=duplicate-code
         num_blocks: int = 20,
         checkpoint_blocks: bool = False,
         pos_encodings: Tuple[bool, bool] = (False, False),
-        collapse_dims_for_odd_blocks=False,
+        collapse_dims: Tuple[bool, bool] = (False, False),
         **kwargs,
     ) -> None:
         super().__init__()
@@ -105,37 +111,47 @@ class AxialGATr(nn.Module):  # pylint: disable=duplicate-code
             out_s_channels=out_s_channels,
         )
         self._checkpoint_blocks = checkpoint_blocks
-        self._collapse_dims_for_odd_blocks = collapse_dims_for_odd_blocks
+        (
+            self._collapse_dims_for_even_blocks,
+            self._collapse_dims_for_odd_blocks,
+        ) = collapse_dims
 
     def forward(
         self,
-        multivectors: torch.Tensor,
-        scalars: Optional[torch.Tensor] = None,
+        multivectors: Tensor,
+        scalars: Optional[Tensor] = None,
         attention_mask: Optional[Tuple] = None,
-    ) -> Tuple[torch.Tensor, Union[torch.Tensor, None]]:
+        join_reference: Union[Tensor, str] = "data",
+    ) -> Tuple[Tensor, Optional[Tensor]]:
         """Forward pass of the network.
 
         Parameters
         ----------
-        multivectors : torch.Tensor with shape (..., num_items_1, num_items_2, in_mv_channels, 16)
+        multivectors : Tensor with shape (..., num_items_1, num_items_2, in_mv_channels, 16)
             Input multivectors.
-        scalars : None or torch.Tensor with shape (..., num_items_1, num_items_2, in_s_channels)
+        scalars : None or Tensor with shape (..., num_items_1, num_items_2, in_s_channels)
             Optional input scalars.
-        attention_mask : None or tuple of torch.Tensor
-            Optional attention masks
+        attention_mask : None or tuple of Tensor
+            Optional attention masks.
+        join_reference : Tensor with shape (..., 16) or {"data", "canonical"}
+            Reference multivector for the equivariant joint operation. If "data", a
+            reference multivector is constructed from the mean of the input multivectors. If
+            "canonical", a constant canonical reference multivector is used instead.
 
         Returns
         -------
-        outputs_mv : torch.Tensor with shape (..., num_items_1, num_items_2, out_mv_channels, 16)
+        outputs_mv : Tensor with shape (..., num_items_1, num_items_2, out_mv_channels, 16)
             Output multivectors.
-        outputs_s : None or torch.Tensor with shape
+        outputs_s : None or Tensor with shape
             (..., num_items_1, num_items_2, out_mv_channels, 16)
             Output scalars, if scalars are provided. Otherwise None.
         """
 
+        # Reference MV for equivariant join
+        reference_mv = construct_reference_multivector(join_reference, multivectors)
+
         # Pass through the blocks
         h_mv, h_s = self.linear_in(multivectors, scalars=scalars)
-
         for i, block in enumerate(self.blocks):
             # For first, third, ... block, we want to perform attention over the first token
             # dimension. We implement this by transposing the two item dimensions.
@@ -144,7 +160,9 @@ class AxialGATr(nn.Module):  # pylint: disable=duplicate-code
                     h_mv, h_s
                 )
             else:
-                input_batch_dims = None
+                h_mv, h_s, input_batch_dims = self._reshape_data_before_even_blocks(
+                    h_mv, h_s
+                )
 
             # Attention masks will also be different
             if attention_mask is None:
@@ -158,12 +176,14 @@ class AxialGATr(nn.Module):  # pylint: disable=duplicate-code
                     h_mv,
                     use_reentrant=False,
                     scalars=h_s,
+                    reference_mv=reference_mv,
                     attention_mask=this_attention_mask,
                 )
             else:
                 h_mv, h_s = block(
                     h_mv,
                     scalars=h_s,
+                    reference_mv=reference_mv,
                     attention_mask=this_attention_mask,
                 )
 
@@ -172,21 +192,37 @@ class AxialGATr(nn.Module):  # pylint: disable=duplicate-code
                 h_mv, h_s = self._reshape_data_after_odd_blocks(
                     h_mv, h_s, input_batch_dims
                 )
+            else:
+                h_mv, h_s = self._reshape_data_after_even_blocks(
+                    h_mv, h_s, input_batch_dims
+                )
 
         outputs_mv, outputs_s = self.linear_out(h_mv, scalars=h_s)
 
         return outputs_mv, outputs_s
 
-    def _reshape_data_before_odd_blocks(self, multivector, scalar):
-        # Prepare reshuffling between axial layers
-        input_batch_dims = multivector.shape[:2]
-        assert scalar.shape[:2] == input_batch_dims
+    @staticmethod
+    def _construct_join_reference(inputs: Tensor):
+        """Constructs a reference vector for dualization from the inputs."""
 
+        # When using torch-geometric-style batching, this code should be adapted to perform the
+        # mean over the items in each batch, but not over the batch dimension.
+        # We leave this as an exercise for the practitioner :)
+        mean_dim = tuple(range(1, len(inputs.shape) - 1))
+        return torch.mean(inputs, dim=mean_dim, keepdim=True)  # (batch, 1, ..., 1, 16)
+
+    def _reshape_data_before_odd_blocks(self, multivector, scalar):
+        # Transpose token axes
         multivector = rearrange(
             multivector, _MV_REARRANGE_PATTERN
         )  # (axis2, axis1, ...)
         scalar = rearrange(scalar, _S_REARRANGE_PATTERN)  # (axis2, axis1, ...)
 
+        # Prepare uncollapsing
+        input_batch_dims = multivector.shape[:2]
+        assert scalar.shape[:2] == input_batch_dims
+
+        # Collapse dimensions
         if self._collapse_dims_for_odd_blocks:
             multivector = multivector.reshape(
                 -1, *multivector.shape[2:]
@@ -196,8 +232,7 @@ class AxialGATr(nn.Module):  # pylint: disable=duplicate-code
         return multivector, scalar, input_batch_dims
 
     def _reshape_data_after_odd_blocks(self, multivector, scalar, input_batch_dims):
-        # Transposing back to standard axis order
-
+        # Uncollapse
         if self._collapse_dims_for_odd_blocks:
             multivector = multivector.reshape(
                 *input_batch_dims, *multivector.shape[1:]
@@ -206,9 +241,36 @@ class AxialGATr(nn.Module):  # pylint: disable=duplicate-code
                 *input_batch_dims, *scalar.shape[1:]
             )  # (axis2, axis1, ...)
 
+        # Re-transpose token axes
         multivector = rearrange(
             multivector, _MV_REARRANGE_PATTERN
         )  # (axis1, axis2, ...)
         scalar = rearrange(scalar, _S_REARRANGE_PATTERN)  # (axis1, axis2, ...)
+
+        return multivector, scalar
+
+    def _reshape_data_before_even_blocks(self, multivector, scalar):
+        # Prepare un-collapsing
+        input_batch_dims = multivector.shape[:2]
+        assert scalar.shape[:2] == input_batch_dims
+
+        # Collapse
+        if self._collapse_dims_for_even_blocks:
+            multivector = multivector.reshape(
+                -1, *multivector.shape[2:]
+            )  # (axis2 * axis1, ...)
+            scalar = scalar.reshape(-1, *scalar.shape[2:])  # (axis2 * axis1, ...)
+
+        return multivector, scalar, input_batch_dims
+
+    def _reshape_data_after_even_blocks(self, multivector, scalar, input_batch_dims):
+        # Uncollapse
+        if self._collapse_dims_for_even_blocks:
+            multivector = multivector.reshape(
+                *input_batch_dims, *multivector.shape[1:]
+            )  # (axis2, axis1, ...)
+            scalar = scalar.reshape(
+                *input_batch_dims, *scalar.shape[1:]
+            )  # (axis2, axis1, ...)
 
         return multivector, scalar

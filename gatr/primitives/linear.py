@@ -1,17 +1,16 @@
-from functools import lru_cache
+# Copyright (c) 2023 Qualcomm Technologies, Inc.
+# All rights reserved.
 
 import torch
-import clifford
-import numpy as np
 
-from gatr.utils.einsum import cached_einsum, custom_einsum
+from gatr.utils.einsum import gatr_cache, gatr_einsum, gatr_einsum_with_path
 
 
-@lru_cache()
+@gatr_cache
 def _compute_pin_equi_linear_basis(
     device=torch.device("cpu"), dtype=torch.float32, normalize=True
 ) -> torch.Tensor:
-    """Constructs basis elements for Pin(1,3)-equivariant linear maps between multivectors.
+    """Constructs basis elements for Pin(3,0,1)-equivariant linear maps between multivectors.
 
     This function is cached.
 
@@ -26,31 +25,45 @@ def _compute_pin_equi_linear_basis(
 
     Returns
     -------
-    basis : torch.Tensor with shape (10, 16, 16)
+    basis : torch.Tensor with shape (7, 16, 16)
         Basis elements for equivariant linear maps.
     """
 
-    if device not in [torch.device("cpu"), "cpu"] and dtype != torch.float32:
-        basis = _compute_pin_equi_linear_basis(normalize=normalize)
-    else:
-        # explicit construction of a pin-equilinear basis for the Lorentz group
-        layout, blades = clifford.Cl(1, 3)
-        linear_basis = []
-        for mult in [1, layout.pseudoScalar]:
-            for grade in range(5):
-                w = np.stack([(x(grade) * mult).value for x in blades.values()], 1)
-                w = w.astype(np.float32)
-                if normalize:
-                    # w /= np.linalg.norm(w) # straight-forward normalization
-                    w /= np.linalg.svd(w)[1].max()  # alternative normalization
-                linear_basis.append(w)
-        linear_basis = np.stack(linear_basis)
+    # We constructed these manually in a notebook, here hardcoded for convenience
+    basis_elements = [
+        [0],
+        [1, 2, 3, 4],
+        [5, 6, 7, 8, 9, 10],
+        [11, 12, 13, 14],
+        [15],
+        [(1, 0)],
+        [(5, 2), (6, 3), (7, 4)],
+        [(11, 8), (12, 9), (13, 10)],
+        [(15, 14)],
+    ]
+    basis = []
 
-        basis = torch.tensor(linear_basis, dtype=torch.float32).to_dense()
-    return basis.to(device=device, dtype=dtype)
+    for elements in basis_elements:
+        w = torch.zeros((16, 16))
+        for element in elements:
+            try:
+                i, j = element
+                w[i, j] = 1.0
+            except TypeError:
+                w[element, element] = 1.0
+
+        if normalize:
+            w /= torch.linalg.norm(w)
+
+        w = w.unsqueeze(0)
+        basis.append(w)
+
+    catted_basis = torch.cat(basis, dim=0)
+
+    return catted_basis.to(device=device, dtype=dtype)
 
 
-@lru_cache()
+@gatr_cache
 def _compute_reversal(device=torch.device("cpu"), dtype=torch.float32) -> torch.Tensor:
     """Constructs a matrix that computes multivector reversal.
 
@@ -71,7 +84,7 @@ def _compute_reversal(device=torch.device("cpu"), dtype=torch.float32) -> torch.
     return reversal_flat
 
 
-@lru_cache()
+@gatr_cache
 def _compute_grade_involution(
     device=torch.device("cpu"), dtype=torch.float32
 ) -> torch.Tensor:
@@ -116,8 +129,8 @@ def equi_linear(x: torch.Tensor, coeffs: torch.Tensor) -> torch.Tensor:
     outputs : torch.Tensor with shape (..., 16)
         Result. Batch dimensions are result of broadcasting between x and coeffs.
     """
-    basis = _compute_pin_equi_linear_basis(device=x.device, dtype=x.dtype)
-    return custom_einsum(
+    basis = _compute_pin_equi_linear_basis(x.device, x.dtype)
+    return gatr_einsum_with_path(
         "y x a, a i j, ... x j -> ... y i", coeffs, basis, x, path=[0, 1, 0, 1]
     )
 
@@ -141,15 +154,13 @@ def grade_project(x: torch.Tensor) -> torch.Tensor:
     """
 
     # Select kernel on correct device
-    basis = _compute_pin_equi_linear_basis(
-        device=x.device, dtype=x.dtype, normalize=False
-    )
+    basis = _compute_pin_equi_linear_basis(x.device, x.dtype, False)
 
     # First five basis elements are grade projections
     basis = basis[:5]
 
     # Project to grades
-    projections = cached_einsum("g i j, ... j -> ... g i", basis, x)
+    projections = gatr_einsum("g i j, ... j -> ... g i", basis, x)
 
     return projections
 
@@ -170,7 +181,7 @@ def reverse(x: torch.Tensor) -> torch.Tensor:
     outputs : torch.Tensor with shape (..., 16)
         Output multivector.
     """
-    return _compute_reversal(device=x.device, dtype=x.dtype) * x
+    return _compute_reversal(x.device, x.dtype) * x
 
 
 def grade_involute(x: torch.Tensor) -> torch.Tensor:
@@ -190,4 +201,4 @@ def grade_involute(x: torch.Tensor) -> torch.Tensor:
         Output multivector.
     """
 
-    return _compute_grade_involution(device=x.device, dtype=x.dtype) * x
+    return _compute_grade_involution(x.device, x.dtype) * x

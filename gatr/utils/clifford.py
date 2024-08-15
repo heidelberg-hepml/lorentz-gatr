@@ -1,3 +1,5 @@
+# Copyright (c) 2023 Qualcomm Technologies, Inc.
+# All rights reserved.
 """Geometric algebra operations based on the clifford library."""
 
 from typing import Optional
@@ -5,17 +7,16 @@ from typing import Optional
 import clifford
 import numpy as np
 import torch
-
-LAYOUT, BLADES = clifford.Cl(1, 3)
+from clifford import pga as PGA
 
 
 def np_to_mv(array):
-    """Shorthand to transform a numpy array to a Pin(1,3) multivector."""
-    return clifford.MultiVector(LAYOUT, value=array)
+    """Shorthand to transform a numpy array to a PGA multivector."""
+    return clifford.MultiVector(PGA.layout, value=array)
 
 
 def tensor_to_mv(tensor):
-    """Shorthand to transform a numpy array to a Pin(1,3) multivector."""
+    """Shorthand to transform a numpy array to a PGA multivector."""
     return np_to_mv(tensor.detach().cpu().numpy())
 
 
@@ -43,7 +44,7 @@ def mv_list_to_tensor(multivectors, batch_shape=None):
 def sample_pin_multivector(
     spin: bool = False, rng: Optional[np.random.Generator] = None
 ):
-    """Samples from the Pin(1,3) group as a product of reflections."""
+    """Samples from the Pin(3,0,1) group as a product of reflections."""
 
     if rng is None:
         rng = np.random.default_rng()
@@ -56,18 +57,15 @@ def sample_pin_multivector(
 
     # If no reflections, just return unit scalar
     if i == 0:
-        return BLADES[""]
+        return PGA.blades[""]
 
     multivector = 1.0
     for _ in range(i):
         # Sample reflection vector
         vector = np.zeros(16)
-        vector[2:5] = rng.normal(size=3) * 2
-        norm = np.linalg.norm(vector[2:5])
-        vector[1] = (rng.uniform(size=1) - 0.5) * norm
-
+        vector[1:5] = rng.normal(size=4)
         vector_mv = np_to_mv(vector)
-        vector_mv = vector_mv / abs(vector_mv.mag2()) ** 0.5
+        vector_mv = vector_mv / vector_mv.mag2() ** 0.5
 
         # Multiply together (geometric product)
         multivector = multivector * vector_mv
@@ -133,4 +131,4 @@ class SlowRandomPinTransform:
         # Back to tensor
         outputs = mv_list_to_tensor(outputs_mv, batch_shape=batch_dims)
 
-        return outputs
+        return outputs.to(device=inputs.device, dtype=inputs.dtype)

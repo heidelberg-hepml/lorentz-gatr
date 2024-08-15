@@ -1,8 +1,12 @@
+# Copyright (c) 2023 Qualcomm Technologies, Inc.
+# All rights reserved.
 import torch
 
-from gatr.primitives.invariants import abs_squared_norm
+from gatr.primitives.invariants import inner_product
+from gatr.utils.misc import minimum_autocast_precision
 
 
+@minimum_autocast_precision(torch.float32)
 def equi_layer_norm(
     x: torch.Tensor, channel_dim: int = -2, gain: float = 1.0, epsilon: float = 0.01
 ) -> torch.Tensor:
@@ -34,14 +38,14 @@ def equi_layer_norm(
     """
 
     # Compute mean_channels |inputs|^2
-    abs_squared_norms = abs_squared_norm(x)
-    abs_squared_norms = torch.mean(abs_squared_norms, dim=channel_dim, keepdim=True)
+    squared_norms = inner_product(x, x)
+    squared_norms = torch.mean(squared_norms, dim=channel_dim, keepdim=True)
 
     # Insure against low-norm tensors (which can arise even when `x.var(dim=-1)` is high b/c some
     # entries don't contribute to the inner product / GP norm!)
-    abs_squared_norms = torch.clamp(abs_squared_norms, epsilon)
+    squared_norms = torch.clamp(squared_norms, epsilon)
 
     # Rescale inputs
-    outputs = gain * x / torch.sqrt(abs_squared_norms)
+    outputs = gain * x / torch.sqrt(squared_norms)
 
     return outputs

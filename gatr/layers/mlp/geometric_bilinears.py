@@ -1,3 +1,5 @@
+# Copyright (c) 2023 Qualcomm Technologies, Inc.
+# All rights reserved.
 """Pin-equivariant geometric product layer between multivector tensors (torch.nn.Modules)."""
 
 from typing import Optional, Tuple
@@ -6,10 +8,7 @@ import torch
 from torch import nn
 
 from gatr.layers.linear import EquiLinear
-from gatr.primitives import geometric_product
-from gatr.layers.layer_norm import EquiLayerNorm
-
-INCLUDE_TENSOR = True
+from gatr.primitives import equivariant_join, geometric_product
 
 
 class GeometricBilinear(nn.Module):
@@ -46,30 +45,49 @@ class GeometricBilinear(nn.Module):
         if hidden_mv_channels is None:
             hidden_mv_channels = out_mv_channels
 
+        out_mv_channels_each = hidden_mv_channels // 2
+        assert (
+            out_mv_channels_each * 2 == hidden_mv_channels
+        ), "GeometricBilinear needs even channel number"
+
         # Linear projections for GP
         self.linear_left = EquiLinear(
             in_mv_channels,
-            hidden_mv_channels,
+            out_mv_channels_each,
             in_s_channels=in_s_channels,
             out_s_channels=None,
         )
         self.linear_right = EquiLinear(
             in_mv_channels,
-            hidden_mv_channels,
+            out_mv_channels_each,
             in_s_channels=in_s_channels,
             out_s_channels=None,
             initialization="almost_unit_scalar",
+        )
+
+        # Linear projections for join
+        self.linear_join_left = EquiLinear(
+            in_mv_channels,
+            out_mv_channels_each,
+            in_s_channels=in_s_channels,
+            out_s_channels=None,
+        )
+        self.linear_join_right = EquiLinear(
+            in_mv_channels,
+            out_mv_channels_each,
+            in_s_channels=in_s_channels,
+            out_s_channels=None,
         )
 
         # Output linear projection
         self.linear_out = EquiLinear(
             hidden_mv_channels, out_mv_channels, in_s_channels, out_s_channels
         )
-        self.norm = EquiLayerNorm()
 
     def forward(
         self,
         multivectors: torch.Tensor,
+        reference_mv: torch.Tensor,
         scalars: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Forward pass.
@@ -80,6 +98,8 @@ class GeometricBilinear(nn.Module):
             Input multivectors
         scalars : torch.Tensor with shape (..., in_s_channels)
             Input scalars
+        reference_mv : torch.Tensor with shape (..., 16)
+            Reference multivector for equivariant join.
 
         Returns
         -------
@@ -93,11 +113,14 @@ class GeometricBilinear(nn.Module):
         left, _ = self.linear_left(multivectors, scalars=scalars)
         right, _ = self.linear_right(multivectors, scalars=scalars)
         gp_outputs = geometric_product(left, right)
-        if not INCLUDE_TENSOR:
-            gp_outputs[..., 5:11] = 0.0
+
+        # Equivariant join
+        left, _ = self.linear_join_left(multivectors, scalars=scalars)
+        right, _ = self.linear_join_right(multivectors, scalars=scalars)
+        join_outputs = equivariant_join(left, right, reference_mv)
 
         # Output linear
-        outputs_mv, outputs_s = self.linear_out(gp_outputs, scalars=scalars)
+        outputs_mv = torch.cat((gp_outputs, join_outputs), dim=-2)
+        outputs_mv, outputs_s = self.linear_out(outputs_mv, scalars=scalars)
 
-        outputs_mv, outputs_s = self.norm(outputs_mv, outputs_s)
         return outputs_mv, outputs_s

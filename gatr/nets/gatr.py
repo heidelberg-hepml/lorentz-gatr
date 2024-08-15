@@ -1,22 +1,28 @@
+# Copyright (c) 2023 Qualcomm Technologies, Inc.
+# All rights reserved.
 """Equivariant transformer for multivector data."""
 
 from dataclasses import replace
 from typing import Optional, Tuple, Union
 
 import torch
-from torch import nn
+from torch import Tensor, nn
 from torch.utils.checkpoint import checkpoint
 
 from gatr.layers.attention.config import SelfAttentionConfig
 from gatr.layers.gatr_block import GATrBlock
 from gatr.layers.linear import EquiLinear
 from gatr.layers.mlp.config import MLPConfig
+from gatr.utils.tensors import construct_reference_multivector
 
 
 class GATr(nn.Module):
-    """L-GATr network for a data with a single token dimension.
+    """GATr network for a data with a single token dimension.
 
-    It combines `num_blocks` L-GATr transformer blocks, each consisting of geometric self-attention
+    This, together with gatr.nets.axial_gatr.AxialGATr, is the main architecture proposed in our
+    paper.
+
+    It combines `num_blocks` GATr transformer blocks, each consisting of geometric self-attention
     layers, a geometric MLP, residual connections, and normalization layers. In addition, there
     are initial and final equivariant linear layers.
 
@@ -73,10 +79,10 @@ class GATr(nn.Module):
             out_s_channels=hidden_s_channels,
         )
         attention = replace(
-            SelfAttentionConfig.cast(attention),
-            additional_qk_mv_channels=0
-            if reinsert_mv_channels is None
-            else len(reinsert_mv_channels),
+            SelfAttentionConfig.cast(attention),  # convert duck typing to actual class
+            additional_qk_mv_channels=(
+                0 if reinsert_mv_channels is None else len(reinsert_mv_channels)
+            ),
             additional_qk_s_channels=0
             if reinsert_s_channels is None
             else len(reinsert_s_channels),
@@ -109,6 +115,7 @@ class GATr(nn.Module):
         multivectors: torch.Tensor,
         scalars: Optional[torch.Tensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
+        join_reference: Union[Tensor, str] = "data",
     ) -> Tuple[torch.Tensor, Union[torch.Tensor, None]]:
         """Forward pass of the network.
 
@@ -120,6 +127,10 @@ class GATr(nn.Module):
             Optional input scalars.
         attention_mask: None or torch.Tensor with shape (..., num_items, num_items)
             Optional attention mask
+        join_reference : Tensor with shape (..., 16) or {"data", "canonical"}
+            Reference multivector for the equivariant joint operation. If "data", a
+            reference multivector is constructed from the mean of the input multivectors. If
+            "canonical", a constant canonical reference multivector is used instead.
 
         Returns
         -------
@@ -129,7 +140,8 @@ class GATr(nn.Module):
             Output scalars, if scalars are provided. Otherwise None.
         """
 
-        # Channels that will be re-inserted in any query / key computation
+        # Reference multivector and channels that will be re-inserted in any query / key computation
+        reference_mv = construct_reference_multivector(join_reference, multivectors)
         (
             additional_qk_features_mv,
             additional_qk_features_s,
@@ -144,6 +156,7 @@ class GATr(nn.Module):
                     h_mv,
                     use_reentrant=False,
                     scalars=h_s,
+                    reference_mv=reference_mv,
                     additional_qk_features_mv=additional_qk_features_mv,
                     additional_qk_features_s=additional_qk_features_s,
                     attention_mask=attention_mask,
@@ -152,6 +165,7 @@ class GATr(nn.Module):
                 h_mv, h_s = block(
                     h_mv,
                     scalars=h_s,
+                    reference_mv=reference_mv,
                     additional_qk_features_mv=additional_qk_features_mv,
                     additional_qk_features_s=additional_qk_features_s,
                     attention_mask=attention_mask,
