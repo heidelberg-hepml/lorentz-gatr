@@ -13,3 +13,4 @@ from .reflection import embed_reflection, extract_reflection
 from .rotation import embed_rotation, extract_rotation
 from .scalar import embed_scalar, extract_scalar
 from .translation import embed_translation, extract_translation
+from .vector import embed_vector, extract_vector

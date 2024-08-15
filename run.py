@@ -1,26 +1,14 @@
 import hydra
-from experiments.amplitudes.experiment import AmplitudeExperiment
-from experiments.toptagging.experiment import TopTaggingExperiment
 from experiments.eventgen.processes import (
     ttbarExperiment,
     zmumuExperiment,
     z5gExperiment,
 )
-from experiments.toptagging.experiment import QGTaggingExperiment
 
 
 @hydra.main(config_path="config", config_name="ttbar", version_base=None)
 def main(cfg):
-    if cfg.exp_type == "amplitudes":
-        raise NotImplementedError
-        exp = AmplitudeExperiment(cfg)
-    elif cfg.exp_type == "toptagging":
-        raise NotImplementedError
-        exp = TopTaggingExperiment(cfg)
-    elif cfg.exp_type == "qgtagging":
-        raise NotImplementedError
-        exp = QGTaggingExperiment(cfg)
-    elif cfg.exp_type == "ttbar":
+    if cfg.exp_type == "ttbar":
         exp = ttbarExperiment(cfg)
     elif cfg.exp_type == "zmumu":
         exp = zmumuExperiment(cfg)

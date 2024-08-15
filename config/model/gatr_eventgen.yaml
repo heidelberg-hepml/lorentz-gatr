@@ -1,7 +1,7 @@
 _target_: experiments.eventgen.wrappers.GATrCFM
 beam_reference: xyplane
 two_beams: false
-add_time_reference: true
+add_time_reference: false
 scalar_dims: [0, 3]
 
 net:
