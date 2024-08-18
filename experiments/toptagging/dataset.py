@@ -490,11 +490,7 @@ def embed_beam_reference(p_ref, beam_reference, add_time_reference, two_beams):
 
     if beam_reference in ["lightlike", "spacelike", "timelike"]:
         # add another 4-momentum
-        if beam_reference == "lightlike":
-            beam = [1, 0, 0, 1]
-        elif beam_reference == "timelike":
-            beam = [2**0.5, 0, 0, 1]
-        elif beam_reference == "spacelike":
+        if beam_reference == "spacelike":
             beam = [0, 0, 0, 1]
         beam = torch.tensor(beam, device=p_ref.device, dtype=p_ref.dtype).reshape(1, 4)
         beam = embed_vector(beam)
@@ -503,11 +499,8 @@ def embed_beam_reference(p_ref, beam_reference, add_time_reference, two_beams):
             beam2[..., 4] = -1  # flip pz
             beam = torch.cat((beam, beam2), dim=0)
 
-    elif beam_reference == "xyplane":
-        # add the x-y-plane, embedded as a bivector
-        # convention for bivector components: [tx, ty, tz, xy, xz, yz]
-        beam = torch.zeros(1, 16, device=p_ref.device, dtype=p_ref.dtype)
-        beam[..., 8] = 1
+    elif beam_reference in ["lightlike", "xyplane", "timelike"]:
+        raise ValueError(f"beam_referenec=xyplane does not make sense for E3GATr")
 
     elif beam_reference is None:
         beam = None
