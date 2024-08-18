@@ -101,10 +101,10 @@ class TopTaggingDataset(torch.utils.data.Dataset):
 
         # create embeddings
         x = batch.x.unsqueeze(1)
+        scalars = torch.zeros(x.shape[0], 0, device=self.device, dtype=self.dtype)
         if self.cfg.data.add_pt:
-            scalars = get_pt(batch.x)
-        else:
-            scalars = torch.zeros(x.shape[0], 0, device=self.device, dtype=self.dtype)
+            pt = get_pt(x)
+            scalars = torch.cat((scalars, pt), dim=-1)
         is_global = batch.is_global if self.cfg.data.include_global_token else None
 
         # beam reference
@@ -269,7 +269,8 @@ class QGTaggingDataset(torch.utils.data.Dataset):
         x = batch.x.unsqueeze(1)
         scalars = batch.pid
         if self.cfg.data.add_pt:
-            single_scalars = torch.cat((single_scalars, get_pt(single)), dim=1)
+            pt = get_pt(x)
+            scalars = torch.cat((scalars, pt), dim=-1)
         is_global = batch.is_global if self.cfg.data.include_global_token else None
 
         # beam reference
@@ -317,12 +318,12 @@ class QGTaggingDataset(torch.utils.data.Dataset):
                 x = torch.cat((x, beam), dim=-2)
 
         # add information about which token is global
-        scalars_is_global = torch.zeros(
-            scalars.shape[0], 1, device=self.device, dtype=self.dtype
-        )
-        scalars_is_global[0, :] = 1.0
-        scalars = torch.cat([scalars_is_global, scalars], dim=-1)
-
+        if self.cfg.data.include_global_token:
+            scalars_is_global = torch.zeros(
+                scalars.shape[0], 1, device=self.device, dtype=self.dtype
+            )
+            scalars_is_global[0, :] = 1.0
+            scalars = torch.cat([scalars_is_global, scalars], dim=-1)
         return Data(x=x, scalars=scalars, label=batch.label, is_global=is_global)
 
 
