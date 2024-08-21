@@ -1,8 +1,8 @@
 _target_: experiments.eventgen.wrappers.GATrCFM
-beam_reference: xyplane
+beam_reference: spacelike
 two_beams: false
 add_time_reference: false
-scalar_dims: [0, 3]
+scalar_dims: [0]
 
 net:
  _target_: gatr.nets.GATr

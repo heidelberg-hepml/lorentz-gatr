@@ -27,8 +27,8 @@ cfm:
  embed_t_scale: 30.
  hutchinson: true
  coordinates_straight: ${cfm.coordinates_sampling}
- coordinates_network: Fourmomenta
- coordinates_sampling: StandardLogPtPhiEtaLogM2
+ coordinates_network: M2PPP
+ coordinates_sampling: StandardLogPtPhiEtaLogM2_from_M2PPP
  transforms_float64: true
 
 training:

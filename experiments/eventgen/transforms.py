@@ -149,6 +149,80 @@ class EPPP_to_PPPM2(BaseTransform):
         return 2 * E
 
 
+class M2PPP_to_EPPP(BaseTransform):
+    # only used for E3GATr (starts from M2PPP instead of EPPP)
+    def _forward(self, m2ppp):
+        m2, px, py, pz = unpack_last(m2ppp)
+        E = torch.sqrt(m2 + px**2 + py**2 + pz**2)
+        return torch.stack((E, px, py, pz), dim=-1)
+
+    def _inverse(self, eppp):
+        E, px, py, pz = unpack_last(eppp)
+        m2 = E**2 - px**2 - py**2 - pz**2
+        return torch.stack((m2, px, py, pz), dim=-1)
+
+    def _jac_forward(self, m2ppp, eppp):
+        m2, px, py, pz = unpack_last(m2ppp)
+        E = eppp[..., 0]
+        zero, one = torch.zeros_like(E), torch.ones_like(E)
+        jac_m2 = torch.stack((1 / (2 * E), zero, zero, zero), dim=-1)
+        jac_px = torch.stack((px / E, one, zero, zero), dim=-1)
+        jac_py = torch.stack((py / E, zero, one, zero), dim=-1)
+        jac_pz = torch.stack((pz / E, zero, zero, one), dim=-1)
+        return torch.stack((jac_m2, jac_px, jac_py, jac_pz), dim=-1)
+
+    def _jac_inverse(self, eppp, m2ppp):
+        m2, px, py, pz = unpack_last(m2ppp)
+        E = eppp[..., 0]
+        zero, one = torch.zeros_like(E), torch.ones_like(E)
+        jac_E = torch.stack((2 * E, zero, zero, zero), dim=-1)
+        jac_px = torch.stack((-2 * px, one, zero, zero), dim=-1)
+        jac_py = torch.stack((-2 * py, zero, one, zero), dim=-1)
+        jac_pz = torch.stack((-2 * pz, zero, zero, one), dim=-1)
+        return torch.stack((jac_E, jac_px, jac_py, jac_pz), dim=-1)
+
+    def _detjac_forward(self, m2ppp, eppp):
+        E, px, py, pz = unpack_last(eppp)
+        return 1 / (2 * E)
+
+
+class EPPP_to_M2PPP(BaseTransform):
+    # only used for E3GATr (starts from M2PPP instead of EPPP)
+    def _forward(self, eppp):
+        E, px, py, pz = unpack_last(eppp)
+        m2 = E**2 - px**2 - py**2 - pz**2
+        return torch.stack((m2, px, py, pz), dim=-1)
+
+    def _inverse(self, m2ppp):
+        m2, px, py, pz = unpack_last(m2ppp)
+        E = torch.sqrt(m2 + px**2 + py**2 + pz**2)
+        return torch.stack((E, px, py, pz), dim=-1)
+
+    def _jac_forward(self, eppp, m2ppp):
+        m2, px, py, pz = unpack_last(m2ppp)
+        E = eppp[..., 0]
+        zero, one = torch.zeros_like(E), torch.ones_like(E)
+        jac_E = torch.stack((2 * E, zero, zero, zero), dim=-1)
+        jac_px = torch.stack((-2 * px, one, zero, zero), dim=-1)
+        jac_py = torch.stack((-2 * py, zero, one, zero), dim=-1)
+        jac_pz = torch.stack((-2 * pz, zero, zero, one), dim=-1)
+        return torch.stack((jac_E, jac_px, jac_py, jac_pz), dim=-1)
+
+    def _jac_inverse(self, m2ppp, eppp):
+        m2, px, py, pz = unpack_last(m2ppp)
+        E = eppp[..., 0]
+        zero, one = torch.zeros_like(E), torch.ones_like(E)
+        jac_m2 = torch.stack((1 / (2 * E), zero, zero, zero), dim=-1)
+        jac_px = torch.stack((px / E, one, zero, zero), dim=-1)
+        jac_py = torch.stack((py / E, zero, one, zero), dim=-1)
+        jac_pz = torch.stack((pz / E, zero, zero, one), dim=-1)
+        return torch.stack((jac_m2, jac_px, jac_py, jac_pz), dim=-1)
+
+    def _detjac_forward(self, eppp, m2ppp):
+        E, px, py, pz = unpack_last(eppp)
+        return 2 * E
+
+
 class EPPP_to_EPhiPtPz(BaseTransform):
     def _forward(self, eppp):
         E, px, py, pz = unpack_last(eppp)

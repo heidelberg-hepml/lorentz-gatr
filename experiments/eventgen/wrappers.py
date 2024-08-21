@@ -233,8 +233,8 @@ class GATrCFM(EventCFM):
         self.scalar_dims = scalar_dims
         assert (np.array(scalar_dims) < 4).all() and (np.array(scalar_dims) >= 0).all()
         assert (
-            self.cfm.coordinates_network == "Fourmomenta"
-        ), f"GA-networks require coordinates_network=Fourmomenta"
+            self.cfm.coordinates_network == "M2PPP"
+        ), f"GA-networks require coordinates_network=M2PPP"
 
     def get_velocity(self, fourmomenta, t, ijet):
         mv, s = self.embed_into_ga(fourmomenta, t, ijet)
