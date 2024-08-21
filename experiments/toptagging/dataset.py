@@ -329,8 +329,7 @@ class QGTaggingDataset(torch.utils.data.Dataset):
 
 def embed_beam_reference(p_ref, beam_reference, add_time_reference, two_beams):
     """
-    Construct attention mask that makes sure that objects only attend to each other
-    within the same batch element, and not across batch elements
+    Construct symmetry-breaking reference multivector
 
     Parameters
     ----------
