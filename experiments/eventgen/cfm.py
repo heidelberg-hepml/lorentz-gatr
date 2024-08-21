@@ -490,10 +490,10 @@ class EventCFM(CFM):
             raise ValueError(f"base_type={self.base_type} not implemented")
 
     def init_coordinates(self):
+        self.coordinates_network = self._init_coordinates(self.cfm.coordinates_network)
         self.coordinates_straight = self._init_coordinates(
             self.cfm.coordinates_straight
         )
-        self.coordinates_network = self._init_coordinates(self.cfm.coordinates_network)
         self.coordinates_sampling = self._init_coordinates(
             self.cfm.coordinates_sampling
         )
@@ -504,9 +504,38 @@ class EventCFM(CFM):
         ]
 
     def _init_coordinates(self, coordinates_label):
-        if coordinates_label == "M2PPP":
+        if coordinates_label == "Fourmomenta":
+            coordinates = c.Fourmomenta
+        elif coordinates_label == "M2PPP":
             coordinates = c.M2PPP()
+        elif coordinates_label == "PPPM2":
+            coordinates = c.PPPM2()
+        elif coordinates_label == "PPPLogM2":
+            coordinates = c.PPPLogM2()
+        elif coordinates_label == "StandardPPPLogM2":
+            coordinates = c.StandardPPPLogM2()
+        elif coordinates_label == "EPhiPtPz":
+            coordinates = c.EPhiPtPz()
+        elif coordinates_label == "PtPhiEtaE":
+            coordinates = c.PtPhiEtaE()
+        elif coordinates_label == "PtPhiEtaM2":
+            coordinates = c.PtPhiEtaM2()
+        elif coordinates_label == "LogPtPhiEtaE":
+            coordinates = c.LogPtPhiEtaE(self.pt_min, self.units)
+        elif coordinates_label == "LogPtPhiEtaM2":
+            coordinates = c.LogPtPhiEtaM2(self.pt_min, self.units)
+        elif coordinates_label == "PtPhiEtaLogM2":
+            coordinates = c.PtPhiEtaLogM2()
+        elif coordinates_label == "LogPtPhiEtaLogM2":
+            coordinates = c.LogPtPhiEtaLogM2(self.pt_min, self.units)
+        elif coordinates_label == "StandardLogPtPhiEtaLogM2":
+            coordinates = c.StandardLogPtPhiEtaLogM2(self.pt_min, self.units)
         elif coordinates_label == "StandardLogPtPhiEtaLogM2_from_M2PPP":
+            assert hasattr(self, "coordinates_network")
+            assert isinstance(self.coordinates_network, c.M2PPP), (
+                f"Trying to use coordinates=StandardLogPtPhiEtaLogM2_from_M2PPP, "
+                f"but coordinates=StandardLogPtPhiEtaLogM2_from_M2PPP can only be used with coordinates_network=M2PPP"
+            )
             coordinates = c.StandardLogPtPhiEtaLogM2_from_M2PPP(
                 self.pt_min, self.units, self.onshell_list
             )
