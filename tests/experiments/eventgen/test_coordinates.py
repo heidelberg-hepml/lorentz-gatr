@@ -39,7 +39,7 @@ from tests.helpers import STRICT_TOLERANCES as TOLERANCES
         StandardLogPtPhiEtaLogM2,
     ],
 )
-@pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
+@pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 3], [ttbarExperiment, 10]])
 @pytest.mark.parametrize("nevents", [10000])
 def test_invertibility(coordinates, distribution, experiment_np, nevents):
     """test invertibility of forward() and inverse() methods"""
@@ -112,7 +112,7 @@ def test_invertibility(coordinates, distribution, experiment_np, nevents):
         StandardLogPtPhiEtaLogM2,
     ],
 )
-@pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
+@pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 3], [ttbarExperiment, 10]])
 @pytest.mark.parametrize("nevents", [10000])
 def test_velocity(coordinates, distribution, experiment_np, nevents):
     """test correctness of jacobians from _jac_forward() and _jac_inverse() methods, and their invertibility"""
@@ -212,7 +212,7 @@ def test_velocity(coordinates, distribution, experiment_np, nevents):
         StandardLogPtPhiEtaLogM2,
     ],
 )
-@pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
+@pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 3], [ttbarExperiment, 10]])
 @pytest.mark.parametrize("nevents", [10000])
 def test_logdetjac(coordinates, distribution, experiment_np, nevents):
     """test correctness of jacobians from logdetjac_fourmomenta_to_x() and logdetjac_x_to_fourmomenta() methods, and their invertibility"""
