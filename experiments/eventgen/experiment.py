@@ -87,7 +87,8 @@ class EventGenerationExperiment(BaseExperiment):
                 )
                 data_raw = data_raw[: self.cfg.data.subsample, :]
             data_raw = data_raw.reshape(data_raw.shape[0], data_raw.shape[1] // 4, 4)
-            data_raw = data_raw[:, 2:, :]
+            if self.cfg.exp_type == "zmumu":
+                data_raw = data_raw[:, 2:, :]
             data_raw = torch.tensor(data_raw, dtype=self.dtype)
 
             # collect everything
