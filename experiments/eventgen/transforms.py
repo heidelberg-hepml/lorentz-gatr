@@ -191,10 +191,12 @@ class EPPP_to_M2PPP(BaseTransform):
     def _forward(self, eppp):
         E, px, py, pz = unpack_last(eppp)
         m2 = E**2 - px**2 - py**2 - pz**2
+        m2 = stay_positive(m2)
         return torch.stack((m2, px, py, pz), dim=-1)
 
     def _inverse(self, m2ppp):
         m2, px, py, pz = unpack_last(m2ppp)
+        m2 = stay_positive(m2)
         E = torch.sqrt(m2 + px**2 + py**2 + pz**2)
         return torch.stack((E, px, py, pz), dim=-1)
 
