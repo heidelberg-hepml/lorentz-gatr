@@ -505,7 +505,7 @@ class EventCFM(CFM):
 
     def _init_coordinates(self, coordinates_label):
         if coordinates_label == "Fourmomenta":
-            coordinates = c.Fourmomenta
+            coordinates = c.Fourmomenta()
         elif coordinates_label == "M2PPP":
             coordinates = c.M2PPP()
         elif coordinates_label == "PPPM2":
