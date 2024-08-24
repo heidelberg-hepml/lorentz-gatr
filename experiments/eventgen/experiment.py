@@ -77,7 +77,7 @@ class EventGenerationExperiment(BaseExperiment):
                 self.cfg.model.gpt = self.cfg.gpt
                 if self.cfg.model.n_gauss is None:
                     self.cfg.model.n_gauss = self.cfg.model.net.hidden_channels // 3
-                max_idx = 4 * n_particles + 1
+                max_idx = 4 * n_particles
                 self.cfg.model.net.in_channels = 1 + max_idx + n_datasets
                 self.cfg.model.net.out_channels = 3 * self.cfg.model.n_gauss
             else:

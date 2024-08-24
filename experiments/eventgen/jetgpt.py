@@ -49,8 +49,7 @@ class GPT(nn.Module):
     ):
         super().__init__()
         self.gmm = GaussianMixtureModel(n_gauss)
-        self.channels = torch.tensor(gpt.channels)
-        self.start_channel = None  # implemented in subclass
+        self.channels = torch.tensor(gpt.channels, dtype=torch.long)
 
         if gpt.transforms_float64:
             c.DTYPE = torch.float64
@@ -72,7 +71,8 @@ class GPT(nn.Module):
     def _get_idx(self, shape, device):
         # indices to go back and forth between default (pt, phi, eta, m) ordering
         # and the ordering specified in self.channels
-        self.channels = self.channels.to(device, dtype=torch.long)
+        if self.channels.device != device:
+            self.channels = self.channels.to(device)
         channels_mask = self.channels < shape[-1]
         idx = self.channels[channels_mask]
         reverse_idx = torch.argsort(idx)
@@ -91,8 +91,8 @@ class GPT(nn.Module):
         idx, reverse_idx = self._get_idx(shape, device)
 
         x0_condition = torch.zeros(shape[0], 1, device=device, dtype=dtype)
-        for i in range(1, shape[-1] + 1):
-            idx_condition = idx[1 : i + 1]
+        for i in range(shape[-1]):
+            idx_condition = idx[: i + 1]
             condition = self.get_condition(x0_condition, idx_condition, ijet)
             x0_next = self.gmm.sample(condition[:, [-1], :])
             x0_condition = torch.cat((x0_condition, x0_next), dim=-1)
@@ -117,11 +117,7 @@ class GPT(nn.Module):
         x0_condition = torch.cat(
             (torch.zeros_like(x0_gaussian[:, [0]]), x0_gaussian[..., :-1]), dim=-1
         )
-        idx_condition = torch.cat(
-            (self.channel_channels * torch.ones_like(idx[[0]]), idx[:-1]), dim=-1
-        )
-        condition = self.get_condition(x0_condition, idx_condition, ijet)
-
+        condition = self.get_condition(x0_condition, idx, ijet)
         log_prob_gaussian = self.gmm.log_prob(x0_gaussian, condition)
         log_prob_gaussian = log_prob_gaussian[:, reverse_idx]
         x0_gaussian = x0_gaussian[:, reverse_idx]
@@ -139,7 +135,7 @@ class GPT(nn.Module):
 
 
 class EventGPT(GPT):
-    # TBD: support onshell generation
+    # Does not support onshell generation yet
     def __init__(self, n_gauss, gpt):
         super().__init__(n_gauss, gpt)
         self.component_channels = 4
@@ -184,9 +180,8 @@ class JetGPT(EventGPT):
     def __init__(self, net, n_gauss, gpt, type_token_channels, process_token_channels):
         super().__init__(n_gauss, gpt)
         self.net = net
-        self.channel_channels = 4 * type_token_channels + 1
+        self.channel_channels = 4 * type_token_channels
         self.process_token_channels = process_token_channels
-        self.start_channel = self.channel_channels
 
     def get_condition(self, x, idx, ijet):
         embedding = self._embed(x, idx, ijet)
