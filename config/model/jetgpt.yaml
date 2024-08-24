@@ -1,0 +1,14 @@
+_target_: experiments.eventgen.jetgpt.JetGPT
+n_gauss: null
+
+net:
+ _target_: experiments.baselines.Transformer
+
+ in_channels: null
+ out_channels: null
+ hidden_channels: 32
+
+ num_blocks: 1
+ num_heads: 4
+
+ pos_encoding: false

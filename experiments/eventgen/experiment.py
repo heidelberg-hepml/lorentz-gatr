@@ -19,6 +19,9 @@ class EventGenerationExperiment(BaseExperiment):
         self.define_process_specifics()
 
         # dynamically set wrapper properties
+        self.modeltype = (
+            "GPT" if self.cfg.model._target_.rsplit(".", 1)[-1] == "JetGPT" else "CFM"
+        )
         self.modelname = self.cfg.model.net._target_.rsplit(".", 1)[-1]
         n_particles = self.n_hard_particles + max(self.cfg.data.n_jets)
         n_datasets = len(self.cfg.data.n_jets)
@@ -64,8 +67,21 @@ class EventGenerationExperiment(BaseExperiment):
                     self.cfg.model.net.in_mv_channels += 1
 
             # copy model-specific parameters
-            self.cfg.model.odeint = self.cfg.odeint
-            self.cfg.model.cfm = self.cfg.cfm
+            if self.modeltype == "CFM":
+                self.cfg.model.odeint = self.cfg.odeint
+                self.cfg.model.cfm = self.cfg.cfm
+            elif self.modeltype == "GPT":
+                assert (
+                    self.cfg.exp_type == "ttbar"
+                ), "JetGPT only implemented for exp_type=ttbar, not exp_type={self.cfg.exp_type}"
+                self.cfg.model.gpt = self.cfg.gpt
+                if self.cfg.model.n_gauss is None:
+                    self.cfg.model.n_gauss = self.cfg.model.net.hidden_channels // 3
+                max_idx = 4 * n_particles + 1
+                self.cfg.model.net.in_channels = 1 + max_idx + n_datasets
+                self.cfg.model.net.out_channels = 3 * self.cfg.model.n_gauss
+            else:
+                raise ValueError(f"modeltype={self.modeltype} not implemented")
 
     def init_data(self):
         LOGGER.info(f"Working with {self.cfg.data.n_jets} extra jets")
@@ -124,7 +140,8 @@ class EventGenerationExperiment(BaseExperiment):
         fit_data = [x / self.units for x in self.events_raw]
         for coordinates in self.model.coordinates:
             coordinates.init_fit(fit_data)
-        self.model.distribution.coordinates.init_fit(fit_data)
+        if hasattr(self.model, "distribution"):
+            self.model.distribution.coordinates.init_fit(fit_data)
 
     def _init_dataloader(self):
         assert sum(self.cfg.data.train_test_val) <= 1
