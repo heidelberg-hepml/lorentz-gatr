@@ -509,13 +509,7 @@ def embed_beam_reference(p_ref, beam_reference, add_time_reference, two_beams):
         raise ValueError(f"beam_reference {beam_reference} not implemented")
 
     if add_time_reference:
-        time = [1, 0, 0, 0]
-        time = torch.tensor(time, device=p_ref.device, dtype=p_ref.dtype).reshape(1, 4)
-        time = embed_vector(time)
-        if beam is None:
-            reference = time
-        else:
-            reference = torch.cat([beam, time], dim=-2)
+        raise ValueError(f"add_time_reference=true does not make sense for E3GATr")
     else:
         reference = beam
 
