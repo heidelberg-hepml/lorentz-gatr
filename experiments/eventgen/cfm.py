@@ -513,7 +513,9 @@ class EventCFM(CFM):
         elif coordinates_label == "PPPLogM2":
             coordinates = c.PPPLogM2()
         elif coordinates_label == "StandardPPPLogM2":
-            coordinates = c.StandardPPPLogM2()
+            coordinates = c.PPPLogM2()
+        elif coordinates_label == "StandardLogM2PPP":
+            coordinates = c.StandardLogM2PPP()
         elif coordinates_label == "EPhiPtPz":
             coordinates = c.EPhiPtPz()
         elif coordinates_label == "PtPhiEtaE":
@@ -530,15 +532,6 @@ class EventCFM(CFM):
             coordinates = c.LogPtPhiEtaLogM2(self.pt_min, self.units)
         elif coordinates_label == "StandardLogPtPhiEtaLogM2":
             coordinates = c.StandardLogPtPhiEtaLogM2(self.pt_min, self.units)
-        elif coordinates_label == "StandardLogPtPhiEtaLogM2_from_M2PPP":
-            assert hasattr(self, "coordinates_network")
-            assert isinstance(self.coordinates_network, c.M2PPP), (
-                f"Trying to use coordinates=StandardLogPtPhiEtaLogM2_from_M2PPP, "
-                f"but coordinates=StandardLogPtPhiEtaLogM2_from_M2PPP can only be used with coordinates_network=M2PPP"
-            )
-            coordinates = c.StandardLogPtPhiEtaLogM2_from_M2PPP(
-                self.pt_min, self.units, self.onshell_list
-            )
         else:
             raise ValueError(f"coordinates={coordinates_label} not implemented")
         return coordinates

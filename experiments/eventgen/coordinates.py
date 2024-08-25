@@ -175,6 +175,17 @@ class StandardPPPLogM2(BaseCoordinates):
         ]
 
 
+class StandardLogM2PPP(BaseCoordinates):
+    # fitted (log(m^2), px, py, pz)
+    def __init__(self, onshell_list=[]):
+        self.transforms = [
+            tr.EPPP_to_PPPM2(),
+            tr.M2_to_LogM2(),
+            tr.LastInFront(),
+            tr.StandardNormal([], onshell_list),
+        ]
+
+
 class LogPtPhiEtaE(PhiCoordinates):
     # (log(pt), phi, eta, E)
     def __init__(self, pt_min, units):
@@ -222,24 +233,3 @@ class StandardLogPtPhiEtaLogM2(PhiCoordinates):
             tr.M2_to_LogM2(),
             tr.StandardNormal([1], onshell_list),
         ]
-
-
-class StandardLogPtPhiEtaLogM2_from_M2PPP(PhiCoordinates):
-    # Fitted (log(pt), phi, eta, log(m^2)
-    # only used for E3GATr
-    def __init__(self, pt_min, units, onshell_list=[]):
-        self.transforms = [
-            tr.M2PPP_to_EPPP(),
-            tr.EPPP_to_PtPhiEtaE(),
-            tr.PtPhiEtaE_to_PtPhiEtaM2(),
-            tr.Pt_to_LogPt(pt_min, units),
-            tr.M2_to_LogM2(),
-            tr.StandardNormal([1], onshell_list),
-        ]
-
-
-class M2PPP(BaseCoordinates):
-    # (m2, px, py, pz)
-    # only used for E3GATr
-    def __init__(self):
-        self.transforms = [tr.EPPP_to_M2PPP()]
