@@ -28,7 +28,9 @@ class BaselineLayerNorm(nn.Module):
         outputs : Tensor
             Normalized inputs.
         """
-        return torch.nn.functional.layer_norm(inputs, normalized_shape=inputs.shape[1:])
+        return torch.nn.functional.layer_norm(
+            inputs, normalized_shape=inputs.shape[-1:]
+        )
 
 
 class MultiHeadQKVLinear(nn.Module):
