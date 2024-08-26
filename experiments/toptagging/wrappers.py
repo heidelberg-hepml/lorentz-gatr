@@ -58,12 +58,12 @@ def xformers_ca_mask(batch, num_class_tokens=1, materialize=False):
         or torch.nn.functional.scaled_dot_product_attention
     """
     kv_seqlen = torch.bincount(batch.batch).tolist()
-    batchsize = len(kv_seqlen)
-    q_seqlen = [num_class_tokens] * batchsize
+    kv_seqlen = [i + num_class_tokens for i in kv_seqlen]
+    q_seqlen = [num_class_tokens] * len(kv_seqlen)
     mask = BlockDiagonalMask.from_seqlens(q_seqlen, kv_seqlen=kv_seqlen)
     if materialize:
         # materialize mask to torch.tensor (only for testing purposes)
-        mask = mask.materialize(shape=(batchsize, len(batch.batch))).to(
+        mask = mask.materialize(shape=(sum(q_seqlen), sum(kv_seqlen))).to(
             batch.batch.device
         )
     return mask
@@ -145,7 +145,7 @@ class TopTaggingCLSGATrWrapper(nn.Module):
             scalars=scalars,
             selfattn_mask=sa_mask,
             crossattn_mask=ca_mask,
-            batchsize=batchsize,
+            batch=batch.batch,
         )
         logits = self.extract_from_ga(batch, cls_multivector, cls_scalar)
 

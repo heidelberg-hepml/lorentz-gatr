@@ -6,6 +6,7 @@ from typing import Optional, Tuple, Union
 import torch
 from torch import nn
 from torch.utils.checkpoint import checkpoint
+from torch_geometric.utils import to_dense_batch
 
 from gatr.layers.attention.config import SelfAttentionConfig, CrossAttentionConfig
 from gatr.layers.gatr_block import GATrBlock
@@ -103,12 +104,8 @@ class CLSGATr(nn.Module):
             CrossAttentionConfig.cast(crossattention),
             additional_q_mv_channels=0,
             additional_q_s_channels=0,
-            additional_k_mv_channels=0
-            if reinsert_mv_channels is None
-            else len(reinsert_mv_channels),
-            additional_k_s_channels=0
-            if reinsert_s_channels is None
-            else len(reinsert_s_channels),
+            additional_k_mv_channels=0,
+            additional_k_s_channels=0,
         )
         mlp = MLPConfig.cast(mlp)
         self.sa_blocks = nn.ModuleList(
@@ -154,7 +151,7 @@ class CLSGATr(nn.Module):
     def forward(
         self,
         multivectors: torch.Tensor,
-        batchsize: int,
+        batch: torch.Tensor,
         scalars: Optional[torch.Tensor] = None,
         selfattn_mask: Optional[torch.Tensor] = None,
         crossattn_mask: Optional[torch.Tensor] = None,
@@ -206,29 +203,34 @@ class CLSGATr(nn.Module):
                     additional_qk_features_s=ref_additional_qk_features_s,
                     attention_mask=selfattn_mask,
                 )
+
+        batchsize = batch.max().item() + 1
         cls_mv = self.cls_mv.unsqueeze(0).repeat(1, batchsize, 1, 1)
         cls_s = self.cls_s.unsqueeze(0).repeat(1, batchsize, 1)
         for block in self.ca_blocks:
+            kv_mv, kv_s = self._construct_reference(
+                cls_mv,
+                ref_mv,
+                cls_s,
+                ref_s,
+                batch,
+            )
             if self._checkpoint_blocks:
                 cls_mv, cls_s = checkpoint(
                     block,
                     multivectors_q=cls_mv,
                     use_reentrant=False,
                     scalars_q=cls_s,
-                    multivectors_kv=ref_mv,
-                    scalars_kv=ref_s,
-                    additional_k_features_mv=ref_additional_qk_features_mv,
-                    additional_k_features_s=ref_additional_qk_features_s,
+                    multivectors_kv=kv_mv,
+                    scalars_kv=kv_s,
                     attention_mask=crossattn_mask,
                 )
             else:
                 cls_mv, cls_s = block(
                     multivectors_q=cls_mv,
                     scalars_q=cls_s,
-                    multivectors_kv=ref_mv,
-                    scalars_kv=ref_s,
-                    additional_k_features_mv=ref_additional_qk_features_mv,
-                    additional_k_features_s=ref_additional_qk_features_s,
+                    multivectors_kv=kv_mv,
+                    scalars_kv=kv_s,
                     attention_mask=crossattn_mask,
                 )
 
@@ -251,3 +253,33 @@ class CLSGATr(nn.Module):
             additional_qk_features_s = scalars[..., self._reinsert_s_channels]
 
         return additional_qk_features_mv, additional_qk_features_s
+
+    def _construct_reference(self, cls_mv, ref_mv, cls_s, ref_s, batch):
+        # append cls token to reference
+        kv_mv = append_ref_to_cls(cls_mv, ref_mv, batch, dim=1)
+        kv_s = append_ref_to_cls(cls_s, ref_s, batch, dim=1)
+        return kv_mv, kv_s
+
+
+def append_ref_to_cls(cls, ref, batch, dim=-1):
+    # check shapes
+    if dim != -1:
+        except_dim = lambda x: x[:dim] + x[dim + 1 :]
+        is_fine = except_dim(cls.shape) == except_dim(ref.shape)
+    else:
+        is_fine = cls.shape[:-1] == ref.shape[:-1]
+    assert (
+        is_fine
+    ), "shapes of cls and ref should be equal in all dimensions except 'dim'"
+
+    # append ref to cls
+    ref, cls = ref[0, ...].clone(), cls[0, ...]
+    ref_dense, ref_mask = to_dense_batch(ref, batch)
+    cls_dense = cls.reshape(ref_dense.shape[0], -1, *ref_dense.shape[2:])
+    cls_mask = torch.ones(
+        cls_dense.shape[:2], device=ref_mask.device, dtype=ref_mask.dtype
+    )
+    x_dense = torch.cat((cls_dense, ref_dense), dim=1)
+    x_mask = torch.cat((cls_mask, ref_mask), dim=1)
+    x = x_dense[x_mask].unsqueeze(0)
+    return x
