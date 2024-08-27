@@ -205,8 +205,8 @@ class CLSGATr(nn.Module):
                 )
 
         batchsize = batch.max().item() + 1
-        cls_mv = self.cls_mv.unsqueeze(0).repeat(1, batchsize, 1, 1)
-        cls_s = self.cls_s.unsqueeze(0).repeat(1, batchsize, 1)
+        cls_mv = self.cls_mv.repeat(batchsize, 1, 1)
+        cls_s = self.cls_s.repeat(batchsize, 1)
         for block in self.ca_blocks:
             kv_mv, kv_s = self._construct_reference(
                 cls_mv,
@@ -256,8 +256,8 @@ class CLSGATr(nn.Module):
 
     def _construct_reference(self, cls_mv, ref_mv, cls_s, ref_s, batch):
         # append cls token to reference
-        kv_mv = append_ref_to_cls(cls_mv, ref_mv, batch, dim=1)
-        kv_s = append_ref_to_cls(cls_s, ref_s, batch, dim=1)
+        kv_mv = append_ref_to_cls(cls_mv, ref_mv, batch, dim=-3)
+        kv_s = append_ref_to_cls(cls_s, ref_s, batch, dim=-2)
         return kv_mv, kv_s
 
 
@@ -273,7 +273,6 @@ def append_ref_to_cls(cls, ref, batch, dim=-1):
     ), "shapes of cls and ref should be equal in all dimensions except 'dim'"
 
     # append ref to cls
-    ref, cls = ref[0, ...].clone(), cls[0, ...]
     ref_dense, ref_mask = to_dense_batch(ref, batch)
     cls_dense = cls.reshape(ref_dense.shape[0], -1, *ref_dense.shape[2:])
     cls_mask = torch.ones(
@@ -281,5 +280,5 @@ def append_ref_to_cls(cls, ref, batch, dim=-1):
     )
     x_dense = torch.cat((cls_dense, ref_dense), dim=1)
     x_mask = torch.cat((cls_mask, ref_mask), dim=1)
-    x = x_dense[x_mask].unsqueeze(0)
+    x = x_dense[x_mask]
     return x

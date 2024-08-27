@@ -97,12 +97,11 @@ class TopTaggingGATrWrapper(nn.Module):
 
     def embed_into_ga(self, batch):
         # embedding happens in the dataset for convenience
-        # add artificial batch index (needed for xformers attention)
-        multivector, scalars = batch.x.unsqueeze(0), batch.scalars.unsqueeze(0)
+        multivector, scalars = batch.x, batch.scalars
         return multivector, scalars
 
     def extract_from_ga(self, batch, multivector, scalars):
-        outputs = extract_scalar(multivector).squeeze()
+        outputs = extract_scalar(multivector)
         if self.mean_aggregation:
             outputs = outputs.squeeze()
             batchsize = max(batch.batch) + 1
@@ -110,8 +109,7 @@ class TopTaggingGATrWrapper(nn.Module):
             logits.index_add_(0, batch.batch, outputs)  # sum
             logits = logits / torch.bincount(batch.batch)  # mean
         else:
-            logits = outputs.unsqueeze(-1)[batch.is_global]
-
+            logits = outputs[batch.is_global][:, 0]
         return logits
 
 
@@ -130,6 +128,7 @@ class TopTaggingCLSGATrWrapper(nn.Module):
         self.net = net
         self.num_class_tokens = num_class_tokens
         self.force_xformers = force_xformers
+        assert self.num_class_tokens == 1, "num_class_tokens>1 not properly tested yet"
 
     def forward(self, batch):
         multivector, scalars = self.embed_into_ga(batch)
@@ -153,10 +152,9 @@ class TopTaggingCLSGATrWrapper(nn.Module):
 
     def embed_into_ga(self, batch):
         # embedding happens in the dataset for convenience
-        # add artificial batch index (needed for xformers attention)
-        multivector, scalars = batch.x.unsqueeze(0), batch.scalars.unsqueeze(0)
+        multivector, scalars = batch.x, batch.scalars
         return multivector, scalars
 
     def extract_from_ga(self, batch, multivector, scalars):
-        logits = extract_scalar(multivector).squeeze()
+        logits = extract_scalar(multivector)[:, 0, 0]
         return logits
