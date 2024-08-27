@@ -92,7 +92,7 @@ class zmumuExperiment(EventGenerationExperiment):
         self.onshell_list = []
         self.onshell_mass = []
         self.units = 258.1108
-        self.onshell_mass_placeholder = [self.units for _ in self.onshell_mass]
+        self.onshell_mass_placeholder = [5.0 for _ in self.onshell_mass]
         self.delta_r_min = 0.40
         self.pt_min = [20.0, 20.0, 20.0]
         self.obs_names_index = []
@@ -120,9 +120,7 @@ class z5gExperiment(EventGenerationExperiment):
         self.onshell_mass = [91.188, 0.1, 0.1, 0.1, 0.1, 0.1]
         self.units = 275.69
         self.onshell_mass_placeholder = [self.onshell_mass[0]]
-        self.onshell_mass_placeholder.extend(
-            [self.units for _ in self.onshell_mass[1:]]
-        )
+        self.onshell_mass_placeholder.extend([5.0 for _ in self.onshell_mass[1:]])
         self.delta_r_min = 0.4
         self.pt_min = [0.0, 20.0, 20.0, 20.0, 20.0, 20.0]
         self.obs_names_index = ["Z"]
