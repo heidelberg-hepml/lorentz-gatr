@@ -16,7 +16,6 @@ from experiments.mlflow import log_mlflow
 
 MODEL_TITLE_DICT = {
     "GATr": "GATr",
-    "CLSGATr": "CLS-GATr",
     "Transformer": "Tr",
     "MLP": "MLP",
 }
@@ -36,15 +35,13 @@ class TaggingExperiment(BaseExperiment):
         # dynamically extend dict
         with open_dict(self.cfg):
             gatr_name = "experiments.toptagging.wrappers.TopTaggingGATrWrapper"
-            clsgatr_name = "experiments.toptagging.wrappers.TopTaggingCLSGATrWrapper"
-            assert self.cfg.model._target_ in [gatr_name, clsgatr_name]
+            assert self.cfg.model._target_ in [gatr_name]
 
             # global token?
             if self.cfg.model._target_ == gatr_name:
                 self.cfg.data.include_global_token = not self.cfg.model.mean_aggregation
-            elif self.cfg.model._target_ == clsgatr_name:
-                self.cfg.data.include_global_token = False
-                self.cfg.model.num_class_tokens = 1  # not for jetclass!
+            else:
+                raise ValueError(f"model {self.cfg.model._target_} not implemented")
 
             if self.cfg.exp_type == "toptagging":
                 # make sure we know where we start from
