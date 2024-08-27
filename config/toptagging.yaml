@@ -6,11 +6,11 @@ data:
  data_dir : /media/jspinner/shared/Studium/project3/data
  dataset: mini
  beam_reference: spacelike
- two_beams: false
+ two_beams: true
  beam_token: true
  add_time_reference: false
  add_pt: false
- reinsert_channels: true
+ reinsert_channels: false
  rescale_data: true
 
 train: true
