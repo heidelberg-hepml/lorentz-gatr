@@ -9,6 +9,8 @@ from gatr.layers.linear import EquiLinear
 from gatr.primitives import geometric_product
 from gatr.layers.layer_norm import EquiLayerNorm
 
+INCLUDE_TENSOR = True
+
 
 class GeometricBilinear(nn.Module):
     """Geometric bilinear layer.
@@ -91,6 +93,8 @@ class GeometricBilinear(nn.Module):
         left, _ = self.linear_left(multivectors, scalars=scalars)
         right, _ = self.linear_right(multivectors, scalars=scalars)
         gp_outputs = geometric_product(left, right)
+        if not INCLUDE_TENSOR:
+            gp_outputs[..., 5:11] = 0.0
 
         # Output linear
         outputs_mv, outputs_s = self.linear_out(gp_outputs, scalars=scalars)

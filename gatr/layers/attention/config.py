@@ -24,8 +24,6 @@ class SelfAttentionConfig:
         Whether additional multivector features for the keys and queries will be provided.
     additional_qk_s_channels : int
         Whether additional scalar features for the keys and queries will be provided.
-    normalizer : str
-        Normalizer function to use in sdp_dist attention
     multi_query: bool
         Whether to do multi-query attention
     attention_type : {"scalar", "geometric", "sdp_dist"}
@@ -41,6 +39,8 @@ class SelfAttentionConfig:
         Factor by which to increase the number of hidden channels (both multivectors and scalars)
     dropout_prob : float or None
         Dropout probability
+    head_scale: bool
+        Whether to use HeadScaleMHA following the NormFormer (https://arxiv.org/pdf/2110.09456)
     """
 
     multi_query: bool = True
@@ -57,6 +57,7 @@ class SelfAttentionConfig:
     checkpoint: bool = True
     increase_hidden_channels: int = 2
     dropout_prob: Optional[float] = None
+    head_scale: bool = False
 
     def __post_init__(self):
         """Type checking / conversion."""

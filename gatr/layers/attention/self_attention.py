@@ -66,6 +66,11 @@ class SelfAttention(nn.Module):
         else:
             self.dropout = None
 
+        # HeadScaleMHA
+        self.use_head_scale = config.head_scale
+        if self.use_head_scale:
+            self.head_scale = nn.Parameter(torch.ones(config.num_heads))
+
     def forward(
         self,
         multivectors: torch.Tensor,
@@ -127,6 +132,13 @@ class SelfAttention(nn.Module):
         h_mv, h_s = self.attention(
             q_mv, k_mv, v_mv, q_s, k_s, v_s, attention_mask=attention_mask
         )
+        if self.use_head_scale:
+            h_mv = h_mv * self.head_scale.view(
+                *[1] * len(h_mv.shape[:-5]), len(self.head_scale), 1, 1, 1
+            )
+            h_s = h_s * self.head_scale.view(
+                *[1] * len(h_s.shape[:-4]), len(self.head_scale), 1, 1
+            )
 
         h_mv = rearrange(
             h_mv,
