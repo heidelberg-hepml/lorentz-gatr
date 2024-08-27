@@ -10,5 +10,6 @@ net:
 
  num_blocks: 1
  num_heads: 4
+ dropout_prob: null
 
  pos_encoding: false

@@ -153,6 +153,7 @@ class BaselineSelfAttention(nn.Module):
         pos_encoding: bool = False,
         pos_enc_base: int = 4096,
         multi_query: bool = True,
+        dropout_prob=None,
     ) -> None:
         super().__init__()
 
@@ -172,6 +173,11 @@ class BaselineSelfAttention(nn.Module):
             )
         else:
             self.pos_encoding = None
+
+        if dropout_prob is not None:
+            self.dropout = nn.Dropout(dropout_prob)
+        else:
+            self.dropout = None
 
     def forward(
         self,
@@ -211,6 +217,9 @@ class BaselineSelfAttention(nn.Module):
             "... num_heads num_items hidden_channels -> ... num_items (num_heads hidden_channels)",
         )
         outputs = self.out_linear(h)  # (..., num_items, out_channels)
+
+        if self.dropout is not None:
+            outputs = self.dropout(outputs)
 
         return outputs
 
@@ -272,6 +281,7 @@ class BaselineTransformerBlock(nn.Module):
         pos_encoding_base: int = 4096,
         increase_hidden_channels=1,
         multi_query: bool = True,
+        dropout_prob=None,
     ) -> None:
         super().__init__()
 
@@ -292,12 +302,15 @@ class BaselineTransformerBlock(nn.Module):
             pos_encoding=pos_encoding,
             pos_enc_base=pos_encoding_base,
             multi_query=multi_query,
+            dropout_prob=dropout_prob,
         )
 
         self.mlp = nn.Sequential(
             nn.Linear(channels, 2 * channels),
+            nn.Dropout(dropout_prob) if dropout_prob is not None else nn.Identity(),
             nn.GELU(),
             nn.Linear(2 * channels, channels),
+            nn.Dropout(dropout_prob) if dropout_prob is not None else nn.Identity(),
         )
 
     def forward(
@@ -373,6 +386,7 @@ class Transformer(nn.Module):
         checkpoint_blocks: bool = False,
         increase_hidden_channels=1,
         multi_query: bool = False,
+        dropout_prob=None,
     ) -> None:
         super().__init__()
         self.checkpoint_blocks = checkpoint_blocks
@@ -386,6 +400,7 @@ class Transformer(nn.Module):
                     pos_encoding_base=pos_encoding_base,
                     increase_hidden_channels=increase_hidden_channels,
                     multi_query=multi_query,
+                    dropout_prob=dropout_prob,
                 )
                 for _ in range(num_blocks)
             ]
