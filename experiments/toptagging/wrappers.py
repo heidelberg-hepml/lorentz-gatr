@@ -6,55 +6,54 @@ from gatr.interface import extract_scalar
 from xformers.ops.fmha import BlockDiagonalMask
 
 
-def attention_mask(batch, force_xformers=True):
+def xformers_sa_mask(batch, materialize=False):
     """
-    Construct attention mask that makes surfe that objects only attend to each other
+    Construct attention mask that makes sure that objects only attend to each other
     within the same batch element, and not across batch elements
 
     Parameters
     ----------
     batch: torch_geometric.data.Data
         torch_geometric representation of the data
-    force_xformers: bool
-        Decides whether a xformers or torch.tensor mask should be returned
+    materialize: bool
+        Decides whether a xformers or ('materialized') torch.tensor mask should be returned
         The xformers mask allows to use the optimized xformers attention kernel, but only runs on gpu
 
     Returns
     -------
     mask: xformers.ops.fmha.attn_bias.BlockDiagonalMask or torch.tensor
         attention mask, to be used in xformers.ops.memory_efficient_attention
+        or torch.nn.functional.scaled_dot_product_attention
     """
     bincounts = torch.bincount(batch.batch).tolist()
     mask = BlockDiagonalMask.from_seqlens(bincounts)
-    if not force_xformers:
+    if materialize:
         # materialize mask to torch.tensor (only for testing purposes)
-        mask = mask.materialize(shape=(len(batch.batch), len(batch.batch)))
+        mask = mask.materialize(shape=(len(batch.batch), len(batch.batch))).to(
+            batch.batch.device
+        )
     return mask
 
 
 class TopTaggingGATrWrapper(nn.Module):
     """
     L-GATr for toptagging
-    including all kinds of options to play with
     """
 
     def __init__(
         self,
         net,
         mean_aggregation=False,
-        add_pt=False,
         force_xformers=True,
     ):
         super().__init__()
         self.net = net
         self.mean_aggregation = mean_aggregation
-        self.add_pt = add_pt
         self.force_xformers = force_xformers
 
     def forward(self, batch):
-        mask = attention_mask(batch, self.force_xformers)
-
         multivector, scalars = self.embed_into_ga(batch)
+        mask = xformers_sa_mask(batch, materialize=not self.force_xformers)
         multivector_outputs, scalar_outputs = self.net(
             multivector, scalars=scalars, attention_mask=mask
         )
@@ -64,12 +63,11 @@ class TopTaggingGATrWrapper(nn.Module):
 
     def embed_into_ga(self, batch):
         # embedding happens in the dataset for convenience
-        # add artificial batch index (needed for xformers attention)
-        multivector, scalars = batch.x.unsqueeze(0), batch.scalars.unsqueeze(0)
+        multivector, scalars = batch.x, batch.scalars
         return multivector, scalars
 
     def extract_from_ga(self, batch, multivector, scalars):
-        outputs = extract_scalar(multivector).squeeze()
+        outputs = extract_scalar(multivector)
         if self.mean_aggregation:
             outputs = outputs.squeeze()
             batchsize = max(batch.batch) + 1
@@ -77,6 +75,7 @@ class TopTaggingGATrWrapper(nn.Module):
             logits.index_add_(0, batch.batch, outputs)  # sum
             logits = logits / torch.bincount(batch.batch)  # mean
         else:
-            logits = outputs.unsqueeze(-1)[batch.is_global]
+            logits = outputs[batch.is_global][:, 0]
+        return logits
 
         return logits

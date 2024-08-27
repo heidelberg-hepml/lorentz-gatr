@@ -24,9 +24,9 @@ The datasets can be downloaded from the Heidelberg ITP website ([amplitudes](htt
 
 You can run any of our experiments with the following commands:
 ```bash
-python run.py model=gatr_amplitudes exp_type=amplitudes exp_name=amplitudes run_name=hello_world_amplitudes
-python run.py model=gatr_toptagging exp_type=toptagging exp_name=toptagging run_name=hello_world_toptagging
-python run.py model=gatr_eventgen exp_type=ttbar exp_name=eventgen run_name=hello_world_eventgen
+python run.py -cn amplitudes model=gatr_amplitudes exp_name=amplitudes run_name=hello_world_amplitudes
+python run.py -cn toptagging model=gatr_toptagging exp_name=toptagging run_name=hello_world_toptagging
+python run.py -cn ttbar model=gatr_eventgen exp_name=eventgen run_name=hello_world_eventgen
 ```
 
 We use hydra for configuration management, allowing to quickly override parameters in e.g. config/amplitudes.yaml. Further, we use mlflow for tracking. You can start a mlflow server based on the saved results in runs/tracking/mlflow.db on port 4242 of your machine with the following command

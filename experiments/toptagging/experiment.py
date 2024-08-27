@@ -14,9 +14,11 @@ from experiments.toptagging.plots import plot_mixer
 from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
 
-import matplotlib.pyplot as plt
-
-MODEL_TITLE_DICT = {"GATr": "GATr", "Transformer": "Tr", "MLP": "MLP"}
+MODEL_TITLE_DICT = {
+    "GATr": "GATr",
+    "Transformer": "Tr",
+    "MLP": "MLP",
+}
 
 
 class TaggingExperiment(BaseExperiment):
@@ -25,15 +27,6 @@ class TaggingExperiment(BaseExperiment):
     """
 
     def init_physics(self):
-        if (
-            self.cfg.model._target_
-            == "experiments.toptagging.wrappers.TopTaggingTransformerWrapper"
-        ):
-            assert (
-                not self.cfg.data.pairs.use
-            ), "data.pairs are not implemented for the default Transformer"
-            # assert not self.cfg.model.beam_reference, "model.beam_reference are not implemented for the default Transformer"
-
         if not self.cfg.training.force_xformers:
             LOGGER.warning(
                 f"Using training.force_xformers=False, this will slow down the network by a factor of 5-10."
@@ -41,54 +34,51 @@ class TaggingExperiment(BaseExperiment):
 
         # dynamically extend dict
         with open_dict(self.cfg):
-            if (
-                self.cfg.model._target_
-                == "experiments.toptagging.wrappers.TopTaggingGATrWrapper"
-            ):
-                if self.cfg.exp_type == "toptagging":
-                    # make sure we know where we start from
-                    self.cfg.model.net.in_s_channels = 1
-                    self.cfg.model.net.in_mv_channels = 1
+            gatr_name = "experiments.toptagging.wrappers.TopTaggingGATrWrapper"
+            assert self.cfg.model._target_ in [gatr_name]
 
-                elif self.cfg.exp_type == "qgtagging":
-                    # We add 7 scalar channels, 1 for the global token and 6 for the particle id features
-                    # (charge, electron, muon, photon, charged hadron and neutral hadron)
-                    self.cfg.model.net.in_s_channels = 7
-                    self.cfg.model.net.in_mv_channels = 1
+            # global token?
+            if self.cfg.model._target_ == gatr_name:
+                self.cfg.data.include_global_token = not self.cfg.model.mean_aggregation
+            else:
+                raise ValueError(f"model {self.cfg.model._target_} not implemented")
 
-                # extra s channels for pt
-                self.cfg.model.add_pt = self.cfg.data.add_pt
-                if self.cfg.data.add_pt:
-                    self.cfg.model.net.in_s_channels += 1
+            if self.cfg.exp_type == "toptagging":
+                # make sure we know where we start from
+                self.cfg.model.net.in_s_channels = 0
+                self.cfg.model.net.in_mv_channels = 1
+            elif self.cfg.exp_type == "qgtagging":
+                # We add 7 scalar channels, 1 for the global token and 6 for the particle id features
+                # (charge, electron, muon, photon, charged hadron and neutral hadron)
+                self.cfg.model.net.in_s_channels = 6
+                self.cfg.model.net.in_mv_channels = 1
 
-                # extra mv channels for beam_reference and time_reference
-                if not self.cfg.data.beam_token:
-                    if self.cfg.data.beam_reference is not None:
-                        self.cfg.model.net.in_mv_channels += (
-                            2
-                            if self.cfg.data.two_beams
-                            and not self.cfg.data.beam_reference == "xyplane"
-                            else 1
-                        )
-                    if self.cfg.data.add_time_reference:
-                        self.cfg.model.net.in_mv_channels += 1
+            # extra scalar channels
+            if self.cfg.data.add_pt:
+                self.cfg.model.net.in_s_channels += 1
+            if self.cfg.data.include_global_token:
+                self.cfg.model.net.in_s_channels += 1
 
-                # extra mv and s channels for pairs
-                if self.cfg.data.pairs.use:
-                    self.cfg.model.net.in_mv_channels += 2
-                    if self.cfg.data.pairs.add_differences:
-                        self.cfg.model.net.in_mv_channels += 1
-                    if self.cfg.data.pairs.add_scalars:
-                        self.cfg.model.net.in_s_channels += 2
-
-                # reinsert channels
-                if self.cfg.data.reinsert_channels:
-                    self.cfg.model.net.reinsert_mv_channels = list(
-                        range(self.cfg.model.net.in_mv_channels)
+            # extra mv channels for beam_reference and time_reference
+            if not self.cfg.data.beam_token:
+                if self.cfg.data.beam_reference is not None:
+                    self.cfg.model.net.in_mv_channels += (
+                        2
+                        if self.cfg.data.two_beams
+                        and not self.cfg.data.beam_reference == "xyplane"
+                        else 1
                     )
-                    self.cfg.model.net.reinsert_s_channels = list(
-                        range(self.cfg.model.net.in_s_channels)
-                    )
+                if self.cfg.data.add_time_reference:
+                    self.cfg.model.net.in_mv_channels += 1
+
+            # reinsert channels
+            if self.cfg.data.reinsert_channels:
+                self.cfg.model.net.reinsert_mv_channels = list(
+                    range(self.cfg.model.net.in_mv_channels)
+                )
+                self.cfg.model.net.reinsert_s_channels = list(
+                    range(self.cfg.model.net.in_s_channels)
+                )
 
     def init_data(self):
         raise NotImplementedError
