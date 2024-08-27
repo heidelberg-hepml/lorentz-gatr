@@ -45,6 +45,8 @@ class TaggingExperiment(BaseExperiment):
             elif self.cfg.model._target_ == clsgatr_name:
                 self.cfg.data.include_global_token = False
                 self.cfg.model.num_class_tokens = 1  # not for jetclass!
+            else:
+                raise ValueError(f"model {self.cfg.model._target_} not implemented")
 
             if self.cfg.exp_type == "toptagging":
                 # make sure we know where we start from
