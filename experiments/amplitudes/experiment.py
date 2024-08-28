@@ -418,7 +418,6 @@ class AmplitudeExperiment(BaseExperiment):
             global_token = torch.tensor(
                 range(len(data)), dtype=torch.long, device=self.device
             )
-            attn_mask = None
         x, y = x.to(self.device), y.to(self.device)
         y_pred = self.model(
             x, type_token=type_token, global_token=global_token, attn_mask=attn_mask
