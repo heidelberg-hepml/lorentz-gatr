@@ -97,19 +97,20 @@ class TopTaggingGATrWrapper(nn.Module):
 
     def embed_into_ga(self, batch):
         # embedding happens in the dataset for convenience
-        multivector, scalars = batch.x, batch.scalars
+        # add artificial batch index (otherwise xformers attention on gpu complains)
+        multivector, scalars = batch.x.unsqueeze(0), batch.scalars.unsqueeze(0)
         return multivector, scalars
 
     def extract_from_ga(self, batch, multivector, scalars):
         outputs = extract_scalar(multivector)
         if self.mean_aggregation:
-            outputs = outputs.squeeze()
+            outputs = outputs[0, :, 0, 0]
             batchsize = max(batch.batch) + 1
             logits = torch.zeros(batchsize, device=outputs.device, dtype=outputs.dtype)
             logits.index_add_(0, batch.batch, outputs)  # sum
             logits = logits / torch.bincount(batch.batch)  # mean
         else:
-            logits = outputs[batch.is_global][:, 0]
+            logits = outputs[0, :, :, 0][batch.is_global]
         return logits
 
 
@@ -147,14 +148,14 @@ class TopTaggingCLSGATrWrapper(nn.Module):
             batch=batch.batch,
         )
         logits = self.extract_from_ga(batch, cls_multivector, cls_scalar)
-
         return logits
 
     def embed_into_ga(self, batch):
         # embedding happens in the dataset for convenience
-        multivector, scalars = batch.x, batch.scalars
+        # add artificial batch index (otherwise xformers attention on gpu complains)
+        multivector, scalars = batch.x.unsqueeze(0), batch.scalars.unsqueeze(0)
         return multivector, scalars
 
     def extract_from_ga(self, batch, multivector, scalars):
-        logits = extract_scalar(multivector)[:, 0, 0]
+        logits = extract_scalar(multivector)[0, :, 0, 0]
         return logits
