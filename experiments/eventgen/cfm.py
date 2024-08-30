@@ -13,6 +13,7 @@ from experiments.eventgen.distributions import (
     StandardLogPtPhiEtaLogM2,
 )
 import experiments.eventgen.coordinates as c
+import experiments.eventgen.trajectories as traj
 import experiments.eventgen.distributions as d
 from experiments.eventgen.coordinates import (
     convert_coordinates,
@@ -522,6 +523,8 @@ class EventCFM(CFM):
             coordinates = c.LogPtPhiEtaLogM2(self.pt_min, self.units)
         elif coordinates_label == "StandardLogPtPhiEtaLogM2":
             coordinates = c.StandardLogPtPhiEtaLogM2(self.pt_min, self.units)
+        elif coordinates_label == "SophisticatedMass":
+            coordinates = traj.SophisticatedMass(self.pt_min, self.units)
         else:
             raise ValueError(f"coordinates={coordinates_label} not implemented")
         return coordinates
