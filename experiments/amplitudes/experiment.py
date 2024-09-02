@@ -47,6 +47,9 @@ VB_MODELS = ["DSI"]
 
 class AmplitudeExperiment(BaseExperiment):
     def init_physics(self):
+        assert (
+            not self.cfg.training.force_xformers
+        ), "amplitudes experiment assumes default torch attention"
         self.n_datasets = len(self.cfg.data.dataset)
 
         # create type_token list
@@ -257,13 +260,20 @@ class AmplitudeExperiment(BaseExperiment):
         for data in loader:
             for idataset, data_onedataset in enumerate(data):
                 x, y = data_onedataset
+                x = x.unsqueeze(0)
                 pred = self.model(
                     x.to(self.device),
-                    type_token=self.type_token[idataset],
-                    global_token=idataset,
+                    type_token=torch.tensor(
+                        [self.type_token[idataset]],
+                        dtype=torch.long,
+                        device=self.device,
+                    ),
+                    global_token=torch.tensor(
+                        [idataset], dtype=torch.long, device=self.device
+                    ),
                 )
 
-                y_pred = pred[..., 0]
+                y_pred = pred[0, ..., 0]
 
                 amplitudes_pred_prepd[idataset].append(y_pred.cpu().float().numpy())
                 amplitudes_truth_prepd[idataset].append(
@@ -368,14 +378,55 @@ class AmplitudeExperiment(BaseExperiment):
         # average over contributions from different datasets
         loss = 0.0
         mse = []
-        for idataset, data_onedataset in enumerate(data):
-            x, y = data_onedataset
-            x, y = x.to(self.device), y.to(self.device)
-            y_pred = self.model(
-                x, type_token=self.type_token[idataset], global_token=idataset
+        if len(data) == 1:
+            x, y = data[0]
+            x, y = x.unsqueeze(0), y.unsqueeze(0)
+            attn_mask = None
+            type_token = torch.tensor(
+                self.type_token, dtype=torch.long, device=self.device
             )
-            loss += self.loss(y, y_pred) / self.n_datasets
-            mse.append(torch.mean((y_pred[:, 0] - y[:, 0]) ** 2).cpu().item())
+            global_token = torch.tensor([0], dtype=torch.long, device=self.device)
+        else:
+            particles_max = data[-1][0].shape[-2]
+            assert particles_max == max([d[0].shape[-2] for d in data])
+            y = torch.stack([d[1] for d in data], dim=0)
+            x = torch.zeros(len(data), *data[-1][0].shape, dtype=self.dtype)
+            # carefully construct padding attention mask as float (and not bool!)
+            # bool padding mask does not work, because a full row/column of zeros yields nan's in the softmax
+            # this will hopefully be fixed soon, see https://github.com/pytorch/pytorch/issues/103749
+            attn_mask = (
+                torch.ones(
+                    len(data),
+                    1,
+                    1,
+                    1 + particles_max,
+                    1 + particles_max,
+                    dtype=self.dtype,
+                )
+                * torch.finfo(self.dtype).min
+            )
+            type_token = torch.zeros(
+                len(data), particles_max, dtype=torch.long, device=self.device
+            )
+            for i, d in enumerate(data):
+                particles_i = d[0].shape[-2]
+                x[i, :, :particles_i, :] = d[0]
+                attn_mask[i, :, :, : (1 + particles_i), : (1 + particles_i)] = 0.0
+                type_token[i, :particles_i] = torch.tensor(
+                    self.type_token[i], dtype=torch.long, device=self.device
+                )
+            global_token = torch.tensor(
+                range(len(data)), dtype=torch.long, device=self.device
+            )
+        x, y = x.to(self.device), y.to(self.device)
+        y_pred = self.model(
+            x, type_token=type_token, global_token=global_token, attn_mask=attn_mask
+        )
+        loss = self.loss(y, y_pred)
+        mse = [
+            torch.mean((y_pred[i, :, 0] - y[i, :, 0]) ** 2).cpu().item()
+            for i in range(len(data))
+        ]
         assert torch.isfinite(loss).all()
 
         metrics = {

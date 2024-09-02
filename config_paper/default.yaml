@@ -10,7 +10,11 @@ save: true
 use_mlflow: true
 save_source: true
 ema: false
-gatr_mix_duals: true
+
+ga_representations:
+ mix_duals: true
+ include_axialvector: true
+ include_tensor: true
 
 train: true
 training:

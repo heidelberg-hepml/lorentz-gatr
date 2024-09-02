@@ -9,8 +9,7 @@ from experiments.eventgen.processes import (
 from experiments.toptagging.experiment import QGTaggingExperiment
 from experiments.toptagging.experiment import JetClassTaggingExperiment
 
-
-@hydra.main(config_path="config", config_name="amplitudes", version_base=None)
+@hydra.main(config_path="config", config_name="jctagging", version_base=None)
 def main(cfg):
     if cfg.exp_type == "amplitudes":
         exp = AmplitudeExperiment(cfg)

@@ -13,7 +13,7 @@ data:
   lowest_kt: false
   add_scalars: false
  beam_reference: spacelike
- two_beams: false
+ two_beams: true
  beam_token: true
  add_time_reference: false
  add_pt: false

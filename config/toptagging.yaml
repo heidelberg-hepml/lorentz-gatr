@@ -5,29 +5,24 @@ base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
 data:
  data_dir : /media/jspinner/shared/Studium/project3/data
  dataset: mini
- pairs:
-  use: false
-  add_differences: true
-  directed: true
-  top_k: 50
-  lowest_kt: false
-  add_scalars: false
  beam_reference: spacelike
- two_beams: false
+ two_beams: true
  beam_token: true
  add_time_reference: false
  add_pt: false
- add_jet_momentum: false
- reinsert_channels: true
+ reinsert_channels: false
  rescale_data: true
 
+ema: true
 train: true
 training:
- iterations: 10
+ iterations: 200000
+ optimizer: Lion
  batchsize: 128
- lr: 1e-3
-
- force_xformers: false
+ lr: 3e-4
+ scheduler: CosineAnnealingLR
+ weight_decay: 0.2
+ force_xformers: true
 
 evaluation:
  batchsize: 128
