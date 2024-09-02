@@ -1,7 +1,6 @@
 import numpy as np
 import torch
-#from torch_geometric.loader import DataLoader
-from torch.utils.data import DataLoader
+import torch_geometric
 
 import os, time
 from omegaconf import OmegaConf, open_dict
@@ -29,15 +28,6 @@ class TaggingExperiment(BaseExperiment):
     """
 
     def init_physics(self):
-        if (
-            self.cfg.model._target_
-            == "experiments.toptagging.wrappers.TopTaggingTransformerWrapper"
-        ):
-            assert (
-                not self.cfg.data.pairs.use
-            ), "data.pairs are not implemented for the default Transformer"
-            # assert not self.cfg.model.beam_reference, "model.beam_reference are not implemented for the default Transformer"
-
         if not self.cfg.training.force_xformers:
             LOGGER.warning(
                 f"Using training.force_xformers=False, this will slow down the network by a factor of 5-10."
@@ -45,54 +35,51 @@ class TaggingExperiment(BaseExperiment):
 
         # dynamically extend dict
         with open_dict(self.cfg):
-            if (
-                self.cfg.model._target_
-                == "experiments.toptagging.wrappers.TopTaggingGATrWrapper"
-            ):
-                if self.cfg.exp_type == "toptagging":
-                    # make sure we know where we start from
-                    self.cfg.model.net.in_s_channels = 1
-                    self.cfg.model.net.in_mv_channels = 1
+            gatr_name = ["experiments.toptagging.wrappers.TopTaggingGATrWrapper", "experiments.toptagging.wrappers.TopTaggingPretrainGATrWrapper"]
+            assert self.cfg.model._target_ in gatr_name
 
-                elif self.cfg.exp_type == "qgtagging":
-                    # We add 7 scalar channels, 1 for the global token and 6 for the particle id features
-                    # (charge, electron, muon, photon, charged hadron and neutral hadron)
-                    self.cfg.model.net.in_s_channels = 7
-                    self.cfg.model.net.in_mv_channels = 1
+            # global token?
+            if self.cfg.model._target_ in gatr_name:
+                self.cfg.data.include_global_token = not self.cfg.model.mean_aggregation
+            else:
+                raise ValueError(f"model {self.cfg.model._target_} not implemented")
 
-                # extra s channels for pt
-                self.cfg.model.add_pt = self.cfg.data.add_pt
-                if self.cfg.data.add_pt:
-                    self.cfg.model.net.in_s_channels += 1
+            if self.cfg.exp_type == "toptagging":
+                # make sure we know where we start from
+                self.cfg.model.net.in_s_channels = 0
+                self.cfg.model.net.in_mv_channels = 1
+            elif self.cfg.exp_type == "qgtagging":
+                # We add 7 scalar channels, 1 for the global token and 6 for the particle id features
+                # (charge, electron, muon, photon, charged hadron and neutral hadron)
+                self.cfg.model.net.in_s_channels = 6
+                self.cfg.model.net.in_mv_channels = 1
 
-                # extra mv channels for beam_reference and time_reference
-                if not self.cfg.data.beam_token:
-                    if self.cfg.data.beam_reference is not None:
-                        self.cfg.model.net.in_mv_channels += (
-                            2
-                            if self.cfg.data.two_beams
-                            and not self.cfg.data.beam_reference == "xyplane"
-                            else 1
-                        )
-                    if self.cfg.data.add_time_reference:
-                        self.cfg.model.net.in_mv_channels += 1
+            # extra scalar channels
+            if self.cfg.data.add_pt:
+                self.cfg.model.net.in_s_channels += 1
+            if self.cfg.data.include_global_token:
+                self.cfg.model.net.in_s_channels += 1
 
-                # extra mv and s channels for pairs
-                if self.cfg.data.pairs.use:
-                    self.cfg.model.net.in_mv_channels += 2
-                    if self.cfg.data.pairs.add_differences:
-                        self.cfg.model.net.in_mv_channels += 1
-                    if self.cfg.data.pairs.add_scalars:
-                        self.cfg.model.net.in_s_channels += 2
-
-                # reinsert channels
-                if self.cfg.data.reinsert_channels:
-                    self.cfg.model.net.reinsert_mv_channels = list(
-                        range(self.cfg.model.net.in_mv_channels)
+            # extra mv channels for beam_reference and time_reference
+            if not self.cfg.data.beam_token:
+                if self.cfg.data.beam_reference is not None:
+                    self.cfg.model.net.in_mv_channels += (
+                        2
+                        if self.cfg.data.two_beams
+                        and not self.cfg.data.beam_reference == "xyplane"
+                        else 1
                     )
-                    self.cfg.model.net.reinsert_s_channels = list(
-                        range(self.cfg.model.net.in_s_channels)
-                    )
+                if self.cfg.data.add_time_reference:
+                    self.cfg.model.net.in_mv_channels += 1
+
+            # reinsert channels
+            if self.cfg.data.reinsert_channels:
+                self.cfg.model.net.reinsert_mv_channels = list(
+                    range(self.cfg.model.net.in_mv_channels)
+                )
+                self.cfg.model.net.reinsert_s_channels = list(
+                    range(self.cfg.model.net.in_s_channels)
+                )
 
     def init_data(self):
         raise NotImplementedError
@@ -263,11 +250,11 @@ class TaggingExperiment(BaseExperiment):
             shuffle=False,
         )
 
-        if mode == "eval":
-            LOGGER.info(
-                f"### Starting to evaluate model on {title} dataset with "
-                f"{len(loader.dataset.data_list)} elements, batchsize {loader.batch_size} ###"
-            )
+        #if mode == "eval":
+        #    LOGGER.info(
+        #        f"### Starting to evaluate model on {title} dataset with "
+        #        f"{len(loader.dataset.data_list)} elements, batchsize {loader.batch_size} ###"
+        #    )
         metrics = {}
 
         # predictions
@@ -276,12 +263,22 @@ class TaggingExperiment(BaseExperiment):
         if self.cfg.training.optimizer == "ScheduleFree":
             self.optimizer.eval()
         with torch.no_grad():
-            for batch in loader:
-                batch = batch.to(self.device)
-                y_pred = self.model(batch)
-                y_pred = torch.nn.functional.sigmoid(y_pred)
-                labels_true.append(batch.label.cpu().float())
-                labels_predict.append(y_pred.cpu().float())
+            if self.cfg.exp_type == "jctagging":
+                for batch in loader:
+                    input = batch[0]['pf_vectors'].to(torch.device("cuda"))
+                    label = batch[1]['_label_'].to(torch.device("cuda"))
+                    y_pred = self.model(input).reshape(-1, 10)
+                    y_pred = torch.nn.functional.sigmoid(y_pred)
+                    labels_true.append(label.cpu())
+                    labels_predict.append(y_pred.cpu().float())
+            else:
+                for batch in loader:
+                    batch = batch.to(self.device)
+                    y_pred = self.model(batch)
+                    y_pred = torch.nn.functional.sigmoid(y_pred)
+                    labels_true.append(batch.label.cpu().float())
+                    labels_predict.append(y_pred.cpu().float())
+
         labels_true, labels_predict = torch.cat(labels_true), torch.cat(labels_predict)
         if mode == "eval":
             metrics["labels_true"], metrics["labels_predict"] = (
@@ -289,47 +286,100 @@ class TaggingExperiment(BaseExperiment):
                 labels_predict,
             )
 
-        # bce loss
-        metrics["bce"] = torch.nn.functional.binary_cross_entropy(
-            labels_predict, labels_true
-        ).item()
-        labels_true, labels_predict = labels_true.numpy(), labels_predict.numpy()
 
-        # accuracy
-        metrics["accuracy"] = accuracy_score(labels_true, np.round(labels_predict))
-        if mode == "eval":
-            LOGGER.info(f"Accuracy on {title} dataset: {metrics['accuracy']:.4f}")
+        if self.cfg.exp_type == "jctagging":
+            # bce loss
+            metrics["ce"] = torch.nn.functional.cross_entropy(
+                labels_predict, labels_true
+            ).item()
+            labels_true, labels_predict = labels_true.numpy(), torch.softmax(labels_predict, dim=1).numpy()
 
-        # roc (fpr = epsB, tpr = epsS)
-        fpr, tpr, th = roc_curve(labels_true, labels_predict)
-        if mode == "eval":
-            metrics["fpr"], metrics["tpr"] = fpr, tpr
-        metrics["auc"] = roc_auc_score(labels_true, labels_predict)
-        if mode == "eval":
-            LOGGER.info(f"AUC score on {title} dataset: {metrics['auc']:.4f}")
+            # accuracy
+            labels_predict_score = np.argmax(labels_predict, axis=1)
+            metrics["accuracy"] = accuracy_score(labels_true, np.round(labels_predict_score))
+            if mode == "eval":
+                LOGGER.info(f"Accuracy on {title} dataset: {metrics['accuracy']:.4f}")
 
-        # 1/epsB at fixed epsS
-        def get_rej(epsS):
-            idx = np.argmin(np.abs(tpr - epsS))
-            return 1 / fpr[idx]
+            # roc (fpr = epsB, tpr = epsS)
+            fpr_list, tpr_list, auc_scores = [], [], []
+            for i in range(10):
+                fpr, tpr, _ = roc_curve(labels_true == i, labels_predict[:, i])
+                auc_score = roc_auc_score(labels_true == i, labels_predict[:, i])
+                auc_scores.append(auc_score)
+                fpr_list.append(fpr)
+                tpr_list.append(tpr)
+                metrics["auc_class_{}".format(i)] = auc_score
+                if mode == "eval":
+                    LOGGER.info(f"AUC score for class {i} on {title} dataset: {auc_score:.4f}")
 
-        metrics["rej03"] = get_rej(0.3)
-        metrics["rej05"] = get_rej(0.5)
-        metrics["rej08"] = get_rej(0.8)
-        if mode == "eval":
-            LOGGER.info(
-                f"Rejection rate {title} dataset: {metrics['rej03']:.0f} (epsS=0.3), "
-                f"{metrics['rej05']:.0f} (epsS=0.5), {metrics['rej08']:.0f}"
-            )
+            metrics["auc_total"] = np.mean(auc_scores)
 
-        if self.cfg.use_mlflow:
-            for key, value in metrics.items():
-                if key in ["labels_true", "labels_predict", "fpr", "tpr"]:
-                    # do not log matrices
-                    continue
-                name = f"{mode}.{title}" if mode == "eval" else "val"
-                log_mlflow(f"{name}.{key}", value, step=step)
-        return metrics
+            # 1/epsB at fixed epsS
+            def get_rej(epsS, class_idx):
+                idx = np.argmin(np.abs(tpr_list[class_idx] - epsS))
+                return 1 / fpr_list[class_idx][idx]
+
+            for i in range(10):
+                metrics["rej05_{}".format(i)] = get_rej(0.5, i)
+                metrics["rej099_{}".format(i)] = get_rej(0.99, i)
+                metrics["rej0995_{}".format(i)] = get_rej(0.995, i)
+                if mode == "eval":
+                        LOGGER.info(
+                        f"Rejection rate for class {i} on {title} dataset: {metrics[f'rej05_{i}']:.0f} (epsS=0.5), "
+                        f"{metrics[f'rej099_{i}']:.0f} (epsS=0.99), {metrics[f'rej0995_{i}']:.0f} (epsS=0.995)"
+                        )
+
+            if self.cfg.use_mlflow:
+                for key, value in metrics.items():
+                    if key in ["labels_true", "labels_predict", "fpr", "tpr"]:
+                        # do not log matrices
+                        continue
+                    name = f"{mode}.{title}" if mode == "eval" else "val"
+                    log_mlflow(f"{name}.{key}", value, step=step)
+            return metrics
+
+        else:
+            # bce loss
+            metrics["bce"] = torch.nn.functional.binary_cross_entropy(
+                labels_predict, labels_true
+            ).item()
+            labels_true, labels_predict = labels_true.numpy(), labels_predict.numpy()
+
+            # accuracy
+            metrics["accuracy"] = accuracy_score(labels_true, np.round(labels_predict))
+            if mode == "eval":
+                LOGGER.info(f"Accuracy on {title} dataset: {metrics['accuracy']:.4f}")
+
+            # roc (fpr = epsB, tpr = epsS)
+            fpr, tpr, th = roc_curve(labels_true, labels_predict)
+            if mode == "eval":
+                metrics["fpr"], metrics["tpr"] = fpr, tpr
+            metrics["auc"] = roc_auc_score(labels_true, labels_predict)
+            if mode == "eval":
+                LOGGER.info(f"AUC score on {title} dataset: {metrics['auc']:.4f}")
+
+            # 1/epsB at fixed epsS
+            def get_rej(epsS):
+                idx = np.argmin(np.abs(tpr - epsS))
+                return 1 / fpr[idx]
+
+            metrics["rej03"] = get_rej(0.3)
+            metrics["rej05"] = get_rej(0.5)
+            metrics["rej08"] = get_rej(0.8)
+            if mode == "eval":
+                LOGGER.info(
+                    f"Rejection rate {title} dataset: {metrics['rej03']:.0f} (epsS=0.3), "
+                    f"{metrics['rej05']:.0f} (epsS=0.5), {metrics['rej08']:.0f}"
+                )
+
+            if self.cfg.use_mlflow:
+                for key, value in metrics.items():
+                    if key in ["labels_true", "labels_predict", "fpr", "tpr"]:
+                        # do not log matrices
+                        continue
+                    name = f"{mode}.{title}" if mode == "eval" else "val"
+                    log_mlflow(f"{name}.{key}", value, step=step)
+            return metrics
 
     def plot(self):
         plot_path = os.path.join(self.cfg.run_dir, f"plots_{self.cfg.run_idx}")
@@ -373,17 +423,21 @@ class TaggingExperiment(BaseExperiment):
             metrics = self._evaluate_single(
                 self.val_loader, "val", mode="val", step=step
             )
-        self.val_loss.append(metrics["bce"])
-        return metrics["bce"]
+
+        if self.cfg.exp_type == "jctagging":
+            self.val_loss.append(metrics["ce"])
+            return metrics["ce"]
+        else:
+            self.val_loss.append(metrics["bce"])
+            return metrics["bce"]
 
     def _batch_loss(self, batch):
-        LOGGER.info(f"The batch is {batch}")
         if self.cfg.exp_type == "jctagging":
-            input = batch[0]['pf_vectors']
-            label = batch[1]['_label_']
-            y_pred = self.model(input)
-            loss = self.loss(y_pred, label.to(self.dtype))
-        elif self.cfg.exp_type == "toptagging":
+            input = batch[0]['pf_vectors'].to(torch.device("cuda"))
+            label = batch[1]['_label_'].to(torch.device("cuda"))
+            y_pred = self.model(input).reshape(-1,10)
+            loss = self.loss(y_pred, label)
+        elif self.cfg.exp_type == "toptagging" or self.cfg.exp_type == "qgtagging":
             y_pred = self.model(batch)
             loss = self.loss(y_pred, batch.label.to(self.dtype))
         assert torch.isfinite(loss).all()
