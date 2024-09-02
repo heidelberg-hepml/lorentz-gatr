@@ -30,6 +30,15 @@ cfm:
  coordinates_network: Fourmomenta
  coordinates_sampling: SophisticatedMass
  transforms_float64: true
+ trajs:
+  use_float64: true
+  physics_to_latent: true
+  naive: true
+  approx_mW2: true
+  use_logmW2: true
+  rtol: 1e-5
+  atol: 1e-5
+  max_steps: 500
 
 training:
  iterations: 50

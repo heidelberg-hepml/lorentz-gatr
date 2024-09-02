@@ -215,6 +215,7 @@ class LogPtPhiEtaLogM2(PhiCoordinates):
 class StandardLogPtPhiEtaLogM2(PhiCoordinates):
     # Fitted (log(pt), phi, eta, log(m^2)
     def __init__(self, pt_min, units):
+        self.units = units
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
