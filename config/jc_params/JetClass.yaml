@@ -4,8 +4,8 @@ num_workers: 1
 fetch_step: 0.01
 extra_selection: null
 extra-test-selection: null
-data_fraction: 0.01
-file_fraction: 0.01
+data_fraction: 1.0
+file_fraction: 1.0
 fetch_by_files: False
 in_memory: False
 not_remake_weights: False

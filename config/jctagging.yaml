@@ -5,21 +5,11 @@ base_dir: /remote/gpu02/breso/lorentz-gatr-pretrain/
 data:
  data_dir : /remote/gpu02/breso/lorentz-gatr-pretrain/data
  dataset: mini
- pairs:
-  use: false
-  use_nearest: false
-  add_differences: true
-  directed: true
-  top_k: 50
-  top_deltaR: 16
-  lowest_kt: false
-  add_scalars: true
  beam_reference: null
  two_beams: false
  beam_token: false
  add_time_reference: false
  add_pt: false
- add_jet_momentum: false
  reinsert_channels: true
  rescale_data: true
 
