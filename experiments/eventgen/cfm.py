@@ -165,6 +165,18 @@ class CFM(nn.Module):
         x1_fourmomenta = self.sample_base(
             x0_fourmomenta.shape, x0_fourmomenta.device, x0_fourmomenta.dtype
         )
+        if self.cfm.trajs.bootstrap_factor > 1:
+            factor = self.cfm.trajs.bootstrap_factor
+            assert factor % 2 == 0
+            assert x0_fourmomenta.shape[0] % 2 == 0
+            assert x0_fourmomenta.shape[0] > factor
+            batchsize_eff = x0_fourmomenta.shape[0] // factor
+            crop = lambda x: x[:batchsize_eff, ...]
+            repeat = lambda x: x.repeat(
+                factor, *[1 for _ in range(len(x0_fourmomenta.shape[1:]))]
+            )
+            x0_fourmomenta = repeat(crop(x0_fourmomenta))
+            x1_fourmomenta = repeat(crop(x1_fourmomenta))
 
         # construct target trajectories
         x0_straight = self.coordinates_straight.fourmomenta_to_x(x0_fourmomenta)

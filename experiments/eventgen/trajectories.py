@@ -113,8 +113,20 @@ class SophisticatedMass(c.StandardLogPtPhiEtaLogM2):
 
         xstart, xtarget = (x1, x2) if self.cfm.trajs.physics_to_latent else (x2, x1)
         vel = StraightVelocity() if self.cfm.trajs.naive else MassVelocity()
+        
+        t = squeeze(t)
+        t = torch.ones_like(t)
+        if self.cfm.trajs.bootstrap_factor > 1:
+            factor = self.cfm.trajs.bootstrap_factor
+            batchsize_eff = xstart.shape[0] // factor
+            xstart, xtarget = xstart[:batchsize_eff,...], xtarget[:batchsize_eff, ...]
+            t0 = torch.zeros_like(t[:batchsize_eff, ...])
+            t_eval = t.reshape(batchsize_eff, factor)
+            t_eval = torch.cat((t0, t_eval), dim=-1)
+        else:
+            t_eval = torch.cat((torch.zeros_like(t), t), dim=-1)
 
-        def velocity_fn(t, xt):
+        def velocity_fn(t, xt, xstart=xstart, xtarget=xtarget):
             xt = unsqueeze(xt).detach()
             xt[..., 1] = ensure_angle(xt[..., 1])
             vt = vel.get_velocity(
@@ -129,8 +141,6 @@ class SophisticatedMass(c.StandardLogPtPhiEtaLogM2):
             return squeeze(vt)
 
         max_steps = self.cfm.trajs.max_steps
-        t = squeeze(t)
-        t_eval = torch.cat((torch.zeros_like(t), t), dim=-1)
         kwargs = {"rtol": self.cfm.trajs.rtol, "atol": self.cfm.trajs.atol}
 
         term = to.ODETerm(velocity_fn)
@@ -146,7 +156,15 @@ class SophisticatedMass(c.StandardLogPtPhiEtaLogM2):
 
         sol = torch.compile(solver).solve(problem)
         # print(sol.stats["n_f_evals"][0].item())
-        xt = unsqueeze(sol.ys[:, 0, :])
+        if self.cfm.trajs.bootstrap_factor > 1:
+            factor = self.cfm.trajs.bootstrap_factor
+            xt = sol.ys[:, :-1, :].reshape(x1.shape)
+            vt = unsqueeze(velocity_fn(squeeze(t), squeeze(xt),
+                                       xstart=xstart.repeat(factor, 1, 1),
+                                       xtarget=xtarget.repeat(factor, 1, 1)))
+        else:
+            xt = sol.ys[:, -1, :]
+            xt = unsqueeze(xt)
+            vt = unsqueeze(velocity_fn(squeeze(t), squeeze(xt)))
 
-        vt = unsqueeze(velocity_fn(t, squeeze(xt)))
         return xt.to(torch.float32), vt.to(torch.float32)

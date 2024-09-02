@@ -31,9 +31,10 @@ cfm:
  coordinates_sampling: SophisticatedMass
  transforms_float64: true
  trajs:
+  bootstrap_factor: 1
   use_float64: true
   physics_to_latent: true
-  naive: true
+  naive: false
   approx_mW2: true
   use_logmW2: true
   rtol: 1e-5
