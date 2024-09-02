@@ -14,6 +14,7 @@ from tqdm import trange
 
 import gatr.primitives.attention
 import gatr.layers.linear
+import gatr.layers.mlp.geometric_bilinears
 from experiments.misc import get_device, flatten_dict
 import experiments.logger
 from experiments.logger import LOGGER, MEMORY_HANDLER, FORMATTER
@@ -69,7 +70,7 @@ class BaseExperiment:
 
         # save config
         LOGGER.debug(OmegaConf.to_yaml(self.cfg))
-        self._save_config("config.yaml", to_mlflow=True)
+        self._save_config("config.yaml", to_mlflow=False)
         self._save_config(f"config_{self.cfg.run_idx}.yaml")
 
         self.init_physics()
@@ -102,7 +103,13 @@ class BaseExperiment:
         )
 
     def init_model(self):
-        gatr.layers.linear.MIX_DUALS = True if self.cfg.gatr_mix_duals else False
+        gatr.layers.linear.MIX_DUALS = self.cfg.ga_representations.mix_duals
+        gatr.layers.linear.INCLUDE_AXIALVECTOR = (
+            self.cfg.ga_representations.include_axialvector
+        )
+        gatr.layers.mlp.geometric_bilinears.INCLUDE_TENSOR = (
+            self.cfg.ga_representations.include_tensor
+        )
 
         # initialize model
         self.model = instantiate(self.cfg.model)
@@ -356,21 +363,6 @@ class BaseExperiment:
                 eps=self.cfg.training.eps,
                 weight_decay=self.cfg.training.weight_decay,
             )
-        elif self.cfg.training.optimizer == "RAdam":
-            self.optimizer = torch.optim.RAdam(
-                self.model.parameters(),
-                lr=self.cfg.training.lr,
-                betas=self.cfg.training.betas,
-                eps=self.cfg.training.eps,
-            )
-        elif self.cfg.training.optimizer == "AdamW":
-            self.optimizer = torch.optim.AdamW(
-                self.model.parameters(),
-                lr=self.cfg.training.lr,
-                betas=self.cfg.training.betas,
-                eps=self.cfg.training.eps,
-                weight_decay=self.cfg.training.weight_decay,
-            )
         elif self.cfg.training.optimizer == "Lion":
             self.optimizer = Lion(
                 self.model.parameters(),
@@ -520,13 +512,13 @@ class BaseExperiment:
                 )
 
         dt = time.time() - self.training_start_time
-        LOGGER.info(
-            f"Finished training for {step} iterations = {step / len(self.train_loader):.1f} epochs "
-            f"after {dt/60:.2f}min = {dt/60**2:.2f}h"
-        )
+        #LOGGER.info(
+        #    f"Finished training for {step} iterations = {step / len(self.train_loader):.1f} epochs "
+        #    f"after {dt/60:.2f}min = {dt/60**2:.2f}h"
+        #)
         if self.cfg.use_mlflow:
             log_mlflow("iterations", step)
-            log_mlflow("epochs", step / len(self.train_loader))
+            #log_mlflow("epochs", step / len(self.train_loader))
             log_mlflow("traintime", dt / 3600)
 
         # wrap up early stopping
