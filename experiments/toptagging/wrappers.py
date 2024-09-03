@@ -44,18 +44,19 @@ def attention_mask_pretrain(attention_mask_list, force_xformers=True):
     ----------
     batch: torch_geometric.data.Data
         torch_geometric representation of the data
-    force_xformers: bool
-        Decides whether a xformers or torch.tensor mask should be returned
+    materialize: bool
+        Decides whether a xformers or ('materialized') torch.tensor mask should be returned
         The xformers mask allows to use the optimized xformers attention kernel, but only runs on gpu
 
     Returns
     -------
     mask: xformers.ops.fmha.attn_bias.BlockDiagonalMask or torch.tensor
         attention mask, to be used in xformers.ops.memory_efficient_attention
+        or torch.nn.functional.scaled_dot_product_attention
     """
     bincounts = torch.bincount(attention_mask_list).tolist()
     mask = BlockDiagonalMask.from_seqlens(bincounts)
-    if not force_xformers:
+    if materialize:
         # materialize mask to torch.tensor (only for testing purposes)
         mask = mask.materialize(shape=(len(attention_mask_list), len(attention_mask_list)))
     return mask
@@ -63,8 +64,7 @@ def attention_mask_pretrain(attention_mask_list, force_xformers=True):
 
 class TopTaggingPretrainGATrWrapper(nn.Module):
     """
-    GATr for toptagging
-    including all kinds of options to play with
+    L-GATr for toptagging
     """
 
     def __init__(

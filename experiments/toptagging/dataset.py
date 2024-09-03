@@ -324,10 +324,6 @@ class QGTaggingDataset(torch.utils.data.Dataset):
             )
             scalars_is_global[0, :] = 1.0
             scalars = torch.cat([scalars_is_global, scalars], dim=-1)
-
-        LOGGER.info(f"The scalars are {scalars}")
-        LOGGER.info(f"The scalars are {scalars.shape}")
-
         return Data(x=x, scalars=scalars, label=batch.label, is_global=is_global)
 
 

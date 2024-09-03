@@ -14,12 +14,11 @@ from experiments.toptagging.plots import plot_mixer
 from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
 
-import matplotlib.pyplot as plt
-
-from data.utils.dataset import SimpleIterDataset
-from data.utils.loader import to_filelist
-
-MODEL_TITLE_DICT = {"GATr": "GATr", "Transformer": "Tr", "MLP": "MLP"}
+MODEL_TITLE_DICT = {
+    "GATr": "GATr",
+    "Transformer": "Tr",
+    "MLP": "MLP",
+}
 
 
 class TaggingExperiment(BaseExperiment):
