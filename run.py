@@ -7,7 +7,7 @@ from experiments.eventgen.processes import (
     z5gExperiment,
 )
 from experiments.toptagging.experiment import QGTaggingExperiment
-from experiments.toptagging.experiment import JetClassTaggingExperiment
+from experiments.toptagging.jetclassexperiment import JetClassTaggingExperiment
 
 @hydra.main(config_path="config", config_name="jctagging", version_base=None)
 def main(cfg):
