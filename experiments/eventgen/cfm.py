@@ -135,6 +135,10 @@ class CFM(nn.Module):
         )
         return vp_sampling, xt_sampling
 
+    def handle_velocity(self, v):
+        # default: do nothing
+        return v
+
     def batch_loss(self, x0_fourmomenta, ijet):
         """
         Construct the conditional flow matching objective
@@ -229,6 +233,7 @@ class CFM(nn.Module):
             vt_sampling, xt_sampling = self.get_velocity_sampling(
                 xt_network, t, ijet=ijet
             )
+            vt_sampling = self.handle_velocity(vt_sampling)
 
             # collect trajectories
             if save_trajectory:
@@ -344,6 +349,7 @@ class CFM(nn.Module):
                     xt_sampling, self.coordinates_sampling, self.coordinates_network
                 )
                 vt_sampling = self.get_velocity_sampling(xt_network, t, ijet=ijet)[0]
+                vt_sampling = self.handle_velocity(vt_sampling)
                 dlogp_dt_sampling = (
                     -self.trace_fn(vt_sampling, xt_sampling).unsqueeze(-1).detach()
                 )
@@ -505,7 +511,7 @@ class EventCFM(CFM):
         elif coordinates_label == "PPPLogM2":
             coordinates = c.PPPLogM2()
         elif coordinates_label == "StandardPPPLogM2":
-            coordinates = c.StandardPPPLogM2()
+            coordinates = c.StandardPPPLogM2(self.onshell_list)
         elif coordinates_label == "EPhiPtPz":
             coordinates = c.EPhiPtPz()
         elif coordinates_label == "PtPhiEtaE":
@@ -521,7 +527,9 @@ class EventCFM(CFM):
         elif coordinates_label == "LogPtPhiEtaLogM2":
             coordinates = c.LogPtPhiEtaLogM2(self.pt_min, self.units)
         elif coordinates_label == "StandardLogPtPhiEtaLogM2":
-            coordinates = c.StandardLogPtPhiEtaLogM2(self.pt_min, self.units)
+            coordinates = c.StandardLogPtPhiEtaLogM2(
+                self.pt_min, self.units, self.onshell_list
+            )
         else:
             raise ValueError(f"coordinates={coordinates_label} not implemented")
         return coordinates
@@ -536,14 +544,19 @@ class EventCFM(CFM):
 
     def sample(self, *args, **kwargs):
         fourmomenta = super().sample(*args, **kwargs)
-
-        # enforce onshell-ness
-        mass = (
-            torch.tensor(self.onshell_mass)
-            .unsqueeze(0)
-            .to(fourmomenta.device, dtype=fourmomenta.dtype)
-        ) / self.units
-        fourmomenta[..., self.onshell_list, 0] = torch.sqrt(
-            mass**2 + torch.sum(fourmomenta[..., self.onshell_list, 1:] ** 2, dim=-1)
-        )
         return fourmomenta
+
+    def handle_velocity(self, v):
+        if self.cfm.coordinates_straight in [
+            "PPPM2",
+            "PPPLogM2",
+            "StandardPPPLogM2",
+            "PtPhiEtaM2",
+            "LogPtPhiEtaM2",
+            "PtPhiEtaLogM2",
+            "LogPtPhiEtaLogM2",
+            "StandardLogPtPhiEtaLogM2",
+        ]:
+            # manually set mass velocity of onshell events to zero
+            v[..., self.onshell_list, 3] = 0.0
+        return v

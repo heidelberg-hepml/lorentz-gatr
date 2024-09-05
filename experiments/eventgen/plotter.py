@@ -26,7 +26,7 @@ def plot_losses(exp, filename, model_label):
             [exp.train_loss, exp.val_loss],
             exp.train_lr,
             labels=["train loss", "val loss"],
-            logy=True,
+            logy=True if exp.modeltype == "CFM" else False,
         )
 
         for ijet, n_jets in enumerate(exp.cfg.data.n_jets):
@@ -38,7 +38,7 @@ def plot_losses(exp, filename, model_label):
                 ],
                 lr=exp.train_lr,
                 labels=[f"train mse {n_jets}j", f"val mse {n_jets}j"],
-                logy=True,
+                logy=True if exp.modeltype == "CFM" else False,
             )
             for k in range(4):
                 plot_loss(
@@ -49,7 +49,7 @@ def plot_losses(exp, filename, model_label):
                     ],
                     lr=exp.train_lr,
                     labels=[f"train mse_{k} {n_jets}j", f"val mse_{k} {n_jets}j"],
-                    logy=True,
+                    logy=True if exp.modeltype == "CFM" else False,
                 )
 
 

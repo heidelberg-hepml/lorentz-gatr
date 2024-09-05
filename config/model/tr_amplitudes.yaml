@@ -9,5 +9,6 @@ net:
 
   num_blocks: 4
   num_heads: 4
+  dropout_prob: null
 
   pos_encoding: false
