@@ -68,6 +68,10 @@ def test_invertibility(coordinates, distribution, experiment_np, nevents):
         c.StandardGaussian,
     ]:
         coord = coordinates(exp.pt_min, exp.units)
+    elif coordinates == c.StandardPPPLogM2:
+        coord = coordinates(exp.onshell_list)
+    elif coordinates in [c.StandardLogPtPhiEtaLogM2, c.StandardGaussian]:
+        coord = coordinates(exp.pt_min, exp.units, exp.onshell_list)
     else:
         coord = coordinates()
 

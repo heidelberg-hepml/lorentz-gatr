@@ -87,7 +87,7 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
         if tra == tr.Pt_to_LogPt:
             ts.append(tra(exp.pt_min, exp.units))
         elif tra == tr.StandardNormal:
-            local = tra([0, 1, 2, 3])
+            local = tra([], onshell_list=exp.onshell_list)
             local.init_unit([nparticles])
             ts.append(local)
         else:
@@ -181,7 +181,7 @@ def test_jacobians(transforms, distribution, experiment_np, nevents):
         if tra == tr.Pt_to_LogPt:
             ts.append(tra(exp.pt_min, exp.units))
         elif tra == tr.StandardNormal:
-            local = tra([0, 1, 2, 3])
+            local = tra([], onshell_list=exp.onshell_list)
             local.init_unit([nparticles])
             ts.append(local)
         else:
@@ -310,7 +310,7 @@ def test_logdetjac(transforms, distribution, experiment_np, nevents):
         if tra == tr.Pt_to_LogPt:
             ts.append(tra(exp.pt_min, exp.units))
         elif tra == tr.StandardNormal:
-            local = tra([0, 1, 2, 3])
+            local = tra([], onshell_list=exp.onshell_list)
             local.init_unit([nparticles])
             ts.append(local)
         else:

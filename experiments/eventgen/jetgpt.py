@@ -164,7 +164,7 @@ class EventGPT(GPT):
         self.distributions = []
 
     def init_coordinates(self):
-        self.coordinates_sampling = StandardGaussian(self.pt_min, self.units)
+        self.coordinates_sampling = StandardGaussian(self.pt_min, self.units, self.onshell_list)
         self.coordinates = [self.coordinates_sampling]
 
     def preprocess(self, fourmomenta):
