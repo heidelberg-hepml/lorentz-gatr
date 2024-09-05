@@ -113,13 +113,13 @@ class SophisticatedMass(c.StandardLogPtPhiEtaLogM2):
 
         xstart, xtarget = (x1, x2) if self.cfm.trajs.physics_to_latent else (x2, x1)
         vel = StraightVelocity() if self.cfm.trajs.naive else MassVelocity()
-        
+
         t = squeeze(t)
         t = torch.ones_like(t)
         if self.cfm.trajs.bootstrap_factor > 1:
             factor = self.cfm.trajs.bootstrap_factor
             batchsize_eff = xstart.shape[0] // factor
-            xstart, xtarget = xstart[:batchsize_eff,...], xtarget[:batchsize_eff, ...]
+            xstart, xtarget = xstart[:batchsize_eff, ...], xtarget[:batchsize_eff, ...]
             t0 = torch.zeros_like(t[:batchsize_eff, ...])
             t_eval = t.reshape(batchsize_eff, factor)
             t_eval = torch.cat((t0, t_eval), dim=-1)
@@ -159,9 +159,14 @@ class SophisticatedMass(c.StandardLogPtPhiEtaLogM2):
         if self.cfm.trajs.bootstrap_factor > 1:
             factor = self.cfm.trajs.bootstrap_factor
             xt = sol.ys[:, :-1, :].reshape(x1.shape)
-            vt = unsqueeze(velocity_fn(squeeze(t), squeeze(xt),
-                                       xstart=xstart.repeat(factor, 1, 1),
-                                       xtarget=xtarget.repeat(factor, 1, 1)))
+            vt = unsqueeze(
+                velocity_fn(
+                    squeeze(t),
+                    squeeze(xt),
+                    xstart=xstart.repeat(factor, 1, 1),
+                    xtarget=xtarget.repeat(factor, 1, 1),
+                )
+            )
         else:
             xt = sol.ys[:, -1, :]
             xt = unsqueeze(xt)

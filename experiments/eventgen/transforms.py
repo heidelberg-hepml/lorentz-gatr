@@ -1,5 +1,7 @@
 import torch
 from torch import nn
+import math
+
 from experiments.eventgen.helpers import (
     unpack_last,
     EPS1,
@@ -426,14 +428,55 @@ class Pt_to_LogPt(BaseTransform):
         return 1 / (dpt + EPS1 + EPS2)
 
 
+class NonPeriodicPhi(BaseTransform):
+    # only used for jetgpt
+    def _forward(self, logptphietalogm2):
+        logpt, phi, eta, logm2 = unpack_last(logptphietalogm2)
+        x = stable_arctanh(phi / math.pi)
+        return torch.stack((logpt, x, eta, logm2), dim=-1)
+
+    def _inverse(self, logptxetalogm2):
+        logpt, x, eta, logm2 = unpack_last(logptxetalogm2)
+        phi = math.pi * torch.tanh(x)
+        return torch.stack((logpt, phi, eta, logm2), dim=-1)
+
+    def _jac_forward(self, logptphietalogm2, logptxetalogm2):
+        logpt, phi, eta, logm2 = unpack_last(logptphietalogm2)
+        factor = math.pi / (math.pi**2 - phi**2).clamp(min=EPS2)
+
+        zero, one = torch.zeros_like(logpt), torch.ones_like(logpt)
+        jac_logpt = torch.stack((one, zero, zero, zero), dim=-1)
+        jac_phi = torch.stack((zero, factor, zero, zero), dim=-1)
+        jac_eta = torch.stack((zero, zero, one, zero), dim=-1)
+        jac_logm2 = torch.stack((zero, zero, zero, one), dim=-1)
+        return torch.stack((jac_logpt, jac_phi, jac_eta, jac_logm2), dim=-1)
+
+    def _jac_inverse(self, logptxetalogm2, logptphietalogm2):
+        logpt, x, eta, logm2 = unpack_last(logptxetalogm2)
+        factor = math.pi / torch.cosh(x) ** 2
+
+        zero, one = torch.zeros_like(logpt), torch.ones_like(logpt)
+        jac_logpt = torch.stack((one, zero, zero, zero), dim=-1)
+        jac_x = torch.stack((zero, factor, zero, zero), dim=-1)
+        jac_eta = torch.stack((zero, zero, one, zero), dim=-1)
+        jac_logm2 = torch.stack((zero, zero, zero, one), dim=-1)
+        return torch.stack((jac_logpt, jac_x, jac_eta, jac_logm2), dim=-1)
+
+    def _detjac_forward(self, logptphietalogm2, logptxetalogm2):
+        logpt, phi, eta, logm2 = unpack_last(logptphietalogm2)
+        factor = math.pi / (math.pi**2 - phi**2).clamp(min=EPS2)
+        return factor
+
+
 class StandardNormal(BaseTransform):
     # standardize to unit normal distribution
     # particle- and process-wise mean and std are determined by initial_fit
     # note: this transform will always come last in the self.transforms list of a coordinates class
-    def __init__(self, dims_fixed):
+    def __init__(self, dims_fixed=[], onshell_list=None):
         self.dims_fixed = dims_fixed
+        self.onshell_list = onshell_list
 
-    def init_fit(self, xs, eps=1e-3):
+    def init_fit(self, xs):
         n_particles = [x.shape[-2] for x in xs]
         assert len(n_particles) == len(
             set(n_particles)
@@ -443,9 +486,8 @@ class StandardNormal(BaseTransform):
             assert len(xs[i].shape) == 3
             self.params[n_p]["mean"] = xs[i].mean(dim=0)
             std = xs[i].std(dim=0)
-            std[
-                std < eps
-            ] = 1.0  # in case we have std=0 in some components (happens for hard-coded masses)
+            if self.onshell_list is not None:
+                std[self.onshell_list, 3] = 1.0
             assert torch.isfinite(std).all()
             self.params[n_p]["std"] = std
 

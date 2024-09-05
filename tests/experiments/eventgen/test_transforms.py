@@ -51,6 +51,7 @@ def test_simple():
             tr.Pt_to_LogPt,
             tr.StandardNormal,
         ],
+        [tr.EPPP_to_EPhiPtPz, tr.NonPeriodicPhi],
     ],
 )
 @pytest.mark.parametrize(
@@ -144,6 +145,7 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
             tr.Pt_to_LogPt,
             tr.StandardNormal,
         ],
+        [tr.EPPP_to_EPhiPtPz, tr.NonPeriodicPhi],
     ],
 )
 @pytest.mark.parametrize(
@@ -272,6 +274,7 @@ def test_jacobians(transforms, distribution, experiment_np, nevents):
             tr.Pt_to_LogPt,
             tr.StandardNormal,
         ],
+        [tr.EPPP_to_EPhiPtPz, tr.NonPeriodicPhi],
     ],
 )
 @pytest.mark.parametrize(
