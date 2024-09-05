@@ -3,30 +3,38 @@ from typing import Tuple
 import torch
 from torch import nn
 
-from gatr.primitives.nonlinearities import gated_gelu, gated_relu, gated_sigmoid
+from gatr.primitives.nonlinearities import (
+    gated_gelu,
+    gated_relu,
+    gated_sigmoid,
+    gated_silu,
+)
 
 
 class ScalarGatedNonlinearity(nn.Module):
     """Gated nonlinearity, where the gate is simply given by the scalar component of the input.
 
-    Given multivector input x, computes f(x_0) * x, where f can either be ReLU, sigmoid, or GeLU.
+    Given multivector input x, computes f(x_0) * x, where f can either be ReLU, sigmoid, SiLU, or GeLU.
 
-    Auxiliary scalar inputs are simply processed with ReLU, sigmoid, or GeLU, without gating.
+    Auxiliary scalar inputs are simply processed with ReLU, sigmoid, SiLU, or GeLU, without gating.
 
     Parameters
     ----------
-    nonlinearity : {"relu", "sigmoid", "gelu"}
+    nonlinearity : {"relu", "sigmoid", "gelu", "silu"}
         Non-linearity type
     """
 
     def __init__(self, nonlinearity: str = "relu", **kwargs) -> None:
         super().__init__()
 
-        gated_fn_dict = dict(relu=gated_relu, gelu=gated_gelu, sigmoid=gated_sigmoid)
+        gated_fn_dict = dict(
+            relu=gated_relu, gelu=gated_gelu, sigmoid=gated_sigmoid, silu=gated_silu
+        )
         scalar_fn_dict = dict(
             relu=nn.functional.relu,
             gelu=nn.functional.gelu,
             sigmoid=nn.functional.sigmoid,
+            silu=nn.functional.silu,
         )
         try:
             self.gated_nonlinearity = gated_fn_dict[nonlinearity]
@@ -39,7 +47,7 @@ class ScalarGatedNonlinearity(nn.Module):
     def forward(
         self, multivectors: torch.Tensor, scalars: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Computes f(x_0) * x for multivector x, where f is GELU, ReLU, or sigmoid.
+        """Computes f(x_0) * x for multivector x, where f is GELU, ReLU, SiLU, or sigmoid.
 
         f is chosen depending on self.nonlinearity.
 

@@ -15,7 +15,7 @@ class MLPConfig:
     s_channels : None or iterable of int
         If not None, sets the number of scalar channels at each layer, from input to output. Length
         needs to match mv_channels
-    activation : {"relu", "sigmoid", "gelu"}
+    activation : {"relu", "sigmoid", "gelu", "silu"}
         Which (gated) activation function to use
     dropout_prob : float or None
         Dropout probability

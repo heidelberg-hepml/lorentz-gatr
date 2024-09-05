@@ -107,3 +107,31 @@ def gated_gelu_divide(x: torch.Tensor, gates: torch.Tensor) -> torch.Tensor:
     weights = torch.sigmoid(_GATED_GELU_DIV_FACTOR * (gates + 0.044715 * gates**3))
     outputs = weights * x
     return outputs
+
+
+def gated_silu(x: torch.Tensor, gates: torch.Tensor) -> torch.Tensor:
+    """Pin-equivariant gated SiLU nonlinearity without division.
+
+    Given multivector input x and scalar input gates (with matching batch dimensions), computes
+    SiLU(gates) * x.
+
+    References
+    ----------
+    Dan Hendrycks, Kevin Gimpel, "Gaussian Error Linear Units (GELUs)", arXiv:1606.08415
+
+    Parameters
+    ----------
+    x : torch.Tensor with shape (..., 16)
+        Multivector input
+    gates : torch.Tensor with shape (..., 1)
+        Pin-invariant gates.
+
+    Returns
+    -------
+    outputs : torch.Tensor with shape (..., 16)
+        Computes GeLU(gates) * x, with broadcasting along the last dimension.
+    """
+
+    weights = torch.nn.functional.silu(gates)
+    outputs = weights * x
+    return outputs

@@ -14,5 +14,11 @@ from .linear import (
     grade_project,
     reverse,
 )
-from .nonlinearities import gated_gelu, gated_gelu_divide, gated_relu, gated_sigmoid
+from .nonlinearities import (
+    gated_gelu,
+    gated_gelu_divide,
+    gated_relu,
+    gated_sigmoid,
+    gated_silu,
+)
 from .normalization import equi_layer_norm
