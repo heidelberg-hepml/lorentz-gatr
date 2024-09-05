@@ -103,8 +103,6 @@ class EventGenerationExperiment(BaseExperiment):
                 )
                 data_raw = data_raw[: self.cfg.data.subsample, :]
             data_raw = data_raw.reshape(data_raw.shape[0], data_raw.shape[1] // 4, 4)
-            if self.cfg.exp_type == "zmumu":
-                data_raw = data_raw[:, 2:, :]
             data_raw = torch.tensor(data_raw, dtype=self.dtype)
 
             # collect everything
@@ -116,7 +114,7 @@ class EventGenerationExperiment(BaseExperiment):
             self.pt_min,
             self.delta_r_min,
             self.onshell_list,
-            self.onshell_mass_placeholder,
+            self.onshell_mass,
             self.cfg.data.base_type,
             self.cfg.data.use_pt_min,
             self.cfg.data.use_delta_r_min,
@@ -129,7 +127,7 @@ class EventGenerationExperiment(BaseExperiment):
             self.events_raw[ijet] = ensure_onshell(
                 self.events_raw[ijet],
                 self.onshell_list,
-                self.onshell_mass_placeholder,
+                self.onshell_mass,
             )
             data_prepd = self.model.preprocess(self.events_raw[ijet])
             self.events_prepd.append(data_prepd)
@@ -410,7 +408,7 @@ class EventGenerationExperiment(BaseExperiment):
             "model_label": self.modelname,
         }
 
-        # set correct masses (not placeholder!)
+        # set correct masses
         for label in ["trn", "tst", "gen"]:
             for ijet in range(len(self.cfg.data.n_jets)):
                 self.data_raw[ijet][label] = ensure_onshell(

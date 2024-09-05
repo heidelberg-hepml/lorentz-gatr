@@ -7,7 +7,7 @@ class ttbarExperiment(EventGenerationExperiment):
     """
     Process: p p > t t~ at reco-level with hadronic top decays and 0-4 extra jets
     Main experiment, used for the paper
-    Dataset will be published at the ITP website
+    Dataset published, see README
     """
 
     def define_process_specifics(self):
@@ -16,7 +16,6 @@ class ttbarExperiment(EventGenerationExperiment):
         self.n_jets_max = 4
         self.onshell_list = []
         self.onshell_mass = []
-        self.onshell_mass_placeholder = []
         self.units = 206.6
         self.pt_min = [22.0] * 10
         self.delta_r_min = 0.5
@@ -87,15 +86,14 @@ class zmumuExperiment(EventGenerationExperiment):
 
     def define_process_specifics(self):
         self.plot_title = r"Z"
-        self.n_hard_particles = 0
+        self.n_hard_particles = 2
         self.n_jets_max = 3
-        self.onshell_list = []
-        self.onshell_mass = []
+        self.onshell_list = [0, 1]
+        self.onshell_mass = [0.1, 0.1]
         self.units = 258.1108
-        self.onshell_mass_placeholder = [5.0 for _ in self.onshell_mass]
         self.delta_r_min = 0.40
-        self.pt_min = [20.0, 20.0, 20.0]
-        self.obs_names_index = []
+        self.pt_min = [0.0, 0.0, 20.0, 20.0, 20.0]
+        self.obs_names_index = ["l1", "l2"]
         for ijet in range(self.n_jets_max):
             self.obs_names_index.append(f"j{ijet+1}")
         self.fourmomentum_ranges = [[0, 200], [-150, 150], [-150, 150], [-150, 150]]
@@ -119,8 +117,6 @@ class z5gExperiment(EventGenerationExperiment):
         self.onshell_list = [0, 1, 2, 3, 4, 5]
         self.onshell_mass = [91.188, 0.1, 0.1, 0.1, 0.1, 0.1]
         self.units = 275.69
-        self.onshell_mass_placeholder = [self.onshell_mass[0]]
-        self.onshell_mass_placeholder.extend([5.0 for _ in self.onshell_mass[1:]])
         self.delta_r_min = 0.4
         self.pt_min = [0.0, 20.0, 20.0, 20.0, 20.0, 20.0]
         self.obs_names_index = ["Z"]

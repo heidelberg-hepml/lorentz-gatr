@@ -121,7 +121,9 @@ def scaled_dot_product_attention(
         of shape [batch, head, item, d]
     """
     if FORCE_XFORMERS or isinstance(attn_mask, AttentionBias):
-        assert not is_causal, "is_causal=True not implemented yet for xformers attention"
+        assert (
+            not is_causal
+        ), "is_causal=True not implemented yet for xformers attention"
         if key.shape[1] != query.shape[1]:  # required to make multi_query work
             key = key.expand(key.shape[0], query.shape[1], *key.shape[2:])
             value = value.expand(value.shape[0], query.shape[1], *value.shape[2:])
