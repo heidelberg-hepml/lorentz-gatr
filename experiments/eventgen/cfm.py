@@ -528,7 +528,8 @@ class EventCFM(CFM):
             coordinates = c.LogPtPhiEtaLogM2(self.pt_min, self.units)
         elif coordinates_label == "StandardLogPtPhiEtaLogM2":
             coordinates = c.StandardLogPtPhiEtaLogM2(
-                self.pt_min, self.units, self.onshell_list
+                self.pt_min,
+                self.units,
             )
         else:
             raise ValueError(f"coordinates={coordinates_label} not implemented")
