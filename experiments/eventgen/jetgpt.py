@@ -39,6 +39,11 @@ class CustomMixtureModel:
 
     def log_prob(self, x, logits):
         assert x.shape == logits.shape[:-1] and logits.shape[-1] % 3 == 0
+        self.is_angle = (
+            self.is_angle
+            if x.device == self.is_angle.device
+            else self.is_angle.to(x.device)
+        )
         is_angle = self.is_angle[None, : x.shape[-1]].expand(x.shape)
         gmm, vmmm = self.build_mm(logits)
         log_prob = torch.where(is_angle, vmmm.log_prob(x), gmm.log_prob(x))
