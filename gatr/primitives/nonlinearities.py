@@ -110,7 +110,7 @@ def gated_gelu_divide(x: torch.Tensor, gates: torch.Tensor) -> torch.Tensor:
 
 
 def gated_silu(x: torch.Tensor, gates: torch.Tensor) -> torch.Tensor:
-    """Pin-equivariant gated SiLU nonlinearity without division.
+    """Pin-equivariant gated SiLU nonlinearity.
 
     Given multivector input x and scalar input gates (with matching batch dimensions), computes
     SiLU(gates) * x.

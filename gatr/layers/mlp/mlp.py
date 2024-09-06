@@ -9,7 +9,7 @@ from gatr.layers.dropout import GradeDropout
 from gatr.layers.linear import EquiLinear
 from gatr.layers.mlp.config import MLPConfig
 from gatr.layers.mlp.geometric_bilinears import GeometricBilinear
-from gatr.layers.mlp.nonlinearities import ScalarGatedNonlinearity
+from gatr.layers.mlp.nonlinearities import ScalarGatedNonlinearity, ScalarGLU
 
 
 class GeoMLP(nn.Module):
@@ -44,6 +44,12 @@ class GeoMLP(nn.Module):
             else config.s_channels
         )
 
+        nonlinearity = lambda channels_mv, channels_s: (
+            ScalarGLU(channels_mv, channels_s, config.activation)
+            if config.glu
+            else ScalarGatedNonlinearity(config.activation)
+        )
+
         layers: List[nn.Module] = []
 
         if len(config.mv_channels) >= 2:
@@ -64,7 +70,7 @@ class GeoMLP(nn.Module):
                 s_channels[1:-1],
                 s_channels[2:],
             ):
-                layers.append(ScalarGatedNonlinearity(config.activation))
+                layers.append(nonlinearity(in_, in_s))
                 layers.append(
                     EquiLinear(in_, out, in_s_channels=in_s, out_s_channels=out_s)
                 )

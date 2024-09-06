@@ -24,6 +24,7 @@ class MLPConfig:
     mv_channels: Optional[List[int]] = None
     s_channels: Optional[List[int]] = None
     activation: str = "gelu"
+    glu: bool = False
     dropout_prob: Optional[float] = None
 
     def __post_init__(self):
