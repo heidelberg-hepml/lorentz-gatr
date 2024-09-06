@@ -4,13 +4,16 @@ import torch.distributions as D
 import torch.nn.functional as F
 
 import experiments.eventgen.coordinates as c
-from experiments.eventgen.coordinates import StandardGaussian
+from experiments.eventgen.coordinates import StandardLogPtPhiEtaLogM2
 from experiments.eventgen.wrappers import get_type_token, get_process_token
 
 
-class GaussianMixtureModel:
-    def __init__(self, n_gauss):
+class CustomMixtureModel:
+    # Mixture model with vonMises distribution for angular variables and Normal distribution for others
+    # Note that we could also preprocess angles to real space, but then the model would not be periodic
+    def __init__(self, n_gauss, channels):
         self.n_gauss = n_gauss
+        self.is_angle = torch.tensor(channels) % 4 == 1
 
     def _extract_logits(self, logits, min_sigmaarg=-20, max_sigmaarg=10):
         logits = logits.reshape(logits.size(0), logits.size(1), self.n_gauss, 3)
@@ -25,20 +28,27 @@ class GaussianMixtureModel:
 
         return mu, sigma, weights
 
-    def build_gmm(self, logits):
+    def build_mm(self, logits):
         mu, sigma, weights = self._extract_logits(logits)
         mix = D.Categorical(weights)
-        comp = D.Normal(mu, sigma)
-        gmm = D.MixtureSameFamily(mix, comp)
-        return gmm
+        normal = D.Normal(mu, sigma)
+        gmm = D.MixtureSameFamily(mix, normal)
+        vonmises = D.VonMises(mu, sigma)
+        vmmm = D.MixtureSameFamily(mix, vonmises)
+        return gmm, vmmm
 
     def log_prob(self, x, logits):
-        gmm = self.build_gmm(logits)
-        return gmm.log_prob(x)
+        assert x.shape == logits.shape[:-1] and logits.shape[-1] % 3 == 0
+        is_angle = self.is_angle[None, : x.shape[-1]].expand(x.shape)
+        gmm, vmmm = self.build_mm(logits)
+        log_prob = torch.where(is_angle, vmmm.log_prob(x), gmm.log_prob(x))
+        return log_prob
 
-    def sample(self, logits):
-        gmm = self.build_gmm(logits)
-        return gmm.sample((1,))[:, :, 0].permute(1, 0)
+    def sample(self, logits, is_angle):
+        gmm, vmmm = self.build_mm(logits)
+        mm = vmmm if is_angle else gmm
+        x = mm.sample((1,))[:, :, 0].permute(1, 0)
+        return x
 
 
 class GPT(nn.Module):
@@ -48,7 +58,7 @@ class GPT(nn.Module):
         gpt,
     ):
         super().__init__()
-        self.gmm = GaussianMixtureModel(n_gauss)
+        self.mixturemodel = CustomMixtureModel(n_gauss, gpt.channels)
         self.channels = torch.tensor(gpt.channels, dtype=torch.long)
 
         if gpt.transforms_float64:
@@ -94,7 +104,8 @@ class GPT(nn.Module):
         for i in range(shape[-1]):
             idx_condition = idx[: i + 1]
             condition = self.get_condition(x0_condition, idx_condition, ijet)
-            x0_next = self.gmm.sample(condition[:, [-1], :])
+            is_angle = self.channels[i] % 4 == 1
+            x0_next = self.mixturemodel.sample(condition[:, [-1], :], is_angle=is_angle)
             x0_condition = torch.cat((x0_condition, x0_next), dim=-1)
 
         x0_gaussian = x0_condition[:, 1:]
@@ -118,7 +129,7 @@ class GPT(nn.Module):
             (torch.zeros_like(x0_gaussian[:, [0]]), x0_gaussian[..., :-1]), dim=-1
         )
         condition = self.get_condition(x0_condition, idx, ijet)
-        log_prob_gaussian = self.gmm.log_prob(x0_gaussian, condition)
+        log_prob_gaussian = self.mixturemodel.log_prob(x0_gaussian, condition)
         log_prob_gaussian = log_prob_gaussian[:, reverse_idx]
         x0_gaussian = x0_gaussian[:, reverse_idx]
         x0_gaussian = x0_gaussian.reshape(
@@ -164,7 +175,9 @@ class EventGPT(GPT):
         self.distributions = []
 
     def init_coordinates(self):
-        self.coordinates_sampling = StandardGaussian(self.pt_min, self.units, self.onshell_list)
+        self.coordinates_sampling = StandardLogPtPhiEtaLogM2(
+            self.pt_min, self.units, self.onshell_list
+        )
         self.coordinates = [self.coordinates_sampling]
 
     def preprocess(self, fourmomenta):
