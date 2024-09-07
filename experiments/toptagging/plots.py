@@ -2,11 +2,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 
-# turn off warnings from 1/0 when plotting roc curves
-import warnings
-
-warnings.simplefilter("ignore", RuntimeWarning)
-
 from experiments.base_plots import plot_loss, plot_metric
 
 plt.rcParams["font.family"] = "serif"
