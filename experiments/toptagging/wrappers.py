@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch import nn
+from torch_geometric.nn.aggr import MeanAggregation
 
 from gatr.interface import extract_scalar
 from xformers.ops.fmha import BlockDiagonalMask
@@ -48,7 +49,7 @@ class TopTaggingGATrWrapper(nn.Module):
     ):
         super().__init__()
         self.net = net
-        self.mean_aggregation = mean_aggregation
+        self.aggregation = MeanAggregation() if mean_aggregation else None
         self.force_xformers = force_xformers
 
     def forward(self, batch):
@@ -68,13 +69,9 @@ class TopTaggingGATrWrapper(nn.Module):
         return multivector, scalars
 
     def extract_from_ga(self, batch, multivector, scalars):
-        outputs = extract_scalar(multivector)
-        if self.mean_aggregation:
-            outputs = outputs[0, :, 0, 0]
-            batchsize = max(batch.batch) + 1
-            logits = torch.zeros(batchsize, device=outputs.device, dtype=outputs.dtype)
-            logits.index_add_(0, batch.batch, outputs)  # sum
-            logits = logits / torch.bincount(batch.batch)  # mean
+        outputs = extract_scalar(multivector)[0, :, :, 0]
+        if self.aggregation is not None:
+            logits = self.aggregation(outputs, index=batch.batch)[:, 0]
         else:
-            logits = outputs[0, :, :, 0][batch.is_global]
+            logits = outputs[batch.is_global]
         return logits
