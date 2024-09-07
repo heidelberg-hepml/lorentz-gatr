@@ -15,13 +15,13 @@ class CustomMixtureModel:
         self.n_gauss = n_gauss
         self.is_angle = torch.tensor(channels) % 4 == 1
 
-    def _extract_logits(self, logits, min_sigmaarg=-20, max_sigmaarg=10):
+    def _extract_logits(self, logits, min_sigmaarg=-10, max_sigmaarg=5):
         logits = logits.reshape(logits.size(0), logits.size(1), self.n_gauss, 3)
 
         weights = F.softmax(logits[:, :, :, 2], dim=-1)
         mu = logits[:, :, :, 0]
 
-        # avoid inf and 0 (both unstable in D.Normal)
+        # avoid inf and 0 (unstable in D.Normal and D.VonMises)
         sigmaarg = torch.clamp(logits[:, :, :, 1], min=min_sigmaarg, max=max_sigmaarg)
         sigma = torch.exp(sigmaarg)
         assert torch.isfinite(sigma).all()
