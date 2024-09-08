@@ -96,7 +96,9 @@ def plot_roc(out, fpr, tpr, auc, title=None):
     ax.set_ylabel(r"$1 / \epsilon_B$", fontsize=FONTSIZE)
     ax.set_yscale("log")
     ax.plot(rnd, 1 / rnd, "k--")
-    ax.plot(tpr, 1 / fpr, color=color)
+    fpr_inv = 1 / fpr
+    fpr_inv[~torch.isfinite(fpr_inv)] = 0.0
+    ax.plot(tpr, fpr_inv, color=color)
     ax.text(
         0.05,
         0.05,
@@ -123,7 +125,9 @@ def plot_roc(out, fpr, tpr, auc, title=None):
     ax.set_xlabel(r"$\epsilon_S$", fontsize=FONTSIZE)
     ax.set_ylabel(r"$\epsilon_S / \sqrt{\epsilon_B}$", fontsize=FONTSIZE)
     ax.plot(rnd, rnd**0.5, "k--")
-    ax.plot(tpr, tpr / fpr**0.5, color=color)
+    sic = tpr / fpr**0.5
+    sic[~torch.isfinite(sic)] = 0.0
+    ax.plot(tpr, sic, color=color)
     ax.text(
         0.95,
         0.05,
