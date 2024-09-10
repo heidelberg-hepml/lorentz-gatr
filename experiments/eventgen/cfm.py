@@ -14,6 +14,7 @@ from experiments.eventgen.distributions import (
 )
 import experiments.eventgen.coordinates as c
 import experiments.eventgen.trajectories as traj
+import experiments.eventgen.mbot as mbot
 import experiments.eventgen.distributions as d
 from experiments.eventgen.coordinates import (
     convert_coordinates,
@@ -558,6 +559,8 @@ class EventCFM(CFM):
             coordinates = traj.SophisticatedMass(
                 cfm=self.cfm, pt_min=self.pt_min, units=self.units
             )
+        elif coordinates_label == "MBOT":
+            coordinates = mbot.MBOT(cfm=self.cfm, pt_min=self.pt_min, units=self.units)
         else:
             raise ValueError(f"coordinates={coordinates_label} not implemented")
         return coordinates
