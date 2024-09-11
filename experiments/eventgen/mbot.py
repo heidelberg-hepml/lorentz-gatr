@@ -1,5 +1,9 @@
 import torch
+import numpy as np
+
 from scipy.optimize import linear_sum_assignment
+import ot as pot
+
 from experiments.eventgen.trajectories import get_prepd_mW2, ensure_angle
 import experiments.eventgen.coordinates as c
 
@@ -19,15 +23,28 @@ class MBOT(c.StandardLogPtPhiEtaLogM2):
             distance = (mW0[..., None] - mW1[..., None, :]) ** 2
             return distance
 
-        # can this be parallelized?
         x2_out = []
-        subbatch_size = x1.shape[0] // self.cfm.mbot.subbatches
-        subdivide = lambda x, i: x[i : i + subbatch_size]
-        for i in range(self.cfm.mbot.subbatches):
-            # subbatches=8 works best on my laptop
+        minibatch_size = x1.shape[0] // self.cfm.mbot.minibatches
+        subdivide = lambda x, i: x[i : i + minibatch_size]
+        for i in range(self.cfm.mbot.minibatches):
             x1_local, x2_local = subdivide(x1, i), subdivide(x2, i)
             distance = get_distance(x1_local, x2_local)
-            index1, index2 = linear_sum_assignment(distance.numpy(), maximize=False)
+            distance /= distance.max()
+            x1h_local, x2h_local = pot.unif(
+                x1_local.shape[0], type_as=x1_local
+            ), pot.unif(x2_local.shape[0], type_as=x2_local)
+            if self.cfm.mbot.reg <= 0:
+                pi = pot.emd(x1h_local, x2h_local, distance)
+            else:
+                pi = pot.sinkhorn(x1h_local, x2h_local, distance, reg=self.cfm.mbot.reg)
+            p = pi.flatten()
+            p /= p.sum()
+            p = p.cpu()
+            choices = torch.multinomial(
+                p, num_samples=x1_local.shape[0], replacement=False
+            )
+            index2 = torch.remainder(choices, pi.shape[1])
+            index2 = torch.tensor(index2, device=x1.device, dtype=torch.long)
             x2_local = x2_local[index2]
             x2_out.append(x2_local)
         x2 = torch.cat(x2_out, dim=0)
