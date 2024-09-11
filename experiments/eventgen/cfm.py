@@ -166,7 +166,7 @@ class CFM(nn.Module):
             dtype=x0_fourmomenta.dtype,
             device=x0_fourmomenta.device,
         )
-        t0 = time.time()
+
         x1_fourmomenta = self.sample_base(
             x0_fourmomenta.shape, x0_fourmomenta.device, x0_fourmomenta.dtype
         )
@@ -186,11 +186,9 @@ class CFM(nn.Module):
         # construct target trajectories
         x0_straight = self.coordinates_straight.fourmomenta_to_x(x0_fourmomenta)
         x1_straight = self.coordinates_straight.fourmomenta_to_x(x1_fourmomenta)
-        t1 = time.time()
         xt_straight, vt_straight = self.coordinates_straight.get_trajectory(
             x0_straight, x1_straight, t
         )
-        t2 = time.time()
         vt_sampling = convert_velocity(
             vt_straight,
             xt_straight,
@@ -202,16 +200,10 @@ class CFM(nn.Module):
         xt_network = convert_coordinates(
             xt_straight, self.coordinates_straight, self.coordinates_network
         )
-        t3 = time.time()
         vp_sampling = self.get_velocity_sampling(xt_network, t, ijet=ijet)[0]
-        t4 = time.time()
 
         # evaluate conditional flow matching objective
         loss = self.loss(vp_sampling, vt_sampling)
-        t5 = time.time()
-        LOGGER.info(
-            f"{t5-t0:.3f}s; trajs {(t2-t1)/(t5-t0):.2f}; net {(t4-t3)/(t5-t0):.2f}; rest {(t1-t0+t3-t2+t5-t4)/(t5-t0):.2f}"
-        )
         return loss, [
             self.loss(vp_sampling[..., i], vt_sampling[..., i]) for i in range(4)
         ]

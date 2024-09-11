@@ -30,3 +30,5 @@ clifford==1.4.0
 numba==0.58.1 # otherwise has conflicts
 xformers==0.0.24
 torchdiffeq # for CFM sampling
+torchode # for CFM sampling
+pot # for CFM optimal transport

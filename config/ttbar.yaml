@@ -28,7 +28,7 @@ cfm:
  hutchinson: true
  coordinates_straight: ${cfm.coordinates_sampling}
  coordinates_network: Fourmomenta
- coordinates_sampling: SophisticatedMass
+ coordinates_sampling: MBOT
  transforms_float64: true
  trajs:
   bootstrap_factor: 1

@@ -33,7 +33,7 @@ class MBOT(c.StandardLogPtPhiEtaLogM2):
             x1h_local, x2h_local = pot.unif(
                 x1_local.shape[0], type_as=x1_local
             ), pot.unif(x2_local.shape[0], type_as=x2_local)
-            if self.cfm.mbot.reg <= 0:
+            if float(self.cfm.mbot.reg) <= 0.0:
                 pi = pot.emd(x1h_local, x2h_local, distance)
             else:
                 pi = pot.sinkhorn(x1h_local, x2h_local, distance, reg=self.cfm.mbot.reg)
