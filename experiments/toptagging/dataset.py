@@ -417,3 +417,84 @@ def get_kt(p1, p2):
     pt1, pt2 = get_pt(p1), get_pt(p2)
     deltaR = get_deltaR(p1, p2)
     return deltaR * torch.min(pt1, pt2)
+
+def jc_batch_encoding(self, batch):
+    # Put the batch into the (batch_size, num_particles, (E, px, py, pz)) format
+    batch = torch.transpose(batch, 1, 2)
+
+    # flatten the events dimension and remove zero padding
+    EPS = 1e-5
+    nonzero_mask = (batch.abs() > EPS).any(dim=-1)
+    num_particles = nonzero_mask.sum(dim=-1)
+    batch_sparse = batch[nonzero_mask]
+
+    # create batch.ptr from torch_geometric.data.Data by hand
+    ptr = torch.zeros_like(num_particles, device=batch.device)
+    ptr[1:] = torch.cumsum(num_particles, dim=0)[:-1]
+
+    # insert global token at the beginning of the batch
+    batchsize = len(ptr)
+    ptr_with_global = ptr + torch.arange(batchsize, device=batch.device)
+    is_global = torch.zeros(batch_sparse.shape[0] + batchsize, *batch_sparse.shape[1:], dtype=torch.bool, device=batch.device)
+    is_global[ptr_with_global] = True
+    batch_sparse_with_global = torch.zeros_like(is_global, dtype=batch.dtype)
+    batch_sparse_with_global[~is_global] = batch_sparse.flatten()
+    is_global = is_global[:, [0]]
+
+    # define the attention indices for the events in the batch as in batch.batch from torch_geometric.data.Data
+    get_batch_from_ptr = lambda ptr: torch.arange(len(ptr) - 1, device=ptr.device).repeat_interleave(ptr[1:] - ptr[:-1])
+    attention_indices = get_batch_from_ptr(ptr_with_global)
+
+    # embed batches into the GA
+    batch_sparse_with_global = embed_vector(batch_sparse_with_global)
+
+    # Include beam information to the events
+    beam = embed_beam_reference(
+        batch_sparse_with_global,
+        self.cfg.data.beam_reference,
+        self.cfg.data.add_time_reference,
+        self.cfg.data.two_beams,
+    )
+
+    batch_final = batch_sparse_with_global
+    is_global_final = is_global
+
+    if beam is not None:
+        if self.cfg.data.beam_token:
+            #embed beam as extra token
+            ptr_beam = torch.cumsum(num_particles, dim=0) - 1
+            ptr_beam_total = torch.cat([ptr_beam + (beam.shape[0] + 1)*torch.arange(1, batchsize + 1, device=batch.device) - i for i in range(beam.shape[0])])
+
+            batch_final = torch.zeros((batch_sparse_with_global.shape[0] + beam.shape[0] * batchsize, *batch_sparse_with_global.shape[1:]), device=batch.device)
+            mask_beam = torch.zeros_like(batch_final[..., 0], dtype=torch.bool, device=batch.device)
+            mask_beam[ptr_beam_total] = True
+
+            batch_final[mask_beam] = beam.repeat(batchsize, 1)
+            batch_final[~mask_beam] = batch_sparse_with_global
+            batch_final = batch_final.unsqueeze(-2)
+
+            # extend is_global and the attention_indices to include the extra token
+            is_global_final = torch.zeros((batch_sparse_with_global.shape[0] + beam.shape[0] * batchsize, 1), dtype=torch.bool, device=batch.device)
+            is_global_final[~mask_beam] = is_global
+
+            attention_indices = get_batch_from_ptr(ptr_with_global + beam.shape[0] * torch.arange(batchsize, device=batch.device))
+        else:
+            batch_sparse_with_global = batch_sparse_with_global.unsqueeze(-2)
+            beam = beam.unsqueeze(0).repeat(batch_sparse_with_global.shape[0], 1, 1)
+            batch_final = torch.cat((batch_sparse_with_global, beam), dim=-2)
+            is_global_final = is_global
+
+    multivector = batch_final.unsqueeze(0)
+    scalars = is_global_final.float().unsqueeze(0)
+
+    # change the shape of is_global to accommodate the number of classes in the output of the model
+    is_global_final = is_global_final.unsqueeze(-2).expand(batch_final.shape[0], self.cfg.jc_params.num_classes, 1)
+
+    # modify the attention_indices to include the indices for the last event in the batch
+    attention_indices = torch.cat((attention_indices, (batchsize - 1) * torch.ones(len(batch_final) - len(attention_indices), device=batch.device)), dim=0)
+
+    return multivector, scalars, is_global_final, attention_indices
+
+
+
+
