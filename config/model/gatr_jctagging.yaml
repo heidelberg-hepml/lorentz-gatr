@@ -2,13 +2,6 @@ _target_: experiments.toptagging.wrappers.TopTaggingPretrainGATrWrapper
 
 force_xformers: '${training.force_xformers}'
 mean_aggregation: false
-#add_jet_momentum: false
-#add_pt: false
-#add_jet_momentum: false
-#beam_reference: spacelike
-#add_time_reference: false
-#two_beams: false
-#beam_token: true
 
 net:
  _target_: gatr.nets.GATr

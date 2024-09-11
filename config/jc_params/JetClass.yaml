@@ -15,6 +15,7 @@ samples_per_epoch: null
 samples_per_epoch_val: null
 local_rank: null
 copy_inputs: False
+num_classes: 10
 
 data_train: ["HToBB:/remote/gpu02/breso/lorentz-gatr-pretrain/data/JetClass/Pythia/train_100M/HToBB_*.root", "HToCC:/remote/gpu02/breso/lorentz-gatr-pretrain/data/JetClass/Pythia/train_100M/HToCC_*.root", "HToGG:/remote/gpu02/breso/lorentz-gatr-pretrain/data/JetClass/Pythia/train_100M/HToGG_*.root", "HToWW2Q1L:/remote/gpu02/breso/lorentz-gatr-pretrain/data/JetClass/Pythia/train_100M/HToWW2Q1L_*.root", "HToWW4Q:/remote/gpu02/breso/lorentz-gatr-pretrain/data/JetClass/Pythia/train_100M/HToWW4Q_*.root", "TTBar:/remote/gpu02/breso/lorentz-gatr-pretrain/data/JetClass/Pythia/train_100M/TTBar_*.root", "TTBarLep:/remote/gpu02/breso/lorentz-gatr-pretrain/data/JetClass/Pythia/train_100M/TTBarLep_*.root", "WToQQ:/remote/gpu02/breso/lorentz-gatr-pretrain/data/JetClass/Pythia/train_100M/WToQQ_*.root", "ZToQQ:/remote/gpu02/breso/lorentz-gatr-pretrain/data/JetClass/Pythia/train_100M/ZToQQ_*.root", "ZJetsToNuNu:/remote/gpu02/breso/lorentz-gatr-pretrain/data/JetClass/Pythia/train_100M/ZJetsToNuNu_*.root"]
 
