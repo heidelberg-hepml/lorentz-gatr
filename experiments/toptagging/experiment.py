@@ -101,7 +101,7 @@ class TaggingExperiment(BaseExperiment):
         dt = time.time() - t0
         LOGGER.info(f"Finished creating datasets after {dt:.2f} s = {dt/60:.2f} min")
 
-    def init_dataloader(self):
+    def _init_dataloader(self):
         self.train_loader = DataLoader(
             dataset=self.data_train,
             batch_size=self.cfg.training.batchsize,
@@ -183,7 +183,6 @@ class TaggingExperiment(BaseExperiment):
                 y_pred = torch.nn.functional.sigmoid(y_pred)
                 labels_true.append(batch.label.cpu().float())
                 labels_predict.append(y_pred.cpu().float())
-
         labels_true, labels_predict = torch.cat(labels_true), torch.cat(labels_predict)
         if mode == "eval":
             metrics["labels_true"], metrics["labels_predict"] = (
@@ -258,7 +257,7 @@ class TaggingExperiment(BaseExperiment):
             plot_dict["val_metrics"] = self.val_metrics
         plot_mixer(self.cfg, plot_path, title, plot_dict)
 
-    def init_loss(self):
+    def _init_loss(self):
         self.loss = torch.nn.BCEWithLogitsLoss()
 
     # overwrite _validate method to compute metrics over the full validation set
@@ -272,7 +271,6 @@ class TaggingExperiment(BaseExperiment):
             metrics = self._evaluate_single(
                 self.val_loader, "val", mode="val", step=step
             )
-
         self.val_loss.append(metrics["bce"])
         return metrics["bce"]
 
@@ -294,6 +292,7 @@ class TopTaggingExperiment(TaggingExperiment):
             self.cfg.data.data_dir, f"toptagging_{self.cfg.data.dataset}.npz"
         )
         self._init_data(TopTaggingDataset, data_path)
+
 
 class QGTaggingExperiment(TaggingExperiment):
     def init_data(self):

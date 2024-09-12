@@ -67,7 +67,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
         LOGGER.info(f"Finished creating datasets after {dt:.2f} s = {dt/60:.2f} min")
 
 
-    def init_dataloader(self):
+    def _init_dataloader(self):
         self.train_loader = DataLoader(
             dataset=self.data_train,
             batch_size=self.cfg.training.batchsize,
@@ -214,7 +214,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
 
         return metrics
 
-    def init_loss(self):
+    def _init_loss(self):
         self.loss = torch.nn.CrossEntropyLoss()
 
     def _validate(self, step):

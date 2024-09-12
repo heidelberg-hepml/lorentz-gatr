@@ -70,14 +70,14 @@ class BaseExperiment:
 
         # save config
         LOGGER.debug(OmegaConf.to_yaml(self.cfg))
-        self._save_config("config.yaml", to_mlflow=False)
+        self._save_config("config.yaml", to_mlflow=True)
         self._save_config(f"config_{self.cfg.run_idx}.yaml")
 
         self.init_physics()
         self.init_model()
         self.init_data()
-        self.init_dataloader()
-        self.init_loss()
+        self._init_dataloader()
+        self._init_loss()
 
         if self.cfg.train:
             self._init_optimizer()
@@ -451,15 +451,14 @@ class BaseExperiment:
         patience = 0
 
         # main train loop
-        """
+        loader_size = 1e8 / self.cfg.training.batchsize if self.cfg.exp_type == "jctagging" else len(self.train_loader)
         LOGGER.info(
             f"Starting to train for {self.cfg.training.iterations} iterations "
-            f"= {self.cfg.training.iterations / len(self.train_loader):.1f} epochs "
-            f"on a dataset with {len(self.train_loader)} batches "
+            f"= {self.cfg.training.iterations / loader_size:.1f} epochs "
+            f"on a dataset with {loader_size} batches "
             f"using early stopping with patience {self.cfg.training.es_patience} "
             f"while validating every {self.cfg.training.validate_every_n_steps} iterations"
         )
-        """
         self.training_start_time = time.time()
 
         # recycle trainloader
@@ -467,6 +466,7 @@ class BaseExperiment:
             while True:
                 for x in iterable:
                     yield x
+
 
         iterator = iter(cycle(self.train_loader))
         for step in range(self.cfg.training.iterations):
@@ -494,7 +494,7 @@ class BaseExperiment:
                     patience += 1
                     if patience > self.cfg.training.es_patience:
                         LOGGER.info(
-                            f"Early stopping in iteration {step} = epoch {step / len(self.train_loader):.1f}"
+                            f"Early stopping in iteration {step} = epoch {step / loader_size:.1f}"
                         )
                         break  # early stopping
 
@@ -512,13 +512,13 @@ class BaseExperiment:
                 )
 
         dt = time.time() - self.training_start_time
-        #LOGGER.info(
-        #    f"Finished training for {step} iterations = {step / len(self.train_loader):.1f} epochs "
-        #    f"after {dt/60:.2f}min = {dt/60**2:.2f}h"
-        #)
+        LOGGER.info(
+            f"Finished training for {step} iterations = {step / loader_size:.1f} epochs "
+            f"after {dt/60:.2f}min = {dt/60**2:.2f}h"
+        )
         if self.cfg.use_mlflow:
             log_mlflow("iterations", step)
-            #log_mlflow("epochs", step / len(self.train_loader))
+            log_mlflow("epochs", step / loader_size)
             log_mlflow("traintime", dt / 3600)
 
         # wrap up early stopping

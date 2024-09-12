@@ -13,16 +13,13 @@ data:
  reinsert_channels: false
  rescale_data: true
 
-ema: true
 train: true
 training:
- iterations: 200000
- optimizer: Lion
+ iterations: 10
  batchsize: 128
- lr: 3e-4
- scheduler: CosineAnnealingLR
- weight_decay: 0.2
- force_xformers: true
+ lr: 1e-3
+
+ force_xformers: false
 
 evaluation:
  batchsize: 128

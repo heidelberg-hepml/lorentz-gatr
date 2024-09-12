@@ -9,8 +9,6 @@ from torch import nn
 from gatr.interface import embed_scalar
 from gatr.primitives.linear import NUM_PIN_LINEAR_BASIS_ELEMENTS, equi_linear
 
-from experiments.logger import LOGGER
-
 MIX_DUALS = False
 INCLUDE_AXIALVECTOR = True
 

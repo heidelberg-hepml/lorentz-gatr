@@ -12,7 +12,6 @@ from gatr.layers.gatr_block import GATrBlock
 from gatr.layers.linear import EquiLinear
 from gatr.layers.mlp.config import MLPConfig
 
-from experiments.logger import LOGGER
 
 class GATr(nn.Module):
     """L-GATr network for a data with a single token dimension.

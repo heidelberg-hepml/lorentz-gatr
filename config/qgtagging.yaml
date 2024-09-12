@@ -6,21 +6,18 @@ data:
  data_dir : /remote/gpu02/breso/lorentz-gatr/data
  dataset: qg_data
  beam_reference: spacelike
- two_beams: true
+ two_beams: false
  beam_token: true
  add_time_reference: false
  add_pt: false
- reinsert_channels: false
+ reinsert_channels: true
  rescale_data: true
 
 train: true
 training:
  iterations: 10
- optimizer: Lion
  batchsize: 128
- lr: 3e-4
- scheduler: CosineAnnealingLR
- weight_decay: 0.2
+ lr: 1e-3
 
  force_xformers: false
 

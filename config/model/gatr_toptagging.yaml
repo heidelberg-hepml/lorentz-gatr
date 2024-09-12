@@ -7,20 +7,20 @@ net:
 
  in_mv_channels: 1
  out_mv_channels: 1
- hidden_mv_channels: 16
+ hidden_mv_channels: 8
 
  in_s_channels: 0
  out_s_channels: 1
- hidden_s_channels: 32
+ hidden_s_channels: 8
 
- num_blocks: 12
+ num_blocks: 4
  reinsert_mv_channels: null
  reinsert_s_channels: null
  dropout_prob: null
  double_layernorm: false
 
  attention:
-  num_heads: 8
+  num_heads: 4
   multi_query: false
   increase_hidden_channels: 2
   head_scale: false
