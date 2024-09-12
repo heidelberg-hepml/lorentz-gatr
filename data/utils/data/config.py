@@ -2,7 +2,6 @@ import numpy as np
 import yaml
 import copy
 
-from ..logger import _logger
 from .tools import _get_variable_names
 
 def _as_list(x):
@@ -52,8 +51,6 @@ class DataConfig(object):
                     opts[k] = v
         # only information in ``self.options'' will be persisted when exporting to YAML
         self.options = opts
-        if print_info:
-            _logger.debug(opts)
 
         self.train_load_branches = set()
         self.train_aux_branches = set()
@@ -149,29 +146,6 @@ class DataConfig(object):
             if k == v:
                 del self.var_funcs[k]
 
-        if print_info:
-            def _log(msg, *args, **kwargs):
-                _logger.info(msg, *args, color='lightgray', **kwargs)
-            _log('preprocess config: %s', str(self.preprocess))
-            _log('selection: %s', str(self.selection))
-            _log('test_time_selection: %s', str(self.test_time_selection))
-            _log('var_funcs:\n - %s', '\n - '.join(str(it) for it in self.var_funcs.items()))
-            _log('input_names: %s', str(self.input_names))
-            _log('input_dicts:\n - %s', '\n - '.join(str(it) for it in self.input_dicts.items()))
-            _log('input_shapes:\n - %s', '\n - '.join(str(it) for it in self.input_shapes.items()))
-            _log('preprocess_params:\n - %s', '\n - '.join(str(it) for it in self.preprocess_params.items()))
-            _log('label_names: %s', str(self.label_names))
-            _log('observer_names: %s', str(self.observer_names))
-            _log('monitor_variables: %s', str(self.monitor_variables))
-            if opts['weights'] is not None:
-                if self.use_precomputed_weights:
-                    _log('weight: %s' % self.var_funcs[self.weight_name])
-                else:
-                    for k in ['reweight_method', 'reweight_basewgt', 'reweight_branches', 'reweight_bins',
-                              'reweight_classes', 'class_weights', 'reweight_threshold',
-                              'reweight_discard_under_overflow']:
-                        _log('%s: %s' % (k, getattr(self, k)))
-
         # selection
         if self.selection:
             self.register(_get_variable_names(self.selection), to='train')
@@ -193,11 +167,6 @@ class DataConfig(object):
                     aux_branches.add(k)
                     load_branches.remove(k)
                     load_branches.update(_get_variable_names(self.var_funcs[k]))
-        if print_info:
-            _logger.debug('train_load_branches:\n  %s', ', '.join(sorted(self.train_load_branches)))
-            _logger.debug('train_aux_branches:\n  %s', ', '.join(sorted(self.train_aux_branches)))
-            _logger.debug('test_load_branches:\n  %s', ', '.join(sorted(self.test_load_branches)))
-            _logger.debug('test_aux_branches:\n  %s', ', '.join(sorted(self.test_aux_branches)))
 
     def __getattr__(self, name):
         return self.options[name]

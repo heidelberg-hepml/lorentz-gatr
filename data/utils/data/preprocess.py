@@ -4,11 +4,8 @@ import copy
 import numpy as np
 import awkward as ak
 
-from ..logger import _logger, warn_n_times
 from .tools import _get_variable_names, _eval_expr
 from .fileio import _read_files
-
-from experiments.logger import LOGGER
 
 def _apply_selection(table, selection, funcs=None):
     if selection is None:
@@ -59,12 +56,6 @@ def _build_weights(table, data_config, reweight_hists=None):
                 rwgt_y_vals, y_bins) - 1, a_min=0, a_max=len(y_bins) - 2)
             wgt[pos] = hist[x_indices, y_indices]
             sum_evts += np.sum(pos)
-        if sum_evts != len(table):
-            warn_n_times(
-                'Not all selected events used in the reweighting. '
-                'Check consistency between `selection` and `reweight_classes` definition, or with the `reweight_vars` binnings '
-                '(under- and overflow bins are discarded by default, unless `reweight_discard_under_overflow` is set to `False` in the `weights` section).',
-            )
         if data_config.reweight_basewgt:
             wgt *= ak.to_numpy(table[data_config.basewgt_name])
         return wgt
@@ -106,10 +97,6 @@ class AutoStandardizer(object):
                 load_branches.remove(k)
                 load_branches.update(_get_variable_names(self._data_config.var_funcs[k]))
 
-        _logger.debug('[AutoStandardizer] keep_branches:\n  %s', ','.join(keep_branches))
-        _logger.debug('[AutoStandardizer] aux_branches:\n  %s', ','.join(aux_branches))
-        _logger.debug('[AutoStandardizer] load_branches:\n  %s', ','.join(load_branches))
-
         table = _read_files(filelist, load_branches, self.load_range, show_progressbar=True,
                             treename=self._data_config.treename,
                             branch_magic=self._data_config.branch_magic, file_magic=self._data_config.file_magic)
@@ -119,7 +106,6 @@ class AutoStandardizer(object):
         return table
 
     def make_preprocess_params(self, table):
-        _logger.info('Using %d events to calculate standardization info', len(table))
         preprocess_params = copy.deepcopy(self._data_config.preprocess_params)
         for k, params in self._data_config.preprocess_params.items():
             if params['center'] == 'auto':
@@ -129,7 +115,6 @@ class AutoStandardizer(object):
                     a = ak.to_numpy(ak.flatten(table[k], axis=None))
                     # check for NaN
                     if np.any(np.isnan(a)):
-                        _logger.warning('[AutoStandardizer] Found NaN in `%s`, will convert it to 0.', k)
                         time.sleep(10)
                         a = np.nan_to_num(a)
                     low, center, high = np.percentile(a, [16, 50, 84])
@@ -138,7 +123,6 @@ class AutoStandardizer(object):
                     params['center'] = float(center)
                     params['scale'] = float(scale)
                 preprocess_params[k] = params
-                _logger.info('[AutoStandardizer] %s low=%s, center=%s, high=%s, scale=%s', k, low, center, high, scale)
         return preprocess_params
 
     def produce(self, output=None):
@@ -148,8 +132,6 @@ class AutoStandardizer(object):
         # must also propagate the changes to `data_config.options` so it can be persisted
         self._data_config.options['preprocess']['params'] = preprocess_params
         if output:
-            _logger.info(
-                'Writing YAML file w/ auto-generated preprocessing info to %s' % output)
             self._data_config.dump(output)
         return self._data_config
 
@@ -186,10 +168,6 @@ class WeightMaker(object):
                 load_branches.remove(k)
                 load_branches.update(_get_variable_names(self._data_config.var_funcs[k]))
 
-        _logger.debug('[WeightMaker] keep_branches:\n  %s', ','.join(keep_branches))
-        _logger.debug('[WeightMaker] aux_branches:\n  %s', ','.join(aux_branches))
-        _logger.debug('[WeightMaker] load_branches:\n  %s', ','.join(load_branches))
-
         table = _read_files(filelist, load_branches, show_progressbar=True,
                             treename=self._data_config.treename,
                             branch_magic=self._data_config.branch_magic, file_magic=self._data_config.file_magic)
@@ -205,12 +183,8 @@ class WeightMaker(object):
             # clip variables to be within bin ranges
             x_min, x_max = min(x_bins), max(x_bins)
             y_min, y_max = min(y_bins), max(y_bins)
-            _logger.info(f'Clipping `{x_var}` to [{x_min}, {x_max}] to compute the shapes for reweighting.')
-            _logger.info(f'Clipping `{y_var}` to [{y_min}, {y_max}] to compute the shapes for reweighting.')
             table[x_var] = np.clip(table[x_var], min(x_bins), max(x_bins))
             table[y_var] = np.clip(table[y_var], min(y_bins), max(y_bins))
-
-        _logger.info('Using %d events to make weights', len(table))
 
         sum_evts = 0
         max_weight = 0.9
@@ -222,20 +196,13 @@ class WeightMaker(object):
             x = ak.to_numpy(table[x_var][pos])
             y = ak.to_numpy(table[y_var][pos])
             hist, _, _ = np.histogram2d(x, y, bins=self._data_config.reweight_bins)
-            _logger.info('%s (unweighted):\n %s', label, str(hist.astype('int64')))
             sum_evts += hist.sum()
             if self._data_config.reweight_basewgt:
                 w = ak.to_numpy(table[self._data_config.basewgt_name][pos])
                 hist, _, _ = np.histogram2d(x, y, weights=w, bins=self._data_config.reweight_bins)
-                _logger.info('%s (weighted):\n %s', label, str(hist.astype('float32')))
             raw_hists[label] = hist.astype('float32')
             result[label] = hist.astype('float32')
         if sum_evts != len(table):
-            _logger.warning(
-                'Only %d (out of %d) events actually used in the reweighting. '
-                'Check consistency between `selection` and `reweight_classes` definition, or with the `reweight_vars` binnings '
-                '(under- and overflow bins are discarded by default, unless `reweight_discard_under_overflow` is set to `False` in the `weights` section).',
-                sum_evts, len(table))
             time.sleep(10)
 
         if self._data_config.reweight_method == 'flat':
@@ -245,8 +212,6 @@ class WeightMaker(object):
                 nonzero_vals = hist[hist > threshold_]
                 min_val, med_val = np.min(nonzero_vals), np.median(hist)  # not really used
                 ref_val = np.percentile(nonzero_vals, self._data_config.reweight_threshold)
-                _logger.debug('label:%s, median=%f, min=%f, ref=%f, ref/min=%f' %
-                              (label, med_val, min_val, ref_val, ref_val / min_val))
                 # wgt: bins w/ 0 elements will get a weight of 0; bins w/ content<ref_val will get 1
                 wgt = np.clip(np.nan_to_num(ref_val / hist, posinf=0), 0, 1)
                 result[label] = wgt
@@ -272,20 +237,9 @@ class WeightMaker(object):
 
         if self._data_config.reweight_basewgt:
             wgts = _build_weights(table, self._data_config, reweight_hists=result)
-            _logger.info('Sample weight percentiles: %s', str(np.percentile(wgts, np.arange(101))))
             wgt_ref = np.percentile(wgts, 100 - self._data_config.reweight_threshold)
-            _logger.info('Set overall reweighting scale factor (%d threshold) to %s (max %s)' %
-                         (100 - self._data_config.reweight_threshold, wgt_ref, np.max(wgts)))
             for label in self._data_config.reweight_classes:
                 result[label] /= wgt_ref
-
-        _logger.info('weights:')
-        for label in self._data_config.reweight_classes:
-            _logger.info('%s:\n %s', label, str(result[label]))
-
-        _logger.info('Raw hist * weights:')
-        for label in self._data_config.reweight_classes:
-            _logger.info('%s:\n %s', label, str((raw_hists[label] * result[label]).astype('int32')))
 
         return result
 
@@ -296,6 +250,5 @@ class WeightMaker(object):
         # must also propagate the changes to `data_config.options` so it can be persisted
         self._data_config.options['weights']['reweight_hists'] = {k: v.tolist() for k, v in wgts.items()}
         if output:
-            _logger.info('Writing YAML file w/ reweighting info to %s' % output)
             self._data_config.dump(output)
         return self._data_config

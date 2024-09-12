@@ -7,13 +7,10 @@ import torch.utils.data
 
 from functools import partial
 from concurrent.futures.thread import ThreadPoolExecutor
-from .logger import _logger
 from .data.tools import _pad, _repeat_pad, _clip, _stack
 from .data.fileio import _read_files
 from .data.config import DataConfig, _md5
 from .data.preprocess import _apply_selection, _build_new_variables, _build_weights, AutoStandardizer, WeightMaker
-
-from experiments.logger import LOGGER
 
 def _collate_awkward_array_fn(batch, *, collate_fn_map=None):
     return _stack(batch, axis=0)
@@ -38,8 +35,6 @@ def _finalize_inputs(table, data_config):
             table[k] = pad_fn(table[k], params['length'])
         # check for NaN
         if np.any(np.isnan(table[k])):
-            _logger.warning(
-                'Found NaN in %s, silently converting it to 0.', k)
             table[k] = np.nan_to_num(table[k])
     # stack variables for each input group
     for k, names in data_config.input_dicts.items():
@@ -178,17 +173,6 @@ class _SimpleIter(object):
             else:
                 self.load_range = (start_pos, start_pos + interval)
 
-        _logger.debug(
-            'Init iter [%d], will load %d (out of %d*%s=%d) files with load_range=%s:\n%s', 0
-            if self.worker_info is None else self.worker_info.id, len(self.filelist),
-            len(sum(self._init_file_dict.values(), [])),
-            self._file_fraction, int(len(sum(self._init_file_dict.values(), [])) * self._file_fraction),
-            str(self.load_range),
-            '\n'.join(self.filelist[: 3]) + '\n ... ' + self.filelist[-1],)
-
-        _logger.info('Restarted DataIter %s, load_range=%s, file_list:\n%s' %
-                     (self._name, str(self.load_range), json.dumps(self.worker_file_dict, indent=2)))
-
         # reset file fetching cursor
         self.ipos = 0 if self._fetch_by_files else self.load_range[0]
         # prefetch the first entry asynchronously
@@ -253,7 +237,6 @@ class _SimpleIter(object):
             filelist = self.filelist
             load_range = (self.ipos, min(self.ipos + self._fetch_step, self.load_range[1]))
 
-        # _logger.info('Start fetching next batch, len(filelist)=%d, load_range=%s'%(len(filelist), load_range))
         if self._async_load:
             self.prefetch = self.executor.submit(_load_next, self._data_config,
                                                  filelist, load_range, self._sampler_options)
@@ -336,8 +319,6 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
             data_config_autogen_file = data_config_file.replace('.yaml', '.%s.auto.yaml' % data_config_md5)
             if os.path.exists(data_config_autogen_file):
                 data_config_file = data_config_autogen_file
-                _logger.info('Found file %s w/ auto-generated preprocessing information, will use that instead!' %
-                             data_config_file)
 
         # load data config (w/ observers now -- so they will be included in the auto-generated yaml)
         self._data_config = DataConfig.load(data_config_file)
@@ -357,10 +338,6 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
             # reload data_config w/o observers for training
             if os.path.exists(data_config_autogen_file) and data_config_file != data_config_autogen_file:
                 data_config_file = data_config_autogen_file
-                _logger.info(
-                    'Found file %s w/ auto-generated preprocessing information, will use that instead!' %
-                    data_config_file)
-                LOGGER.info(f"Hit")
             self._data_config = DataConfig.load(data_config_file, load_observers=False, extra_selection=extra_selection)
         else:
             self._data_config = DataConfig.load(

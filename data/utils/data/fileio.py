@@ -3,7 +3,6 @@ import awkward as ak
 import tqdm
 import traceback
 from .tools import _concat
-from ..logger import _logger, warn_n_times
 
 
 def _read_hdf5(filepath, branches, load_range=None):
@@ -99,15 +98,10 @@ def _read_files(filelist, branches, load_range=None, show_progressbar=False, fil
                 a = _read_parquet(filepath, branches, load_range=load_range)
         except Exception as e:
             a = None
-            _logger.error('When reading file %s:', filepath)
-            _logger.error(traceback.format_exc())
         if a is not None:
             if file_magic is not None:
                 import re
                 for var, value_dict in file_magic.items():
-                    if var in a.fields:
-                        warn_n_times(f'Var `{var}` already defined in the arrays '
-                                     f'but will be OVERWRITTEN by file_magic {value_dict}.')
                     a[var] = 0
                     for fn_pattern, value in value_dict.items():
                         if re.search(fn_pattern, filepath):
@@ -119,14 +113,3 @@ def _read_files(filelist, branches, load_range=None, show_progressbar=False, fil
         raise RuntimeError(f'Zero entries loaded when reading files {filelist} with `load_range`={load_range}.')
     return table
 
-
-def _write_root(file, table, treename='Events', compression=-1, step=1048576):
-    import uproot
-    if compression == -1:
-        compression = uproot.LZ4(4)
-    with uproot.recreate(file, compression=compression) as fout:
-        tree = fout.mktree(treename, {k: table[k].type for k in table.fields})
-        start = 0
-        while start < len(table[table.fields[0]]) - 1:
-            tree.extend({k: table[k][start:start + step] for k in table.fields})
-            start += step
