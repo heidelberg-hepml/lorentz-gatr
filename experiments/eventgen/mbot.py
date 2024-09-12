@@ -1,14 +1,11 @@
 import torch
-import numpy as np
-
-from scipy.optimize import linear_sum_assignment
 import ot as pot
 
-from experiments.eventgen.trajectories import get_prepd_mW2, ensure_angle
-import experiments.eventgen.coordinates as c
+from experiments.eventgen.trajectories import get_prepd_mW2
+from experiments.eventgen.coordinates import StandardLogPtPhiEtaLogM2
 
 
-class MBOT(c.StandardLogPtPhiEtaLogM2):
+class MBOT(StandardLogPtPhiEtaLogM2):
     def __init__(self, cfm, **kwargs):
         super().__init__(**kwargs)
         self.cfm = cfm
@@ -18,8 +15,18 @@ class MBOT(c.StandardLogPtPhiEtaLogM2):
 
         def get_distance(x0, x1):
             # can add more masses here
-            mW0 = get_prepd_mW2(x0, c_start=self, approx_mW2=self.cfm.trajs.approx_mW2)
-            mW1 = get_prepd_mW2(x1, c_start=self, approx_mW2=self.cfm.trajs.approx_mW2)
+            mW0 = get_prepd_mW2(
+                x0,
+                c_start=self,
+                approx_mW2=self.cfm.trajs.approx_mW2,
+                use_logmW2=self.cfm.trajs.use_logmW2,
+            )
+            mW1 = get_prepd_mW2(
+                x1,
+                c_start=self,
+                approx_mW2=self.cfm.trajs.approx_mW2,
+                use_logmW2=self.cfm.trajs.use_logmW2,
+            )
             distance = (mW0[..., None] - mW1[..., None, :]) ** 2
             return distance
 
@@ -34,6 +41,8 @@ class MBOT(c.StandardLogPtPhiEtaLogM2):
                 x1_local.shape[0], type_as=x1_local
             ), pot.unif(x2_local.shape[0], type_as=x2_local)
             if float(self.cfm.mbot.reg) <= 0.0:
+                # use reg=-1 to handle the emd/sinkhorn? and reg? questions with one parameter
+                # using reg<=0 in pot.sinkhorn does not work
                 pi = pot.emd(x1h_local, x2h_local, distance)
             else:
                 pi = pot.sinkhorn(x1h_local, x2h_local, distance, reg=self.cfm.mbot.reg)
