@@ -34,7 +34,10 @@ class TaggingExperiment(BaseExperiment):
 
         # dynamically extend dict
         with open_dict(self.cfg):
-            gatr_name = ["experiments.toptagging.wrappers.TopTaggingGATrWrapper", "experiments.toptagging.wrappers.TopTaggingPretrainGATrWrapper"]
+            gatr_name = [
+                "experiments.toptagging.wrappers.TopTaggingGATrWrapper",
+                "experiments.toptagging.wrappers.TopTaggingPretrainGATrWrapper",
+            ]
             assert self.cfg.model._target_ in gatr_name
 
             # global token?

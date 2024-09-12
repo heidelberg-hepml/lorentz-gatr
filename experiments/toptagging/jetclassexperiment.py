@@ -15,22 +15,31 @@ from experiments.toptagging.dataset import jc_batch_encoding
 from data.utils.dataset import SimpleIterDataset
 from data.utils.loader import to_filelist
 
-class JetClassTaggingExperiment(TaggingExperiment):
 
+class JetClassTaggingExperiment(TaggingExperiment):
     def init_data(self):
         LOGGER.info(f"Creating SimpleIterDataset")
         t0 = time.time()
 
-        train_file_dict, self.train_files = to_filelist(self.cfg.jc_params, 'train')
-        val_file_dict, self.val_files = to_filelist(self.cfg.jc_params, 'val')
-        test_file_dict, self.test_files = to_filelist(self.cfg.jc_params, 'test')
+        train_file_dict, self.train_files = to_filelist(self.cfg.jc_params, "train")
+        val_file_dict, self.val_files = to_filelist(self.cfg.jc_params, "val")
+        test_file_dict, self.test_files = to_filelist(self.cfg.jc_params, "test")
         train_range = val_range = test_range = (0, 1)
 
-        LOGGER.info(f"Using {len(self.train_files)} files for training, range: {str(train_range)}")
-        LOGGER.info(f"Using {len(self.val_files)} files for validation, range: {str(val_range)}")
-        LOGGER.info(f"Using {len(self.test_files)} files for testing, range: {str(test_range)}")
+        LOGGER.info(
+            f"Using {len(self.train_files)} files for training, range: {str(train_range)}"
+        )
+        LOGGER.info(
+            f"Using {len(self.val_files)} files for validation, range: {str(val_range)}"
+        )
+        LOGGER.info(
+            f"Using {len(self.test_files)} files for testing, range: {str(test_range)}"
+        )
 
-        self.data_train = SimpleIterDataset(train_file_dict, self.cfg.jc_params.data_config, for_training=True,
+        self.data_train = SimpleIterDataset(
+            train_file_dict,
+            self.cfg.jc_params.data_config,
+            for_training=True,
             extra_selection=self.cfg.jc_params.extra_selection,
             remake_weights=not self.cfg.jc_params.not_remake_weights,
             load_range_and_fraction=(train_range, self.cfg.jc_params.data_fraction),
@@ -39,9 +48,13 @@ class JetClassTaggingExperiment(TaggingExperiment):
             fetch_step=self.cfg.jc_params.fetch_step,
             infinity_mode=self.cfg.jc_params.steps_per_epoch is not None,
             in_memory=self.cfg.jc_params.in_memory,
-            name='train')
+            name="train",
+        )
 
-        self.data_val = SimpleIterDataset(val_file_dict, self.cfg.jc_params.data_config, for_training=True,
+        self.data_val = SimpleIterDataset(
+            val_file_dict,
+            self.cfg.jc_params.data_config,
+            for_training=True,
             extra_selection=self.cfg.jc_params.extra_selection,
             remake_weights=not self.cfg.jc_params.not_remake_weights,
             load_range_and_fraction=(val_range, self.cfg.jc_params.data_fraction),
@@ -50,9 +63,13 @@ class JetClassTaggingExperiment(TaggingExperiment):
             fetch_step=self.cfg.jc_params.fetch_step,
             infinity_mode=self.cfg.jc_params.steps_per_epoch is not None,
             in_memory=self.cfg.jc_params.in_memory,
-            name='val')
+            name="val",
+        )
 
-        self.data_test = SimpleIterDataset(test_file_dict, self.cfg.jc_params.data_config, for_training=False,
+        self.data_test = SimpleIterDataset(
+            test_file_dict,
+            self.cfg.jc_params.data_config,
+            for_training=False,
             extra_selection=self.cfg.jc_params.extra_selection,
             remake_weights=not self.cfg.jc_params.not_remake_weights,
             load_range_and_fraction=(test_range, self.cfg.jc_params.data_fraction),
@@ -61,11 +78,11 @@ class JetClassTaggingExperiment(TaggingExperiment):
             fetch_step=self.cfg.jc_params.fetch_step,
             infinity_mode=self.cfg.jc_params.steps_per_epoch is not None,
             in_memory=self.cfg.jc_params.in_memory,
-            name='test')
+            name="test",
+        )
 
         dt = time.time() - t0
         LOGGER.info(f"Finished creating datasets after {dt:.2f} s = {dt/60:.2f} min")
-
 
     def _init_dataloader(self):
         self.train_loader = DataLoader(
@@ -73,16 +90,24 @@ class JetClassTaggingExperiment(TaggingExperiment):
             batch_size=self.cfg.training.batchsize,
             drop_last=True,
             pin_memory=True,
-            num_workers=min(self.cfg.jc_params.num_workers, int(len(self.train_files) * self.cfg.jc_params.file_fraction)),
-            persistent_workers=self.cfg.jc_params.num_workers > 0 and self.cfg.jc_params.steps_per_epoch is not None,
+            num_workers=min(
+                self.cfg.jc_params.num_workers,
+                int(len(self.train_files) * self.cfg.jc_params.file_fraction),
+            ),
+            persistent_workers=self.cfg.jc_params.num_workers > 0
+            and self.cfg.jc_params.steps_per_epoch is not None,
         )
         self.val_loader = DataLoader(
             dataset=self.data_val,
             batch_size=self.cfg.evaluation.batchsize,
             drop_last=True,
             pin_memory=True,
-            num_workers=min(self.cfg.jc_params.num_workers, int(len(self.val_files) * int(self.cfg.jc_params.file_fraction))),
-            persistent_workers=self.cfg.jc_params.num_workers > 0 and self.cfg.jc_params.steps_per_epoch_val is not None,
+            num_workers=min(
+                self.cfg.jc_params.num_workers,
+                int(len(self.val_files) * int(self.cfg.jc_params.file_fraction)),
+            ),
+            persistent_workers=self.cfg.jc_params.num_workers > 0
+            and self.cfg.jc_params.steps_per_epoch_val is not None,
         )
         self.test_loader = DataLoader(
             dataset=self.data_test,
@@ -122,8 +147,6 @@ class JetClassTaggingExperiment(TaggingExperiment):
                 self.train_loader, "test", mode="eval"
             )
 
-
-
     def evaluate_single_pretrain(self, loader, title, mode, step=None):
         assert mode in ["val", "eval"]
         # re-initialize dataloader to make sure it is using the evaluation batchsize (makes a difference for trainloader)
@@ -142,10 +165,14 @@ class JetClassTaggingExperiment(TaggingExperiment):
             self.optimizer.eval()
         with torch.no_grad():
             for batch in loader:
-                input = batch[0]['pf_vectors'].to(self.device)
-                label = batch[1]['_label_'].to(self.device)
-                multivector, scalars, is_global, attention_indices = jc_batch_encoding(self, input)
-                y_pred = self.model(multivector, scalars, is_global, attention_indices).reshape(-1, self.cfg.jc_params.num_classes)
+                input = batch[0]["pf_vectors"].to(self.device)
+                label = batch[1]["_label_"].to(self.device)
+                multivector, scalars, is_global, attention_indices = jc_batch_encoding(
+                    self, input
+                )
+                y_pred = self.model(
+                    multivector, scalars, is_global, attention_indices
+                ).reshape(-1, self.cfg.jc_params.num_classes)
                 labels_true.append(label.cpu())
                 labels_predict.append(y_pred.cpu().float())
 
@@ -160,12 +187,17 @@ class JetClassTaggingExperiment(TaggingExperiment):
         metrics["ce"] = torch.nn.functional.cross_entropy(
             labels_predict, labels_true
         ).item()
-        labels_true, labels_predict = labels_true.numpy(), torch.softmax(labels_predict, dim=1).numpy()
+        labels_true, labels_predict = (
+            labels_true.numpy(),
+            torch.softmax(labels_predict, dim=1).numpy(),
+        )
 
         # accuracy
         labels_predict_score = np.argmax(labels_predict, axis=1)
         LOGGER.info(f"The labels true are {labels_true.shape}")
-        metrics["accuracy"] = accuracy_score(labels_true.flatten(), np.round(labels_predict_score).flatten())
+        metrics["accuracy"] = accuracy_score(
+            labels_true.flatten(), np.round(labels_predict_score).flatten()
+        )
         if mode == "eval":
             LOGGER.info(f"Accuracy on {title} dataset: {metrics['accuracy']:.4f}")
 
@@ -173,7 +205,9 @@ class JetClassTaggingExperiment(TaggingExperiment):
         LOGGER.info(f"The labels_predict are {labels_predict.shape}")
 
         # auc and roc (fpr = epsB, tpr = epsS)
-        metrics["auc_ovo"] = roc_auc_score(labels_true.flatten(), labels_predict, multi_class='ovo', average='macro')
+        metrics["auc_ovo"] = roc_auc_score(
+            labels_true.flatten(), labels_predict, multi_class="ovo", average="macro"
+        )
         LOGGER.info(f"The AUC is {metrics['auc_ovo']}")
         fpr_list, tpr_list, auc_scores = [], [], []
         for i in range(self.cfg.jc_params.num_classes):
@@ -184,10 +218,11 @@ class JetClassTaggingExperiment(TaggingExperiment):
             tpr_list.append(tpr)
             metrics["auc_class_{}".format(i)] = auc_score
             if mode == "eval":
-                LOGGER.info(f"AUC score for class {i} on {title} dataset: {auc_score:.4f}")
+                LOGGER.info(
+                    f"AUC score for class {i} on {title} dataset: {auc_score:.4f}"
+                )
 
         metrics["auc_total"] = np.mean(auc_scores)
-
 
         # 1/epsB at fixed epsS
         def get_rej(epsS, class_idx):
@@ -200,8 +235,8 @@ class JetClassTaggingExperiment(TaggingExperiment):
             metrics["rej0995_{}".format(i)] = get_rej(0.995, i)
             if mode == "eval":
                 LOGGER.info(
-                f"Rejection rate for class {i} on {title} dataset: {metrics[f'rej05_{i}']:.0f} (epsS=0.5), "
-                f"{metrics[f'rej099_{i}']:.0f} (epsS=0.99), {metrics[f'rej0995_{i}']:.0f} (epsS=0.995)"
+                    f"Rejection rate for class {i} on {title} dataset: {metrics[f'rej05_{i}']:.0f} (epsS=0.5), "
+                    f"{metrics[f'rej099_{i}']:.0f} (epsS=0.99), {metrics[f'rej0995_{i}']:.0f} (epsS=0.995)"
                 )
 
         if self.cfg.use_mlflow:
@@ -232,10 +267,14 @@ class JetClassTaggingExperiment(TaggingExperiment):
         return metrics["ce"]
 
     def _batch_loss(self, batch):
-        input = batch[0]['pf_vectors'].to(self.device)
-        label = batch[1]['_label_'].to(self.device)
-        multivector, scalars, is_global, attention_indices = jc_batch_encoding(self, input)
-        y_pred = self.model(multivector, scalars, is_global, attention_indices).reshape(-1,self.cfg.jc_params.num_classes)
+        input = batch[0]["pf_vectors"].to(self.device)
+        label = batch[1]["_label_"].to(self.device)
+        multivector, scalars, is_global, attention_indices = jc_batch_encoding(
+            self, input
+        )
+        y_pred = self.model(multivector, scalars, is_global, attention_indices).reshape(
+            -1, self.cfg.jc_params.num_classes
+        )
         loss = self.loss(y_pred, label)
         assert torch.isfinite(loss).all()
 

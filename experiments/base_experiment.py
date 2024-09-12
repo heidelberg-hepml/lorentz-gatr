@@ -451,7 +451,11 @@ class BaseExperiment:
         patience = 0
 
         # main train loop
-        loader_size = 1e8 / self.cfg.training.batchsize if self.cfg.exp_type == "jctagging" else len(self.train_loader)
+        loader_size = (
+            1e8 / self.cfg.training.batchsize
+            if self.cfg.exp_type == "jctagging"
+            else len(self.train_loader)
+        )
         LOGGER.info(
             f"Starting to train for {self.cfg.training.iterations} iterations "
             f"= {self.cfg.training.iterations / loader_size:.1f} epochs "
@@ -466,7 +470,6 @@ class BaseExperiment:
             while True:
                 for x in iterable:
                     yield x
-
 
         iterator = iter(cycle(self.train_loader))
         for step in range(self.cfg.training.iterations):
