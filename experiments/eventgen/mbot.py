@@ -48,12 +48,10 @@ class MBOT(StandardLogPtPhiEtaLogM2):
                 pi = pot.sinkhorn(x1h_local, x2h_local, distance, reg=self.cfm.mbot.reg)
             p = pi.flatten()
             p /= p.sum()
-            p = p.cpu()
             choices = torch.multinomial(
                 p, num_samples=x1_local.shape[0], replacement=False
             )
             index2 = torch.remainder(choices, pi.shape[1])
-            index2 = torch.tensor(index2, device=x1.device, dtype=torch.long)
             x2_local = x2_local[index2]
             x2_out.append(x2_local)
         x2 = torch.cat(x2_out, dim=0)
