@@ -443,6 +443,7 @@ class EventCFM(CFM):
         base_type,
         use_pt_min,
         use_delta_r_min,
+        virtual_components,
     ):
         """
         Pass physics information to the CFM class
@@ -472,6 +473,9 @@ class EventCFM(CFM):
             Whether the base distribution should have delta_r cuts
         use_pt_min: bool
             Whether the base distribution should have pt cuts
+        virtual_components: List[List]
+            List of lists of virtual components of particles within the event
+            Example: [0, 1] if particles 0 and 1 are the two muons within a Z
         """
         self.units = units
         self.pt_min = pt_min
@@ -481,6 +485,7 @@ class EventCFM(CFM):
         self.base_type = base_type
         self.use_delta_r_min = use_delta_r_min
         self.use_pt_min = use_pt_min
+        self.virtual_components = virtual_components
 
         # same preprocessing for all multiplicities
         self.prep_params = {}
@@ -552,7 +557,12 @@ class EventCFM(CFM):
                 cfm=self.cfm, pt_min=self.pt_min, units=self.units
             )
         elif coordinates_label == "MBOT":
-            coordinates = mbot.MBOT(cfm=self.cfm, pt_min=self.pt_min, units=self.units)
+            coordinates = mbot.MBOT(
+                cfm=self.cfm,
+                pt_min=self.pt_min,
+                units=self.units,
+                virtual_components=self.virtual_components,
+            )
         else:
             raise ValueError(f"coordinates={coordinates_label} not implemented")
         return coordinates

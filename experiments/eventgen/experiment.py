@@ -118,6 +118,7 @@ class EventGenerationExperiment(BaseExperiment):
             self.cfg.data.base_type,
             self.cfg.data.use_pt_min,
             self.cfg.data.use_delta_r_min,
+            self.virtual_components,
         )
 
         # preprocessing
