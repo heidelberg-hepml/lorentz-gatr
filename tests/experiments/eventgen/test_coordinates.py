@@ -28,7 +28,6 @@ from tests.helpers import STRICT_TOLERANCES as TOLERANCES
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaLogM2,
         c.StandardLogPtPhiEtaLogM2,
-        c.StandardGaussian,
     ],
 )
 @pytest.mark.parametrize(
@@ -65,12 +64,11 @@ def test_invertibility(coordinates, distribution, experiment_np, nevents):
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaE,
-        c.StandardGaussian,
     ]:
         coord = coordinates(exp.pt_min, exp.units)
     elif coordinates == c.StandardPPPLogM2:
         coord = coordinates(exp.onshell_list)
-    elif coordinates in [c.StandardLogPtPhiEtaLogM2, c.StandardGaussian]:
+    elif coordinates in [c.StandardLogPtPhiEtaLogM2]:
         coord = coordinates(exp.pt_min, exp.units, exp.onshell_list)
     else:
         coord = coordinates()
@@ -107,7 +105,6 @@ def test_invertibility(coordinates, distribution, experiment_np, nevents):
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaLogM2,
         c.StandardLogPtPhiEtaLogM2,
-        c.StandardGaussian,
     ],
 )
 @pytest.mark.parametrize(
@@ -144,7 +141,6 @@ def test_velocity(coordinates, distribution, experiment_np, nevents):
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaE,
-        c.StandardGaussian,
     ]:
         coord = coordinates(exp.pt_min, exp.units)
     else:
@@ -209,7 +205,6 @@ def test_velocity(coordinates, distribution, experiment_np, nevents):
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaLogM2,
         c.StandardLogPtPhiEtaLogM2,
-        c.StandardGaussian,
     ],
 )
 @pytest.mark.parametrize(
@@ -246,7 +241,6 @@ def test_logdetjac(coordinates, distribution, experiment_np, nevents):
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaE,
-        c.StandardGaussian,
     ]:
         coord = coordinates(exp.pt_min, exp.units)
     else:
