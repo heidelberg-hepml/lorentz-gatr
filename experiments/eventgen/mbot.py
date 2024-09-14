@@ -3,6 +3,10 @@ import ot as pot
 
 from experiments.eventgen.coordinates import StandardLogPtPhiEtaLogM2
 from experiments.eventgen.helpers import ensure_angle
+from experiments.logger import LOGGER
+
+WARNINGS = 0
+WARNINGS_MAX = 100
 
 
 class MBOT(StandardLogPtPhiEtaLogM2):
@@ -80,16 +84,30 @@ class MBOT(StandardLogPtPhiEtaLogM2):
         else:
             # entropy-regulated solvers (fast because parallelized; potentially unstable)
             pi = pot.sinkhorn(*args, reg=self.cfm.mbot.reg, method=self.cfm.mbot.solver)
-            assert pi.std() > 1e-10, (
-                f"Solver '{self.cfm.mbot.solver}' with reg={self.cfm.mbot.reg} did not converge, "
-                f"consider increasing reg or using another more stable (but slower) solver "
-                f"like 'sinkhorn_epsilon_scaling', 'sinkhorn_stabilized' or 'sinkhorn_log'"
+        try:
+            p = pi.flatten()
+            p /= p.sum()
+            choices = torch.multinomial(p, num_samples=x1.shape[0], replacement=False)
+        except RuntimeError:
+            raise RuntimeError(
+                f"Solver '{self.cfm.mbot.solver}' with reg={self.cfm.mbot.reg} did not converge "
+                f"(all entries in the permutation matrix are equal). "
+                f"Consider increasing reg or using another more stable (but slower) solver "
+                f"like 'sinkhorn_epsilon_scaling', 'sinkhorn_stabilized' or 'sinkhorn_log'."
             )
-        p = pi.flatten()
-        p /= p.sum()
-        choices = torch.multinomial(p, num_samples=x1.shape[0], replacement=False)
         index1 = torch.div(choices, pi.shape[1], rounding_mode="floor")
         index2 = torch.remainder(choices, pi.shape[1])
+
+        # check that distance decreased
+        arange = torch.arange(0, len(index1))
+        distance_before = distance[arange, arange].sum()
+        distance_after = distance[index1, index2].sum()
+        global WARNINGS
+        if distance_after > distance_before and WARNINGS < WARNINGS_MAX:
+            LOGGER.warning(
+                f"OT solver increased distance from {distance_before:.2e} to {distance_after:.2e}"
+            )
+            WARNINGS += 1
         return index1, index2
 
     def get_trajectory(self, x1, x2, t):
