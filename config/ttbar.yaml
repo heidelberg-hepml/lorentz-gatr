@@ -48,6 +48,7 @@ cfm:
   standardize: false
   virtual_components: null
   normalize_distance: true
+  ot_float64: false
 
 gpt:
  channels: [1,0,2,3,5,4,6,7,9,8,10,11,13,12,14,15,17,16,18,19,21,20,22,23,25,24,26,27,29,28,30,31,33,32,34,35,37,36,38,39]

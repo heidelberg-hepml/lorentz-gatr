@@ -18,6 +18,7 @@ class MBOT(StandardLogPtPhiEtaLogM2):
             if cfm.mbot.virtual_components is None
             else cfm.mbot.virtual_components
         )
+        self.ot_dtype = torch.float64 if cfm.mbot.ot_float64 else torch.float32
 
     def _get_mass(self, particle):
         # particle has to be in 'Fourmomenta' format
@@ -74,7 +75,7 @@ class MBOT(StandardLogPtPhiEtaLogM2):
         return distance
 
     def _solve_optimal_transport(self, x1, x2):
-        distance = self._get_distance(x1, x2)
+        distance = self._get_distance(x1, x2).to(self.ot_dtype)
         distance /= distance.max()
         x1h, x2h = pot.unif(x1.shape[0], type_as=x1), pot.unif(x2.shape[0], type_as=x2)
         args = [x1h, x2h, distance]
@@ -83,7 +84,11 @@ class MBOT(StandardLogPtPhiEtaLogM2):
             pi = pot.emd(*args)
         else:
             # entropy-regulated solvers (fast because parallelized; potentially unstable)
-            pi = pot.sinkhorn(*args, reg=self.cfm.mbot.reg, method=self.cfm.mbot.solver)
+            pi = pot.sinkhorn(
+                *args,
+                reg=self.cfm.mbot.reg,
+                method=self.cfm.mbot.solver,
+            )
         try:
             p = pi.flatten()
             p /= p.sum()
