@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
+from omegaconf import open_dict
 
 import time
 
@@ -10,13 +11,20 @@ from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
 
 from experiments.toptagging.experiment import TaggingExperiment
-from experiments.toptagging.dataset import jc_batch_encoding
+from experiments.toptagging.embedding import jc_batch_encoding
 
 from experiments.toptagging.weaver.dataset import SimpleIterDataset
 from experiments.toptagging.weaver.loader import to_filelist
 
 
 class JetClassTaggingExperiment(TaggingExperiment):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        with open_dict(self.cfg):
+            self.cfg.data.num_global_tokens = 1
+
+            self.cfg.model.net.in_s_channels = 0
+
     def init_data(self):
         LOGGER.info(f"Creating SimpleIterDataset")
         t0 = time.time()
