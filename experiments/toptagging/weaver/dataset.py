@@ -1,6 +1,5 @@
 import os
 import copy
-import json
 import numpy as np
 import awkward as ak
 import torch.utils.data
@@ -10,10 +9,18 @@ from concurrent.futures.thread import ThreadPoolExecutor
 from .tools import _pad, _repeat_pad, _clip, _stack
 from .fileio import _read_files
 from .config import DataConfig, _md5
-from .preprocess import _apply_selection, _build_new_variables, _build_weights, AutoStandardizer, WeightMaker
+from .preprocess import (
+    _apply_selection,
+    _build_new_variables,
+    _build_weights,
+    AutoStandardizer,
+    WeightMaker,
+)
+
 
 def _collate_awkward_array_fn(batch, *, collate_fn_map=None):
     return _stack(batch, axis=0)
+
 
 def _finalize_inputs(table, data_config):
     output = {}
@@ -26,22 +33,37 @@ def _finalize_inputs(table, data_config):
         output[k] = ak.to_numpy(table[k])
     # transformation
     for k, params in data_config.preprocess_params.items():
-        if data_config._auto_standardization and params['center'] == 'auto':
-            raise ValueError('No valid standardization params for %s' % k)
-        if params['center'] is not None:
-            table[k] = _clip((table[k] - params['center']) * params['scale'], params['min'], params['max'])
-        if params['length'] is not None:
-            pad_fn = _repeat_pad if params['pad_mode'] == 'wrap' else partial(_pad, value=params['pad_value'])
-            table[k] = pad_fn(table[k], params['length'])
+        if data_config._auto_standardization and params["center"] == "auto":
+            raise ValueError("No valid standardization params for %s" % k)
+        if params["center"] is not None:
+            table[k] = _clip(
+                (table[k] - params["center"]) * params["scale"],
+                params["min"],
+                params["max"],
+            )
+        if params["length"] is not None:
+            pad_fn = (
+                _repeat_pad
+                if params["pad_mode"] == "wrap"
+                else partial(_pad, value=params["pad_value"])
+            )
+            table[k] = pad_fn(table[k], params["length"])
         # check for NaN
         if np.any(np.isnan(table[k])):
             table[k] = np.nan_to_num(table[k])
     # stack variables for each input group
     for k, names in data_config.input_dicts.items():
-        if len(names) == 1 and data_config.preprocess_params[names[0]]['length'] is None:
-            output['_' + k] = ak.to_numpy(ak.values_astype(table[names[0]], 'float32'))
+        if (
+            len(names) == 1
+            and data_config.preprocess_params[names[0]]["length"] is None
+        ):
+            output["_" + k] = ak.to_numpy(ak.values_astype(table[names[0]], "float32"))
         else:
-            output['_' + k] = ak.to_numpy(np.stack([ak.to_numpy(table[n]).astype('float32') for n in names], axis=1))
+            output["_" + k] = ak.to_numpy(
+                np.stack(
+                    [ak.to_numpy(table[n]).astype("float32") for n in names], axis=1
+                )
+            )
     # copy monitor variables (after transformation)
     for k in data_config.z_variables:
         if k in data_config.monitor_variables:
@@ -60,43 +82,63 @@ def _get_reweight_indices(weights, up_sample=True, max_resample=10, weight_scale
         if n_repeats > max_resample:
             n_repeats = max_resample
         all_indices = np.repeat(np.arange(len(weights)), n_repeats)
-        randwgt = np.random.uniform(low=0, high=weight_scale, size=len(weights) * n_repeats)
+        randwgt = np.random.uniform(
+            low=0, high=weight_scale, size=len(weights) * n_repeats
+        )
         keep_indices = all_indices[randwgt < np.repeat(weights, n_repeats)]
     return copy.deepcopy(keep_indices)
 
 
 def _check_labels(table):
-    if np.all(table['_labelcheck_'] == 1):
+    if np.all(table["_labelcheck_"] == 1):
         return
     else:
-        if np.any(table['_labelcheck_'] == 0):
-            raise RuntimeError('Inconsistent label definition: some of the entries are not assigned to any classes!')
-        if np.any(table['_labelcheck_'] > 1):
-            raise RuntimeError('Inconsistent label definition: some of the entries are assigned to multiple classes!')
+        if np.any(table["_labelcheck_"] == 0):
+            raise RuntimeError(
+                "Inconsistent label definition: some of the entries are not assigned to any classes!"
+            )
+        if np.any(table["_labelcheck_"] > 1):
+            raise RuntimeError(
+                "Inconsistent label definition: some of the entries are assigned to multiple classes!"
+            )
 
 
 def _preprocess(table, data_config, options):
     # apply selection
     table = _apply_selection(
-        table, data_config.selection if options['training'] else data_config.test_time_selection,
-        funcs=data_config.var_funcs)
+        table,
+        data_config.selection
+        if options["training"]
+        else data_config.test_time_selection,
+        funcs=data_config.var_funcs,
+    )
     if len(table) == 0:
         return []
     # define new variables
-    aux_branches = data_config.train_aux_branches if options['training'] else data_config.test_aux_branches
-    table = _build_new_variables(table, {k: v for k, v in data_config.var_funcs.items() if k in aux_branches})
+    aux_branches = (
+        data_config.train_aux_branches
+        if options["training"]
+        else data_config.test_aux_branches
+    )
+    table = _build_new_variables(
+        table, {k: v for k, v in data_config.var_funcs.items() if k in aux_branches}
+    )
     # check labels
-    if data_config.label_type == 'simple' and options['training']:
+    if data_config.label_type == "simple" and options["training"]:
         _check_labels(table)
     # compute reweight indices
-    if options['reweight'] and data_config.weight_name is not None:
+    if options["reweight"] and data_config.weight_name is not None:
         wgts = _build_weights(table, data_config)
-        indices = _get_reweight_indices(wgts, up_sample=options['up_sample'],
-                                        weight_scale=options['weight_scale'], max_resample=options['max_resample'])
+        indices = _get_reweight_indices(
+            wgts,
+            up_sample=options["up_sample"],
+            weight_scale=options["weight_scale"],
+            max_resample=options["max_resample"],
+        )
     else:
         indices = np.arange(len(table[data_config.label_names[0]]))
     # shuffle
-    if options['shuffle']:
+    if options["shuffle"]:
         np.random.shuffle(indices)
     # perform input variable standardization, clipping, padding and stacking
     table = _finalize_inputs(table, data_config)
@@ -104,9 +146,19 @@ def _preprocess(table, data_config, options):
 
 
 def _load_next(data_config, filelist, load_range, options):
-    load_branches = data_config.train_load_branches if options['training'] else data_config.test_load_branches
-    table = _read_files(filelist, load_branches, load_range, treename=data_config.treename,
-                        branch_magic=data_config.branch_magic, file_magic=data_config.file_magic)
+    load_branches = (
+        data_config.train_load_branches
+        if options["training"]
+        else data_config.test_load_branches
+    )
+    table = _read_files(
+        filelist,
+        load_branches,
+        load_range,
+        treename=data_config.treename,
+        branch_magic=data_config.branch_magic,
+        file_magic=data_config.file_magic,
+    )
     table, indices = _preprocess(table, data_config, options)
     return table, indices
 
@@ -135,14 +187,14 @@ class _SimpleIter(object):
         file_dict = copy.deepcopy(self._init_file_dict)
         if worker_info is not None:
             # in a worker process
-            self._name += '_worker%d' % worker_info.id
+            self._name += "_worker%d" % worker_info.id
             self._seed = worker_info.seed & 0xFFFFFFFF
             np.random.seed(self._seed)
             # split workload by files
             new_file_dict = {}
             for name, files in file_dict.items():
-                new_files = files[worker_info.id::worker_info.num_workers]
-                assert (len(new_files) > 0)
+                new_files = files[worker_info.id :: worker_info.num_workers]
+                assert len(new_files) > 0
                 new_file_dict[name] = new_files
             file_dict = new_file_dict
         self.worker_file_dict = file_dict
@@ -152,10 +204,10 @@ class _SimpleIter(object):
         self.restart()
 
     def restart(self):
-        print('=== Restarting DataIter %s, seed=%s ===' % (self._name, self._seed))
+        print("=== Restarting DataIter %s, seed=%s ===" % (self._name, self._seed))
         # re-shuffle filelist and load range if for training
         filelist = copy.deepcopy(self.worker_filelist)
-        if self._sampler_options['shuffle']:
+        if self._sampler_options["shuffle"]:
             np.random.shuffle(filelist)
         if self._file_fraction < 1:
             num_files = int(len(filelist) * self._file_fraction)
@@ -167,7 +219,7 @@ class _SimpleIter(object):
         else:
             (start_pos, end_pos), load_frac = self._init_load_range_and_fraction
             interval = (end_pos - start_pos) * load_frac
-            if self._sampler_options['shuffle']:
+            if self._sampler_options["shuffle"]:
                 offset = np.random.uniform(start_pos, end_pos - interval)
                 self.load_range = (offset, offset + interval)
             else:
@@ -190,7 +242,7 @@ class _SimpleIter(object):
             while True:
                 if self._in_memory and len(self.indices) > 0:
                     # only need to re-shuffle the indices, if this is not the first entry
-                    if self._sampler_options['shuffle']:
+                    if self._sampler_options["shuffle"]:
                         np.random.shuffle(self.indices)
                     break
                 if self.prefetch is None:
@@ -216,11 +268,18 @@ class _SimpleIter(object):
         return self.get_data(i)
 
     def _try_get_next(self, init=False):
-        end_of_list = self.ipos >= len(self.filelist) if self._fetch_by_files else self.ipos >= self.load_range[1]
+        end_of_list = (
+            self.ipos >= len(self.filelist)
+            if self._fetch_by_files
+            else self.ipos >= self.load_range[1]
+        )
         if end_of_list:
             if init:
-                raise RuntimeError('Nothing to load for worker %d' %
-                                   0 if self.worker_info is None else self.worker_info.id)
+                raise RuntimeError(
+                    "Nothing to load for worker %d" % 0
+                    if self.worker_info is None
+                    else self.worker_info.id
+                )
             if self._infinity_mode and not self._in_memory:
                 # infinity mode: re-start
                 self.restart()
@@ -231,23 +290,36 @@ class _SimpleIter(object):
                 return
 
         if self._fetch_by_files:
-            filelist = self.filelist[int(self.ipos): int(self.ipos + self._fetch_step)]
+            filelist = self.filelist[int(self.ipos) : int(self.ipos + self._fetch_step)]
             load_range = self.load_range
         else:
             filelist = self.filelist
-            load_range = (self.ipos, min(self.ipos + self._fetch_step, self.load_range[1]))
+            load_range = (
+                self.ipos,
+                min(self.ipos + self._fetch_step, self.load_range[1]),
+            )
 
         if self._async_load:
-            self.prefetch = self.executor.submit(_load_next, self._data_config,
-                                                 filelist, load_range, self._sampler_options)
+            self.prefetch = self.executor.submit(
+                _load_next,
+                self._data_config,
+                filelist,
+                load_range,
+                self._sampler_options,
+            )
         else:
-            self.prefetch = _load_next(self._data_config, filelist, load_range, self._sampler_options)
+            self.prefetch = _load_next(
+                self._data_config, filelist, load_range, self._sampler_options
+            )
 
         self.ipos += self._fetch_step
 
     def get_data(self, i):
         # inputs
-        X = {k: copy.deepcopy(self.table['_' + k][i]) for k in self._data_config.input_names}
+        X = {
+            k: copy.deepcopy(self.table["_" + k][i])
+            for k in self._data_config.input_names
+        }
         # labels
         y = {k: copy.deepcopy(self.table[k][i]) for k in self._data_config.label_names}
         # observers / monitor variables
@@ -279,10 +351,25 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
         file_fraction (float): fraction of files to load.
     """
 
-    def __init__(self, file_dict, data_config_file,
-                 for_training=True, load_range_and_fraction=None, extra_selection=None,
-                 fetch_by_files=False, fetch_step=0.01, file_fraction=1, remake_weights=False, up_sample=True,
-                 weight_scale=1, max_resample=10, async_load=False, infinity_mode=False, in_memory=False, name=''):
+    def __init__(
+        self,
+        file_dict,
+        data_config_file,
+        for_training=True,
+        load_range_and_fraction=None,
+        extra_selection=None,
+        fetch_by_files=False,
+        fetch_step=0.01,
+        file_fraction=1,
+        remake_weights=False,
+        up_sample=True,
+        weight_scale=1,
+        max_resample=10,
+        async_load=False,
+        infinity_mode=False,
+        in_memory=False,
+        name="",
+    ):
         self._iters = {} if infinity_mode or in_memory else None
         _init_args = set(self.__dict__.keys())
         self._init_file_dict = file_dict
@@ -297,13 +384,14 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
 
         # ==== sampling parameters ====
         self._sampler_options = {
-            'up_sample': up_sample,
-            'weight_scale': weight_scale,
-            'max_resample': max_resample,
+            "up_sample": up_sample,
+            "weight_scale": weight_scale,
+            "max_resample": max_resample,
         }
 
         # ==== torch collate_fn map ====
         from torch.utils.data._utils.collate import default_collate_fn_map
+
         default_collate_fn_map.update({ak.Array: _collate_awkward_array_fn})
 
         if for_training:
@@ -312,11 +400,13 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
             self._sampler_options.update(training=False, shuffle=False, reweight=False)
 
         # discover auto-generated reweight file
-        if '.auto.yaml' in data_config_file:
+        if ".auto.yaml" in data_config_file:
             data_config_autogen_file = data_config_file
         else:
             data_config_md5 = _md5(data_config_file)
-            data_config_autogen_file = data_config_file.replace('.yaml', '.%s.auto.yaml' % data_config_md5)
+            data_config_autogen_file = data_config_file.replace(
+                ".yaml", ".%s.auto.yaml" % data_config_md5
+            )
             if os.path.exists(data_config_autogen_file):
                 data_config_file = data_config_autogen_file
 
@@ -330,18 +420,30 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
                 self._data_config = s.produce(data_config_autogen_file)
 
             # produce reweight info if needed
-            if self._sampler_options['reweight'] and self._data_config.weight_name and not self._data_config.use_precomputed_weights:
+            if (
+                self._sampler_options["reweight"]
+                and self._data_config.weight_name
+                and not self._data_config.use_precomputed_weights
+            ):
                 if remake_weights or self._data_config.reweight_hists is None:
                     w = WeightMaker(file_dict, self._data_config)
                     self._data_config = w.produce(data_config_autogen_file)
 
             # reload data_config w/o observers for training
-            if os.path.exists(data_config_autogen_file) and data_config_file != data_config_autogen_file:
+            if (
+                os.path.exists(data_config_autogen_file)
+                and data_config_file != data_config_autogen_file
+            ):
                 data_config_file = data_config_autogen_file
-            self._data_config = DataConfig.load(data_config_file, load_observers=False, extra_selection=extra_selection)
+            self._data_config = DataConfig.load(
+                data_config_file, load_observers=False, extra_selection=extra_selection
+            )
         else:
             self._data_config = DataConfig.load(
-                data_config_file, load_reweight_info=False, extra_test_selection=extra_selection)
+                data_config_file,
+                load_reweight_info=False,
+                extra_test_selection=extra_selection,
+            )
 
         # derive all variables added to self.__dict__
         self._init_args = set(self.__dict__.keys()) - _init_args
