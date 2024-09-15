@@ -7,10 +7,10 @@ import torch.utils.data
 
 from functools import partial
 from concurrent.futures.thread import ThreadPoolExecutor
-from .data.tools import _pad, _repeat_pad, _clip, _stack
-from .data.fileio import _read_files
-from .data.config import DataConfig, _md5
-from .data.preprocess import _apply_selection, _build_new_variables, _build_weights, AutoStandardizer, WeightMaker
+from .tools import _pad, _repeat_pad, _clip, _stack
+from .fileio import _read_files
+from .config import DataConfig, _md5
+from .preprocess import _apply_selection, _build_new_variables, _build_weights, AutoStandardizer, WeightMaker
 
 def _collate_awkward_array_fn(batch, *, collate_fn_map=None):
     return _stack(batch, axis=0)

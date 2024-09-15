@@ -12,8 +12,8 @@ from experiments.mlflow import log_mlflow
 from experiments.toptagging.experiment import TaggingExperiment
 from experiments.toptagging.dataset import jc_batch_encoding
 
-from data.utils.dataset import SimpleIterDataset
-from data.utils.loader import to_filelist
+from experiments.toptagging.weaver.dataset import SimpleIterDataset
+from experiments.toptagging.weaver.loader import to_filelist
 
 
 class JetClassTaggingExperiment(TaggingExperiment):

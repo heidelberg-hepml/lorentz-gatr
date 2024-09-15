@@ -11,8 +11,6 @@ import copy
 import torch
 import yaml
 
-from experiments.logger import LOGGER
-
 class DotDict(dict):
     __getattr__ = dict.get
     __setattr__ = dict.__setitem__
