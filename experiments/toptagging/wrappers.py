@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 from torch import nn
 from torch_geometric.nn.aggr import MeanAggregation

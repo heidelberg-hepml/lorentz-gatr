@@ -1,10 +1,8 @@
-import numpy as np
 import torch
 from torch import nn
 
 from gatr.interface import embed_vector, extract_scalar
 from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity
-from experiments.amplitudes.preprocessing import preprocess_particles
 
 
 def encode_tokens(type_token, global_token, token_size, isgatr, batchsize, device):
@@ -28,7 +26,6 @@ def encode_tokens(type_token, global_token, token_size, isgatr, batchsize, devic
     global_token: torch.Tensor with shape (batchsize, 1, type_token_max+4)
         ont-hot-encoded dataset token, this will be the global_token and appended to the individual particles
     """
-    nprocesses = type_token.shape[0]
     type_token = nn.functional.one_hot(type_token, num_classes=token_size)
     type_token = (
         type_token.unsqueeze(1)

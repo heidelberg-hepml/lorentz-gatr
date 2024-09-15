@@ -4,7 +4,6 @@ import math
 from experiments.eventgen.helpers import (
     get_pt,
     delta_r_fast,
-    unpack_last,
     fourmomenta_to_jetmomenta,
 )
 import experiments.eventgen.coordinates as c

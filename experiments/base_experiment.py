@@ -10,7 +10,6 @@ from hydra.core.config_store import ConfigStore
 from hydra.utils import instantiate
 import mlflow
 from torch_ema import ExponentialMovingAverage
-from tqdm import trange
 
 import gatr.primitives.attention
 import gatr.layers.linear

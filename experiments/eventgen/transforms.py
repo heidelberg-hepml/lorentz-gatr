@@ -313,7 +313,6 @@ class PtPhiEtaE_to_PtPhiEtaM2(BaseTransform):
         pt, phi, eta, m2 = unpack_last(ptphietam2)
 
         # jac_ij = dptphietae_i / dptphietam2_j
-        p_abs = pt * torch.cosh(eta)
         zero, one = torch.zeros_like(E), torch.ones_like(E)
         jac_pt = torch.stack((one, zero, zero, pt * torch.cosh(eta) ** 2 / E), dim=-1)
         jac_phi = torch.stack((zero, one, zero, zero), dim=-1)
@@ -426,46 +425,6 @@ class Pt_to_LogPt(BaseTransform):
         pt, x1, x2, x3 = unpack_last(ptx)
         dpt = self.get_dpt(pt)
         return 1 / (dpt + EPS1 + EPS2)
-
-
-class NonPeriodicPhi(BaseTransform):
-    # only used for jetgpt
-    def _forward(self, logptphietalogm2):
-        logpt, phi, eta, logm2 = unpack_last(logptphietalogm2)
-        x = stable_arctanh(phi / math.pi)
-        return torch.stack((logpt, x, eta, logm2), dim=-1)
-
-    def _inverse(self, logptxetalogm2):
-        logpt, x, eta, logm2 = unpack_last(logptxetalogm2)
-        phi = math.pi * torch.tanh(x)
-        return torch.stack((logpt, phi, eta, logm2), dim=-1)
-
-    def _jac_forward(self, logptphietalogm2, logptxetalogm2):
-        logpt, phi, eta, logm2 = unpack_last(logptphietalogm2)
-        factor = math.pi / (math.pi**2 - phi**2).clamp(min=EPS2)
-
-        zero, one = torch.zeros_like(logpt), torch.ones_like(logpt)
-        jac_logpt = torch.stack((one, zero, zero, zero), dim=-1)
-        jac_phi = torch.stack((zero, factor, zero, zero), dim=-1)
-        jac_eta = torch.stack((zero, zero, one, zero), dim=-1)
-        jac_logm2 = torch.stack((zero, zero, zero, one), dim=-1)
-        return torch.stack((jac_logpt, jac_phi, jac_eta, jac_logm2), dim=-1)
-
-    def _jac_inverse(self, logptxetalogm2, logptphietalogm2):
-        logpt, x, eta, logm2 = unpack_last(logptxetalogm2)
-        factor = math.pi / torch.cosh(x) ** 2
-
-        zero, one = torch.zeros_like(logpt), torch.ones_like(logpt)
-        jac_logpt = torch.stack((one, zero, zero, zero), dim=-1)
-        jac_x = torch.stack((zero, factor, zero, zero), dim=-1)
-        jac_eta = torch.stack((zero, zero, one, zero), dim=-1)
-        jac_logm2 = torch.stack((zero, zero, zero, one), dim=-1)
-        return torch.stack((jac_logpt, jac_x, jac_eta, jac_logm2), dim=-1)
-
-    def _detjac_forward(self, logptphietalogm2, logptxetalogm2):
-        logpt, phi, eta, logm2 = unpack_last(logptphietalogm2)
-        factor = math.pi / (math.pi**2 - phi**2).clamp(min=EPS2)
-        return factor
 
 
 class StandardNormal(BaseTransform):

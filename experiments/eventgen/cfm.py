@@ -13,7 +13,6 @@ from experiments.eventgen.distributions import (
     StandardLogPtPhiEtaLogM2,
 )
 import experiments.eventgen.coordinates as c
-import experiments.eventgen.distributions as d
 from experiments.eventgen.coordinates import (
     convert_coordinates,
     convert_velocity,

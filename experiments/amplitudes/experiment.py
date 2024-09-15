@@ -103,10 +103,6 @@ class AmplitudeExperiment(BaseExperiment):
             else:
                 raise ValueError(f"model {modelname} not implemented")
 
-            # reinsert_type_token
-            if modelname == "GATr" and self.cfg.model.reinsert_type_token:
-                self.cfg.model.net.reinsert_s_channels = list(range(n_type_tokens))
-
     def init_data(self):
         LOGGER.info(
             f"Working with dataset {self.cfg.data.dataset} "

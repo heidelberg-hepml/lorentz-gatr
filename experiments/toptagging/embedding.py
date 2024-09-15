@@ -1,5 +1,4 @@
 import torch
-from torch_geometric.data import Batch
 from torch.nn.functional import one_hot
 
 from gatr.interface import embed_vector
