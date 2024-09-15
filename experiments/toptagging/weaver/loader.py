@@ -1,16 +1,7 @@
 import glob
 
 
-def to_filelist(args, mode="train"):
-    if mode == "train":
-        flist = args.data_train
-    elif mode == "val":
-        flist = args.data_val
-    elif mode == "test":
-        flist = args.data_test
-    else:
-        raise NotImplementedError("Invalid mode %s" % mode)
-
+def to_filelist(flist):
     # keyword-based: 'a:/path/to/a b:/path/to/b'
     file_dict = {}
     for f in flist:

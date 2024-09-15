@@ -3,7 +3,7 @@ import torch
 from torch.utils.data import DataLoader
 from omegaconf import open_dict
 
-import time
+import os, time
 
 from sklearn.metrics import roc_curve, roc_auc_score, accuracy_score
 
@@ -38,65 +38,50 @@ class JetClassTaggingExperiment(TaggingExperiment):
         LOGGER.info(f"Creating SimpleIterDataset")
         t0 = time.time()
 
-        train_file_dict, self.train_files = to_filelist(self.cfg.jc_params, "train")
-        val_file_dict, self.val_files = to_filelist(self.cfg.jc_params, "val")
-        test_file_dict, self.test_files = to_filelist(self.cfg.jc_params, "test")
-        train_range = val_range = test_range = (0, 1)
+        classes = [
+            "HToBB",
+            "HToCC",
+            "HToGG",
+            "HToWW2Q1L",
+            "HToWW4Q",
+            "TTBar",
+            "TTBarLep",
+            "WToQQ",
+            "ZToQQ",
+            "ZJetsToNuNu",
+        ]
+        frange = (0, 1)
+        datasets = {"train": None, "test": None, "val": None}
+        self.num_files = {"train": None, "test": None, "val": None}
 
-        LOGGER.info(
-            f"Using {len(self.train_files)} files for training, range: {str(train_range)}"
-        )
-        LOGGER.info(
-            f"Using {len(self.val_files)} files for validation, range: {str(val_range)}"
-        )
-        LOGGER.info(
-            f"Using {len(self.test_files)} files for testing, range: {str(test_range)}"
-        )
+        for_training = {"train": True, "val": True, "test": False}
+        folder = {"train": "train_100M", "test": "test_20M", "val": "val_5M"}
+        for label in ["train", "test", "val"]:
+            path = os.path.join(self.cfg.data.data_dir, folder[label])
+            flist = [f"{classname}:{path}/{classname}_*.root" for classname in classes]
+            file_dict, files = to_filelist(flist)
+            self.num_files[label] = len(files)
 
-        self.data_train = SimpleIterDataset(
-            train_file_dict,
-            self.cfg.jc_params.data_config,
-            for_training=True,
-            extra_selection=self.cfg.jc_params.extra_selection,
-            remake_weights=not self.cfg.jc_params.not_remake_weights,
-            load_range_and_fraction=(train_range, self.cfg.jc_params.data_fraction),
-            file_fraction=self.cfg.jc_params.file_fraction,
-            fetch_by_files=self.cfg.jc_params.fetch_by_files,
-            fetch_step=self.cfg.jc_params.fetch_step,
-            infinity_mode=self.cfg.jc_params.steps_per_epoch is not None,
-            in_memory=self.cfg.jc_params.in_memory,
-            name="train",
-        )
-
-        self.data_val = SimpleIterDataset(
-            val_file_dict,
-            self.cfg.jc_params.data_config,
-            for_training=True,
-            extra_selection=self.cfg.jc_params.extra_selection,
-            remake_weights=not self.cfg.jc_params.not_remake_weights,
-            load_range_and_fraction=(val_range, self.cfg.jc_params.data_fraction),
-            file_fraction=self.cfg.jc_params.file_fraction,
-            fetch_by_files=self.cfg.jc_params.fetch_by_files,
-            fetch_step=self.cfg.jc_params.fetch_step,
-            infinity_mode=self.cfg.jc_params.steps_per_epoch is not None,
-            in_memory=self.cfg.jc_params.in_memory,
-            name="val",
-        )
-
-        self.data_test = SimpleIterDataset(
-            test_file_dict,
-            self.cfg.jc_params.data_config,
-            for_training=False,
-            extra_selection=self.cfg.jc_params.extra_selection,
-            remake_weights=not self.cfg.jc_params.not_remake_weights,
-            load_range_and_fraction=(test_range, self.cfg.jc_params.data_fraction),
-            file_fraction=self.cfg.jc_params.file_fraction,
-            fetch_by_files=self.cfg.jc_params.fetch_by_files,
-            fetch_step=self.cfg.jc_params.fetch_step,
-            infinity_mode=self.cfg.jc_params.steps_per_epoch is not None,
-            in_memory=self.cfg.jc_params.in_memory,
-            name="test",
-        )
+            LOGGER.info(
+                f"Using {self.num_files[label]} files for training, range: {str(frange)}"
+            )
+            datasets[label] = SimpleIterDataset(
+                file_dict,
+                self.cfg.data.data_config,
+                for_training=True,
+                extra_selection=self.cfg.jc_params.extra_selection,
+                remake_weights=not self.cfg.jc_params.not_remake_weights,
+                load_range_and_fraction=(frange, self.cfg.jc_params.data_fraction),
+                file_fraction=self.cfg.jc_params.file_fraction,
+                fetch_by_files=self.cfg.jc_params.fetch_by_files,
+                fetch_step=self.cfg.jc_params.fetch_step,
+                infinity_mode=self.cfg.jc_params.steps_per_epoch is not None,
+                in_memory=self.cfg.jc_params.in_memory,
+                name=label,
+            )
+        self.data_train = datasets["train"]
+        self.data_test = datasets["test"]
+        self.data_val = datasets["val"]
 
         dt = time.time() - t0
         LOGGER.info(f"Finished creating datasets after {dt:.2f} s = {dt/60:.2f} min")
@@ -109,7 +94,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
             pin_memory=True,
             num_workers=min(
                 self.cfg.jc_params.num_workers,
-                int(len(self.train_files) * self.cfg.jc_params.file_fraction),
+                int(self.num_files["train"] * self.cfg.jc_params.file_fraction),
             ),
             persistent_workers=self.cfg.jc_params.num_workers > 0
             and self.cfg.jc_params.steps_per_epoch is not None,
@@ -121,7 +106,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
             pin_memory=True,
             num_workers=min(
                 self.cfg.jc_params.num_workers,
-                int(len(self.val_files) * int(self.cfg.jc_params.file_fraction)),
+                int(self.num_files["val"] * int(self.cfg.jc_params.file_fraction)),
             ),
             persistent_workers=self.cfg.jc_params.num_workers > 0
             and self.cfg.jc_params.steps_per_epoch_val is not None,
@@ -131,7 +116,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
             batch_size=self.cfg.evaluation.batchsize,
             drop_last=False,
             pin_memory=True,
-            num_workers=min(self.cfg.jc_params.num_workers, len(self.test_files)),
+            num_workers=min(self.cfg.jc_params.num_workers, self.num_files["test"]),
         )
 
     def evaluate_single(self, loader, title, mode, step=None):
