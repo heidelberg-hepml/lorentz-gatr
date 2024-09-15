@@ -43,6 +43,7 @@ class TopTaggingDataset(TaggingDataset):
         filename,
         mode,
         data_scale=None,
+        dtype=torch.float32,
     ):
         """
         Parameters
@@ -69,7 +70,7 @@ class TopTaggingDataset(TaggingDataset):
 
         if self.rescale_data:
             kinematics = kinematics / self.data_scale
-        kinematics = torch.tensor(kinematics)
+        kinematics = torch.tensor(kinematics, dtype=dtype)
         labels = torch.tensor(labels, dtype=torch.bool)
 
         # create list of torch_geometric.data.Data objects
@@ -80,21 +81,21 @@ class TopTaggingDataset(TaggingDataset):
             fourmomenta = kinematics[i, ...][mask]
             label = labels[i, ...]
             scalars = torch.zeros(
-                fourmomenta.shape[0], 0, dtype=fourmomenta.dtype
+                fourmomenta.shape[0],
+                0,
+                dtype=dtype,
             )  # no scalar information
             data = Data(x=fourmomenta, scalars=scalars, label=label)
             self.data_list.append(data)
 
 
 class QGTaggingDataset(TaggingDataset):
-    def __init__(
+    def load_data(
         self,
         filename,
         mode,
-        cfg,
         data_scale=None,
-        dtype=torch.float,
-        device="cpu",
+        dtype=torch.float32,
     ):
         """
         Parameters
@@ -120,7 +121,7 @@ class QGTaggingDataset(TaggingDataset):
             assert data_scale is not None
         self.data_scale = data_scale
 
-        if self.cfg.data.rescale_data:
+        if self.rescale_data:
             kinematics = kinematics / self.data_scale
         kinematics = torch.tensor(kinematics, dtype=dtype)
         pids = torch.tensor(pids, dtype=dtype)
