@@ -119,7 +119,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
             num_workers=min(self.cfg.jc_params.num_workers, self.num_files["test"]),
         )
 
-    def evaluate_single(self, loader, title, mode, step=None):
+    def _evaluate_single(self, loader, title, mode, step=None):
         assert mode in ["val", "eval"]
         # re-initialize dataloader to make sure it is using the evaluation batchsize
         # (makes a difference for trainloader)
@@ -128,6 +128,9 @@ class JetClassTaggingExperiment(TaggingExperiment):
             batch_size=self.cfg.evaluation.batchsize,
             shuffle=False,
         )
+
+        if mode == "eval":
+            LOGGER.info(f"### Starting to evaluate model on {title} dataset ###")
         metrics = {}
 
         # predictions
@@ -137,15 +140,8 @@ class JetClassTaggingExperiment(TaggingExperiment):
             self.optimizer.eval()
         with torch.no_grad():
             for batch in loader:
-                input = batch[0]["pf_vectors"].to(self.device)
-                label = batch[1]["_label_"].to(self.device)
-                multivector, scalars, is_global, attention_indices = jc_batch_encoding(
-                    self, input
-                )
-                y_pred = self.model(
-                    multivector, scalars, is_global, attention_indices
-                ).reshape(-1, self.cfg.jc_params.num_classes)
-                labels_true.append(label.cpu())
+                y_pred, label = self._get_ypred_and_label(batch)
+                labels_true.append(label.cpu().float())
                 labels_predict.append(y_pred.cpu().float())
 
         labels_true, labels_predict = torch.cat(labels_true), torch.cat(labels_predict)
@@ -221,7 +217,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
 
         return metrics
 
-    def _batch_loss(self, batch):
+    def _get_ypred_and_label(self, batch):
         fourmomenta = batch[0]["pf_vectors"].to(self.device)
         scalars = torch.empty(
             fourmomenta.shape[0],
@@ -234,8 +230,4 @@ class JetClassTaggingExperiment(TaggingExperiment):
         fourmomenta, scalars, ptr = dense_to_sparse_jet(fourmomenta, scalars)
         embedding = embed_tagging_data_into_ga(fourmomenta, scalars, ptr, self.cfg.data)
         y_pred = self.model(embedding)
-        loss = self.loss(y_pred, label)
-        assert torch.isfinite(loss).all()
-
-        metrics = {}
-        return loss, metrics
+        return y_pred, label
