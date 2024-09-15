@@ -150,11 +150,9 @@ class TaggingExperiment(BaseExperiment):
             self.optimizer.eval()
         with torch.no_grad():
             for batch in loader:
-                batch = batch.to(self.device)
-                embedding = embed_tagging_data_into_ga(batch, self.cfg.data)
-                y_pred = self.model(embedding)
+                y_pred, label = self._get_ypred_and_label(batch)
                 y_pred = torch.nn.functional.sigmoid(y_pred)
-                labels_true.append(batch.label.cpu().float())
+                labels_true.append(label.cpu().float())
                 labels_predict.append(y_pred.cpu().float())
         labels_true, labels_predict = torch.cat(labels_true), torch.cat(labels_predict)
         if mode == "eval":
@@ -252,14 +250,20 @@ class TaggingExperiment(BaseExperiment):
         return metrics["bce"]
 
     def _batch_loss(self, batch):
-        batch = batch.to(self.device)
-        embedding = embed_tagging_data_into_ga(batch, self.cfg.data)
-        y_pred = self.model(embedding)
-        loss = self.loss(y_pred, batch.label.to(self.dtype))
+        y_pred, label = self._get_ypred_and_label(batch)
+        loss = self.loss(y_pred, label)
         assert torch.isfinite(loss).all()
 
         metrics = {}
         return loss, metrics
+
+    def _get_ypred_and_label(self, batch):
+        batch = batch.to(self.device)
+        embedding = embed_tagging_data_into_ga(
+            batch.x, batch.scalars, batch.ptr, self.cfg.data
+        )
+        y_pred = self.model(embedding)
+        return y_pred, batch.label.to(self.dtype)
 
     def _init_metrics(self):
         return {}

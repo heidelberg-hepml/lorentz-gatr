@@ -1,35 +1,32 @@
 import torch
 from torch.nn.functional import one_hot
 
+from experiments.toptagging.dataset import EPS
 from gatr.interface import embed_vector
 
 
-def embed_tagging_data_into_ga(batch, cfg_data):
+def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
     """
-    Embed tagging data into sparse geometric algebra representation
+    Embed tagging data into geometric algebra representation
     We use torch_geometric sparse representations to be more memory efficient
     Note that we do not embed the label, because it is handled elsewhere
 
     Parameters
     ----------
-    batch: torch_geometric.data.GlobalStorage
-        Object that contains information about tagging data
-        fourmomenta (in 'x'), scalars, labels
-    add_time_reference: bool
-        Whether to add the time direction as a reference to the network
-    two_beams: bool
-        Whether we only want (x, 0, 0, 1) or both (x, 0, 0, +/- 1) for the beam
-    device
-    dtype
+    fourmomenta: torch.tensor of shape (n_particles, 4)
+        Fourmomenta in the format (E, px, py, pz)
+    scalars: torch.tensor of shape (n_particles, n_features)
+        Optional scalar features, n_features=0 is possible
+    ptr: torch.tensor of shape (batchsize+1)
+        Indices of the first particle for each jet
+        Also includes the first index after the batch ends
+    cfg_data: settings for embedding
 
     Returns
     -------
     spurion: torch.tensor with shape (n_spurions, 16)
         spurion embedded as multivector object
     """
-    fourmomenta = batch.x
-    scalars = batch.scalars
-    ptr = batch.ptr
     batchsize = len(ptr) - 1
     arange = torch.arange(batchsize, device=fourmomenta.device)
 
