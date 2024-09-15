@@ -1,43 +1,10 @@
-exp_type: toptagging
-exp_name: topt_local_debug
-base_dir: /remote/gpu02/breso/lorentz-gatr-pretrain/
-
-data:
- data_dir : /remote/gpu02/breso/lorentz-gatr-pretrain/data
- dataset: mini
- beam_reference: spacelike
- two_beams: false
- beam_token: true
- add_time_reference: false
- add_pt: false
- reinsert_channels: true
- rescale_data: true
-
-train: true
-training:
- iterations: 10
- batchsize: 128
- lr: 1e-3
-
- force_xformers: true
-
-evaluation:
- batchsize: 128
- save_roc: false
-
-plotting:
- roc: true
- loss: true
- score: true
-
-sweep: # only used for sweeps
- seed: null
- trials: 10
- optuna_db: '${base_dir}/runs/${exp_name}/optuna/optuna.db'
+exp_type: jctagging
+exp_name: jc_local_debug
 
 defaults:
  - model: gatr_toptagging
  - jc_params: JetClass
+ - toptagging
  - default
  - hydra
  - _self_

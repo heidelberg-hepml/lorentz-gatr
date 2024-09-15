@@ -11,7 +11,10 @@ from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
 
 from experiments.toptagging.experiment import TaggingExperiment
-from experiments.toptagging.embedding import jc_batch_encoding
+from experiments.toptagging.embedding import (
+    dense_to_sparse_jet,
+    embed_tagging_data_into_ga,
+)
 
 from experiments.toptagging.weaver.dataset import SimpleIterDataset
 from experiments.toptagging.weaver.loader import to_filelist
@@ -20,10 +23,16 @@ from experiments.toptagging.weaver.loader import to_filelist
 class JetClassTaggingExperiment(TaggingExperiment):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        assert (
+            not self.cfg.model.mean_aggregation
+        ), "Mean-aggregation not implemented for multi-class classification"
         with open_dict(self.cfg):
             self.cfg.data.num_global_tokens = 1
 
             self.cfg.model.net.in_s_channels = 0
+
+    def _init_loss(self):
+        self.loss = torch.nn.CrossEntropyLoss()
 
     def init_data(self):
         LOGGER.info(f"Creating SimpleIterDataset")
@@ -125,45 +134,15 @@ class JetClassTaggingExperiment(TaggingExperiment):
             num_workers=min(self.cfg.jc_params.num_workers, len(self.test_files)),
         )
 
-    def evaluate(self):
-        self.results = {}
-
-        if self.ema is not None:
-            with self.ema.average_parameters():
-                self.results["train"] = self.evaluate_single_pretrain(
-                    self.train_loader, "train", mode="eval"
-                )
-                self.results["val"] = self.evaluate_single_pretrain(
-                    self.train_loader, "val", mode="eval"
-                )
-                self.results["test"] = self.evaluate_single_pretrain(
-                    self.train_loader, "test", mode="eval"
-                )
-
-            self.evaluate_single_pretrain(self.train_loader, "train_noema", mode="eval")
-            self.evaluate_single_pretrain(self.val_loader, "val_noema", mode="eval")
-            self.evaluate_single_pretrain(self.test_loader, "test_noema", mode="eval")
-
-        else:
-            self.results["train"] = self.evaluate_single_pretrain(
-                self.train_loader, "train", mode="eval"
-            )
-            self.results["val"] = self.evaluate_single_pretrain(
-                self.train_loader, "val", mode="eval"
-            )
-            self.results["test"] = self.evaluate_single_pretrain(
-                self.train_loader, "test", mode="eval"
-            )
-
-    def evaluate_single_pretrain(self, loader, title, mode, step=None):
+    def evaluate_single(self, loader, title, mode, step=None):
         assert mode in ["val", "eval"]
-        # re-initialize dataloader to make sure it is using the evaluation batchsize (makes a difference for trainloader)
+        # re-initialize dataloader to make sure it is using the evaluation batchsize
+        # (makes a difference for trainloader)
         loader = DataLoader(
             dataset=loader.dataset,
             batch_size=self.cfg.evaluation.batchsize,
             shuffle=False,
         )
-
         metrics = {}
 
         # predictions
@@ -257,32 +236,19 @@ class JetClassTaggingExperiment(TaggingExperiment):
 
         return metrics
 
-    def _init_loss(self):
-        self.loss = torch.nn.CrossEntropyLoss()
-
-    def _validate(self, step):
-        if self.ema is not None:
-            with self.ema.average_parameters():
-                metrics = self.evaluate_single_pretrain(
-                    self.val_loader, "val", mode="val", step=step
-                )
-        else:
-            metrics = self.evaluate_single_pretrain(
-                self.val_loader, "val", mode="val", step=step
-            )
-
-        self.val_loss.append(metrics["ce"])
-        return metrics["ce"]
-
     def _batch_loss(self, batch):
-        input = batch[0]["pf_vectors"].to(self.device)
-        label = batch[1]["_label_"].to(self.device)
-        multivector, scalars, is_global, attention_indices = jc_batch_encoding(
-            self, input
+        fourmomenta = batch[0]["pf_vectors"].to(self.device)
+        scalars = torch.empty(
+            fourmomenta.shape[0],
+            0,
+            fourmomenta.shape[2],
+            device=fourmomenta.device,
+            dtype=fourmomenta.dtype,
         )
-        y_pred = self.model(multivector, scalars, is_global, attention_indices).reshape(
-            -1, self.cfg.jc_params.num_classes
-        )
+        label = batch[1]["_label_"].to(self.device, dtype=fourmomenta.dtype)
+        fourmomenta, scalars, ptr = dense_to_sparse_jet(fourmomenta, scalars)
+        embedding = embed_tagging_data_into_ga(fourmomenta, scalars, ptr, self.cfg.data)
+        y_pred = self.model(embedding)
         loss = self.loss(y_pred, label)
         assert torch.isfinite(loss).all()
 

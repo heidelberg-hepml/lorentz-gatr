@@ -253,7 +253,9 @@ class TaggingExperiment(BaseExperiment):
 
     def _batch_loss(self, batch):
         batch = batch.to(self.device)
-        embedding = embed_tagging_data_into_ga(batch, self.cfg.data)
+        embedding = embed_tagging_data_into_ga(
+            batch.x, batch.scalars, batch.ptr, self.cfg.data
+        )
         y_pred = self.model(embedding)
         loss = self.loss(y_pred, batch.label.to(self.dtype))
         assert torch.isfinite(loss).all()

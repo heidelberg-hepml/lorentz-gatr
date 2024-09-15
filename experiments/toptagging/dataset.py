@@ -2,6 +2,8 @@ import torch
 import numpy as np
 from torch_geometric.data import Data
 
+EPS = 1e-5
+
 
 class TaggingDataset(torch.utils.data.Dataset):
     """
@@ -77,7 +79,7 @@ class TopTaggingDataset(TaggingDataset):
         self.data_list = []
         for i in range(kinematics.shape[0]):
             # drop zero-padded components
-            mask = (kinematics[i, ...].abs() > 1e-5).all(dim=-1)
+            mask = (kinematics[i, ...].abs() > EPS).all(dim=-1)
             fourmomenta = kinematics[i, ...][mask]
             label = labels[i, ...]
             scalars = torch.zeros(
@@ -131,7 +133,7 @@ class QGTaggingDataset(TaggingDataset):
         self.data_list = []
         for i in range(kinematics.shape[0]):
             # drop zero-padded components
-            mask = (kinematics[i, ...].abs() > 1e-5).all(dim=-1)
+            mask = (kinematics[i, ...].abs() > EPS).all(dim=-1)
             fourmomenta = kinematics[i, ...][mask]
             scalars = pids[i, ...][mask]  # PID scalar information
             label = labels[i, ...]

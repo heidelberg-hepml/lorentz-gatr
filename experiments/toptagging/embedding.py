@@ -1,35 +1,32 @@
 import torch
 from torch.nn.functional import one_hot
 
+from experiments.toptagging.dataset import EPS
 from gatr.interface import embed_vector
 
 
-def embed_tagging_data_into_ga(batch, cfg_data):
+def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
     """
-    Embed tagging data into sparse geometric algebra representation
+    Embed tagging data into geometric algebra representation
     We use torch_geometric sparse representations to be more memory efficient
     Note that we do not embed the label, because it is handled elsewhere
 
     Parameters
     ----------
-    batch: torch_geometric.data.GlobalStorage
-        Object that contains information about tagging data
-        fourmomenta (in 'x'), scalars, labels
-    add_time_reference: bool
-        Whether to add the time direction as a reference to the network
-    two_beams: bool
-        Whether we only want (x, 0, 0, 1) or both (x, 0, 0, +/- 1) for the beam
-    device
-    dtype
+    fourmomenta: torch.tensor of shape (n_particles, 4)
+        Fourmomenta in the format (E, px, py, pz)
+    scalars: torch.tensor of shape (n_particles, n_features)
+        Optional scalar features, n_features=0 is possible
+    ptr: torch.tensor of shape (batchsize+1)
+        Indices of the first particle for each jet
+        Also includes the first index after the batch ends
+    cfg_data: settings for embedding
 
     Returns
     -------
     spurion: torch.tensor with shape (n_spurions, 16)
         spurion embedded as multivector object
     """
-    fourmomenta = batch.x
-    scalars = batch.scalars
-    ptr = batch.ptr
     batchsize = len(ptr) - 1
     arange = torch.arange(batchsize, device=fourmomenta.device)
 
@@ -157,124 +154,42 @@ def embed_tagging_data_into_ga(batch, cfg_data):
     return embedding
 
 
-def jc_batch_encoding(self, batch):
-    # Put the batch into the (batch_size, num_particles, (E, px, py, pz)) format
-    batch = torch.transpose(batch, 1, 2)
+def dense_to_sparse_jet(fourmomenta_dense, scalars_dense):
+    """
+    Transform dense jet into sparse jet
 
-    # flatten the events dimension and remove zero padding
-    EPS = 1e-5
-    nonzero_mask = (batch.abs() > EPS).any(dim=-1)
-    num_particles = nonzero_mask.sum(dim=-1)
-    batch_sparse = batch[nonzero_mask]
+    Parameters
+    ----------
+    fourmomenta_dense: torch.tensor of shape (batchsize, 4, num_particles_max)
+    scalars_dense: torch.tensor of shape (batchsize, num_features, num_particles_max)
 
-    # create batch.ptr from torch_geometric.data.Data by hand
-    ptr = torch.zeros_like(num_particles, device=batch.device)
-    ptr[1:] = torch.cumsum(num_particles, dim=0)[:-1]
+    Returns
+    -------
+    fourmomenta_sparse: torch.tensor of shape (num_particles, 4)
+        Fourmomenta for concatenated list of particles of all jets
+    scalars_sparse: torch.tensor of shape (num_particles, num_features)
+        Scalar features for concatenated list of particles of all jets
+    ptr: torch.tensor of shape (batchsize+1)
+        Start indices of each jet, this way we don't lose information when concatenating everything
+        Starts with 0 and ends with the first non-accessible index (=total number of particles)
+    """
+    fourmomenta_dense = torch.transpose(
+        fourmomenta_dense, 1, 2
+    )  # (batchsize, num_particles, 4)
+    scalars_dense = torch.transpose(
+        scalars_dense, 1, 2
+    )  # (batchsize, num_particles, num_features)
 
-    # insert global token at the beginning of the batch
-    batchsize = len(ptr)
-    ptr_with_global = ptr + torch.arange(batchsize, device=batch.device)
-    is_global = torch.zeros(
-        batch_sparse.shape[0] + batchsize,
-        *batch_sparse.shape[1:],
-        dtype=torch.bool,
-        device=batch.device,
+    mask = (fourmomenta_dense.abs() > EPS).any(dim=-1)
+    num_particles = mask.sum(dim=-1)
+    fourmomenta_sparse = fourmomenta_dense[mask]
+    scalars_sparse = scalars_dense[mask]
+
+    ptr = torch.zeros(
+        len(num_particles) + 1, device=fourmomenta_dense.device, dtype=torch.long
     )
-    is_global[ptr_with_global] = True
-    batch_sparse_with_global = torch.zeros_like(is_global, dtype=batch.dtype)
-    batch_sparse_with_global[~is_global] = batch_sparse.flatten()
-    is_global = is_global[:, [0]]
-
-    # define the attention indices for the events in the batch as in batch.batch from torch_geometric.data.Data
-    get_batch_from_ptr = lambda ptr: torch.arange(
-        len(ptr) - 1, device=ptr.device
-    ).repeat_interleave(ptr[1:] - ptr[:-1])
-    attention_indices = get_batch_from_ptr(ptr_with_global)
-
-    # embed batches into the GA
-    batch_sparse_with_global = embed_vector(batch_sparse_with_global)
-
-    # Include beam information to the events
-    beam = get_spurion(
-        self.cfg.data.beam_reference,
-        self.cfg.data.add_time_reference,
-        self.cfg.data.two_beams,
-        device=batch_sparse_with_global.device,
-        dtype=batch_sparse_with_global.dtype,
-    )
-
-    batch_final = batch_sparse_with_global
-    is_global_final = is_global
-
-    if beam is not None:
-        if self.cfg.data.beam_token:
-            # embed beam as extra token
-            ptr_beam = torch.cumsum(num_particles, dim=0) - 1
-            ptr_beam_total = torch.cat(
-                [
-                    ptr_beam
-                    + (beam.shape[0] + 1)
-                    * torch.arange(1, batchsize + 1, device=batch.device)
-                    - i
-                    for i in range(beam.shape[0])
-                ]
-            )
-
-            batch_final = torch.zeros(
-                (
-                    batch_sparse_with_global.shape[0] + beam.shape[0] * batchsize,
-                    *batch_sparse_with_global.shape[1:],
-                ),
-                device=batch.device,
-            )
-            mask_beam = torch.zeros_like(
-                batch_final[..., 0], dtype=torch.bool, device=batch.device
-            )
-            mask_beam[ptr_beam_total] = True
-
-            batch_final[mask_beam] = beam.repeat(batchsize, 1)
-            batch_final[~mask_beam] = batch_sparse_with_global
-            batch_final = batch_final.unsqueeze(-2)
-
-            # extend is_global and the attention_indices to include the extra token
-            is_global_final = torch.zeros(
-                (batch_sparse_with_global.shape[0] + beam.shape[0] * batchsize, 1),
-                dtype=torch.bool,
-                device=batch.device,
-            )
-            is_global_final[~mask_beam] = is_global
-
-            attention_indices = get_batch_from_ptr(
-                ptr_with_global
-                + beam.shape[0] * torch.arange(batchsize, device=batch.device)
-            )
-        else:
-            batch_sparse_with_global = batch_sparse_with_global.unsqueeze(-2)
-            beam = beam.unsqueeze(0).repeat(batch_sparse_with_global.shape[0], 1, 1)
-            batch_final = torch.cat((batch_sparse_with_global, beam), dim=-2)
-            is_global_final = is_global
-
-    multivector = batch_final.unsqueeze(0)
-    scalars = is_global_final.float().unsqueeze(0)
-
-    # change the shape of is_global to accommodate the number of classes in the output of the model
-    is_global_final = is_global_final.unsqueeze(-2).expand(
-        batch_final.shape[0], self.cfg.jc_params.num_classes, 1
-    )
-
-    # modify the attention_indices to include the indices for the last event in the batch
-    attention_indices = torch.cat(
-        (
-            attention_indices,
-            (batchsize - 1)
-            * torch.ones(
-                len(batch_final) - len(attention_indices), device=batch.device
-            ),
-        ),
-        dim=0,
-    )
-
-    return multivector, scalars, is_global_final, attention_indices
+    ptr[1:] = torch.cumsum(num_particles, dim=0)
+    return fourmomenta_sparse, scalars_sparse, ptr
 
 
 def get_spurion(beam_reference, add_time_reference, two_beams, device, dtype):
