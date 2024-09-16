@@ -70,7 +70,7 @@ class TopTaggingGATrWrapper(nn.Module):
     def extract_from_ga(self, multivector, scalars, batch, is_global):
         outputs = extract_scalar(multivector)[0, :, :, 0]
         if self.aggregation is not None:
-            logits = self.aggregation(outputs, index=batch)[:, 0]
+            logits = self.aggregation(outputs, index=batch)
         else:
-            logits = outputs[is_global][:, 0]
+            logits = outputs[is_global]
         return logits

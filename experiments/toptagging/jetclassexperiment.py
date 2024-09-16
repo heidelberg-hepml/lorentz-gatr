@@ -30,6 +30,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
             self.cfg.data.num_global_tokens = 1
 
             self.cfg.model.net.in_s_channels = 0
+            self.cfg.model.net.out_mv_channels = 10
 
     def _init_loss(self):
         self.loss = torch.nn.CrossEntropyLoss()
@@ -63,7 +64,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
             self.num_files[label] = len(files)
 
             LOGGER.info(
-                f"Using {self.num_files[label]} files for training, range: {str(frange)}"
+                f"Using {self.num_files[label]} files for {label}ing, range: {str(frange)}"
             )
             datasets[label] = SimpleIterDataset(
                 file_dict,
@@ -141,7 +142,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
         with torch.no_grad():
             for batch in loader:
                 y_pred, label = self._get_ypred_and_label(batch)
-                labels_true.append(label.cpu().float())
+                labels_true.append(label.cpu())
                 labels_predict.append(y_pred.cpu().float())
 
         labels_true, labels_predict = torch.cat(labels_true), torch.cat(labels_predict)
@@ -152,7 +153,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
             )
 
         # ce loss
-        metrics["ce"] = torch.nn.functional.cross_entropy(
+        metrics["bce"] = torch.nn.functional.cross_entropy(
             labels_predict, labels_true
         ).item()
         labels_true, labels_predict = (
@@ -162,21 +163,18 @@ class JetClassTaggingExperiment(TaggingExperiment):
 
         # accuracy
         labels_predict_score = np.argmax(labels_predict, axis=1)
-        LOGGER.info(f"The labels true are {labels_true.shape}")
         metrics["accuracy"] = accuracy_score(
             labels_true.flatten(), np.round(labels_predict_score).flatten()
         )
         if mode == "eval":
             LOGGER.info(f"Accuracy on {title} dataset: {metrics['accuracy']:.4f}")
 
-        LOGGER.info(f"The labels_true are {labels_true.shape}")
-        LOGGER.info(f"The labels_predict are {labels_predict.shape}")
-
         # auc and roc (fpr = epsB, tpr = epsS)
         metrics["auc_ovo"] = roc_auc_score(
-            labels_true.flatten(), labels_predict, multi_class="ovo", average="macro"
+            labels_true, labels_predict, multi_class="ovo", average="macro"
         )
-        LOGGER.info(f"The AUC is {metrics['auc_ovo']}")
+        if mode == "eval":
+            LOGGER.info(f"The AUC is {metrics['auc_ovo']}")
         fpr_list, tpr_list, auc_scores = [], [], []
         for i in range(self.cfg.jc_params.num_classes):
             fpr, tpr, _ = roc_curve(labels_true == i, labels_predict[:, i])
@@ -191,7 +189,6 @@ class JetClassTaggingExperiment(TaggingExperiment):
                 )
 
         metrics["auc_total"] = np.mean(auc_scores)
-
         # 1/epsB at fixed epsS
         def get_rej(epsS, class_idx):
             idx = np.argmin(np.abs(tpr_list[class_idx] - epsS))
@@ -226,7 +223,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
             device=fourmomenta.device,
             dtype=fourmomenta.dtype,
         )
-        label = batch[1]["_label_"].to(self.device, dtype=fourmomenta.dtype)
+        label = batch[1]["_label_"].to(self.device)
         fourmomenta, scalars, ptr = dense_to_sparse_jet(fourmomenta, scalars)
         embedding = embed_tagging_data_into_ga(fourmomenta, scalars, ptr, self.cfg.data)
         y_pred = self.model(embedding)

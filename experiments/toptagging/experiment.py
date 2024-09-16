@@ -154,6 +154,7 @@ class TaggingExperiment(BaseExperiment):
                 y_pred = torch.nn.functional.sigmoid(y_pred)
                 labels_true.append(label.cpu().float())
                 labels_predict.append(y_pred.cpu().float())
+
         labels_true, labels_predict = torch.cat(labels_true), torch.cat(labels_predict)
         if mode == "eval":
             metrics["labels_true"], metrics["labels_predict"] = (
@@ -262,7 +263,7 @@ class TaggingExperiment(BaseExperiment):
         embedding = embed_tagging_data_into_ga(
             batch.x, batch.scalars, batch.ptr, self.cfg.data
         )
-        y_pred = self.model(embedding)
+        y_pred = self.model(embedding)[:, 0]
         return y_pred, batch.label.to(self.dtype)
 
     def _init_metrics(self):
