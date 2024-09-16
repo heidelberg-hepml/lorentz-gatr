@@ -24,5 +24,9 @@ jc_params:
  copy_inputs: False
  num_classes: 10
 
+plotting:
+ roc: false
+ score: false
+
 defaults:
  - default_tagging

@@ -26,6 +26,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
         assert (
             not self.cfg.model.mean_aggregation
         ), "Mean-aggregation not implemented for multi-class classification"
+        assert not self.cfg.plotting.roc and not self.cfg.plotting.score
         with open_dict(self.cfg):
             if self.cfg.data.score_token:
                 self.cfg.data.num_global_tokens = 10
@@ -101,36 +102,29 @@ class JetClassTaggingExperiment(TaggingExperiment):
         LOGGER.info(f"Finished creating datasets after {dt:.2f} s = {dt/60:.2f} min")
 
     def _init_dataloader(self):
+        self.loader_kwargs = {
+            "pin_memory": True,
+            "num_workers": self.cfg.jc_params.num_workers,
+            "persistent_workers": self.cfg.jc_params.num_workers > 0
+            and self.cfg.jc_params.steps_per_epoch is not None,
+        }
         self.train_loader = DataLoader(
             dataset=self.data_train,
             batch_size=self.cfg.training.batchsize,
             drop_last=True,
-            pin_memory=True,
-            num_workers=min(
-                self.cfg.jc_params.num_workers,
-                int(self.num_files["train"] * self.cfg.jc_params.file_fraction),
-            ),
-            persistent_workers=self.cfg.jc_params.num_workers > 0
-            and self.cfg.jc_params.steps_per_epoch is not None,
+            **self.loader_kwargs,
         )
         self.val_loader = DataLoader(
             dataset=self.data_val,
             batch_size=self.cfg.evaluation.batchsize,
             drop_last=True,
-            pin_memory=True,
-            num_workers=min(
-                self.cfg.jc_params.num_workers,
-                int(self.num_files["val"] * int(self.cfg.jc_params.file_fraction)),
-            ),
-            persistent_workers=self.cfg.jc_params.num_workers > 0
-            and self.cfg.jc_params.steps_per_epoch_val is not None,
+            **self.loader_kwargs,
         )
         self.test_loader = DataLoader(
             dataset=self.data_test,
             batch_size=self.cfg.evaluation.batchsize,
             drop_last=False,
-            pin_memory=True,
-            num_workers=min(self.cfg.jc_params.num_workers, self.num_files["test"]),
+            **self.loader_kwargs,
         )
 
     def _evaluate_single(self, loader, title, mode, step=None):
@@ -141,6 +135,8 @@ class JetClassTaggingExperiment(TaggingExperiment):
             dataset=loader.dataset,
             batch_size=self.cfg.evaluation.batchsize,
             shuffle=False,
+            drop_last=False,
+            **self.loader_kwargs,
         )
 
         if mode == "eval":
