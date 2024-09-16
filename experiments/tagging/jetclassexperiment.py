@@ -34,7 +34,10 @@ class JetClassTaggingExperiment(TaggingExperiment):
                 self.cfg.model.net.out_mv_channels = 10
 
             if self.cfg.data.all_features:
-                raise NotImplementedError
+                self.cfg.model.net.in_s_channels = 10
+                self.cfg.data.data_config = (
+                    "experiments/tagging/miniweaver/allfeatures.yaml"
+                )
             else:
                 self.cfg.model.net.in_s_channels = 0
                 self.cfg.data.data_config = (
@@ -225,13 +228,16 @@ class JetClassTaggingExperiment(TaggingExperiment):
 
     def _get_ypred_and_label(self, batch):
         fourmomenta = batch[0]["pf_vectors"].to(self.device)
-        scalars = torch.empty(
-            fourmomenta.shape[0],
-            0,
-            fourmomenta.shape[2],
-            device=fourmomenta.device,
-            dtype=fourmomenta.dtype,
-        )
+        if self.cfg.data.all_features:
+            scalars = batch[0]["pf_features"].to(self.device)
+        else:
+            scalars = torch.empty(
+                fourmomenta.shape[0],
+                0,
+                fourmomenta.shape[2],
+                device=fourmomenta.device,
+                dtype=fourmomenta.dtype,
+            )
         label = batch[1]["_label_"].to(self.device)
         fourmomenta, scalars, ptr = dense_to_sparse_jet(fourmomenta, scalars)
         embedding = embed_tagging_data_into_ga(fourmomenta, scalars, ptr, self.cfg.data)
