@@ -166,7 +166,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
             )
 
         # ce loss
-        metrics["bce"] = torch.nn.functional.cross_entropy(
+        metrics["loss"] = torch.nn.functional.cross_entropy(
             labels_predict, labels_true
         ).item()
         labels_true, labels_predict = (

@@ -20,8 +20,11 @@ MODEL_TITLE_DICT = {"GATr": "GATr"}
 
 class TaggingExperiment(BaseExperiment):
     """
-    Generalization of all tagging experiments
+    Base class for jet tagging experiments, focusing on binary classification
     """
+
+    def _init_loss(self):
+        self.loss = torch.nn.BCEWithLogitsLoss()
 
     def init_physics(self):
         if not self.cfg.training.force_xformers:
@@ -163,7 +166,7 @@ class TaggingExperiment(BaseExperiment):
             )
 
         # bce loss
-        metrics["bce"] = torch.nn.functional.binary_cross_entropy(
+        metrics["loss"] = torch.nn.functional.binary_cross_entropy(
             labels_predict, labels_true
         ).item()
         labels_true, labels_predict = labels_true.numpy(), labels_predict.numpy()
@@ -233,9 +236,6 @@ class TaggingExperiment(BaseExperiment):
             plot_dict["val_metrics"] = self.val_metrics
         plot_mixer(self.cfg, plot_path, title, plot_dict)
 
-    def _init_loss(self):
-        raise NotImplementedError
-
     # overwrite _validate method to compute metrics over the full validation set
     def _validate(self, step):
         if self.ema is not None:
@@ -247,8 +247,8 @@ class TaggingExperiment(BaseExperiment):
             metrics = self._evaluate_single(
                 self.val_loader, "val", mode="val", step=step
             )
-        self.val_loss.append(metrics["bce"])
-        return metrics["bce"]
+        self.val_loss.append(metrics["loss"])
+        return metrics["loss"]
 
     def _batch_loss(self, batch):
         y_pred, label = self._get_ypred_and_label(batch)
@@ -279,9 +279,6 @@ class TopTaggingExperiment(TaggingExperiment):
             # no fundamental scalar information available
             self.cfg.model.net.in_s_channels = 0
 
-    def _init_loss(self):
-        self.loss = torch.nn.BCEWithLogitsLoss()
-
     def init_data(self):
         data_path = os.path.join(
             self.cfg.data.data_dir, f"toptagging_{self.cfg.data.dataset}.npz"
@@ -298,9 +295,6 @@ class QGTaggingExperiment(TaggingExperiment):
             # We add 6 scalar channels for the particle id features
             # (charge, electron, muon, photon, charged hadron and neutral hadron)
             self.cfg.model.net.in_s_channels = 6
-
-    def _init_loss(self):
-        self.loss = torch.nn.BCEWithLogitsLoss()
 
     def init_data(self):
         data_path = os.path.join(

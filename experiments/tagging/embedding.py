@@ -24,8 +24,9 @@ def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
 
     Returns
     -------
-    spurion: torch.tensor with shape (n_spurions, 16)
-        spurion embedded as multivector object
+    embedding: dict
+        Embedded data
+        Includes keys for multivectors, scalars, is_global and ptr
     """
     batchsize = len(ptr) - 1
     arange = torch.arange(batchsize, device=fourmomenta.device)
