@@ -66,5 +66,3 @@ defaults:
 - model: gatr_eventgen
 - classifier: classifier
 - default
-- hydra
-- _self_

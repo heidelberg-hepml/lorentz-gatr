@@ -21,5 +21,3 @@ plotting:
 defaults:
  - model: gatr_amplitudes
  - default
- - hydra
- - _self_

@@ -29,5 +29,3 @@ plotting:
 defaults:
  - model: gatr_tagging
  - default
- - hydra
- - _self_

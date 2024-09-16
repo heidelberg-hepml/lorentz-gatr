@@ -64,3 +64,7 @@ plotting:
 mlflow:
  db: '${base_dir}/runs/${exp_name}/mlflow/mlflow.db'
  artifacts: '${base_dir}/runs/${exp_name}/mlflow/artifacts'
+
+defaults:
+ - hydra
+ - _self_

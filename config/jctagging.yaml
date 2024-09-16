@@ -26,6 +26,3 @@ jc_params:
 
 defaults:
  - default_tagging
- - default
- - hydra
- - _self_
