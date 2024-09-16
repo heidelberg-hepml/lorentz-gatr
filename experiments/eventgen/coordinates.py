@@ -167,11 +167,11 @@ class PPPLogM2(BaseCoordinates):
 
 class StandardPPPLogM2(BaseCoordinates):
     # fitted (px, py, pz, log(m^2))
-    def __init__(self):
+    def __init__(self, onshell_list=[]):
         self.transforms = [
             tr.EPPP_to_PPPM2(),
             tr.M2_to_LogM2(),
-            tr.StandardNormal([]),
+            tr.StandardNormal([], onshell_list),
         ]
 
 
@@ -214,11 +214,24 @@ class LogPtPhiEtaLogM2(PhiCoordinates):
 
 class StandardLogPtPhiEtaLogM2(PhiCoordinates):
     # Fitted (log(pt), phi, eta, log(m^2)
-    def __init__(self, pt_min, units):
+    def __init__(self, pt_min, units, onshell_list=[]):
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
             tr.Pt_to_LogPt(pt_min, units),
             tr.M2_to_LogM2(),
-            tr.StandardNormal([1]),
+            tr.StandardNormal([1], onshell_list),
+        ]
+
+
+class StandardGaussian(BaseCoordinates):
+    # only used in jetgpt
+    def __init__(self, pt_min, units, onshell_list=[]):
+        self.transforms = [
+            tr.EPPP_to_PtPhiEtaE(),
+            tr.PtPhiEtaE_to_PtPhiEtaM2(),
+            tr.Pt_to_LogPt(pt_min, units),
+            tr.M2_to_LogM2(),
+            tr.NonPeriodicPhi(),
+            tr.StandardNormal(),
         ]

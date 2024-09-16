@@ -28,7 +28,9 @@ class BaselineLayerNorm(nn.Module):
         outputs : Tensor
             Normalized inputs.
         """
-        return torch.nn.functional.layer_norm(inputs, normalized_shape=inputs.shape[1:])
+        return torch.nn.functional.layer_norm(
+            inputs, normalized_shape=inputs.shape[-1:]
+        )
 
 
 class MultiHeadQKVLinear(nn.Module):
@@ -151,6 +153,7 @@ class BaselineSelfAttention(nn.Module):
         pos_encoding: bool = False,
         pos_enc_base: int = 4096,
         multi_query: bool = True,
+        dropout_prob=None,
     ) -> None:
         super().__init__()
 
@@ -171,8 +174,16 @@ class BaselineSelfAttention(nn.Module):
         else:
             self.pos_encoding = None
 
+        if dropout_prob is not None:
+            self.dropout = nn.Dropout(dropout_prob)
+        else:
+            self.dropout = None
+
     def forward(
-        self, inputs: torch.Tensor, attention_mask: Optional[torch.Tensor] = None
+        self,
+        inputs: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        is_causal: bool = False,
     ) -> torch.Tensor:
         """Forward pass.
 
@@ -198,7 +209,7 @@ class BaselineSelfAttention(nn.Module):
             k = self.pos_encoding(k)
 
         # Attention layer
-        h = self._attend(q, k, v, attention_mask)
+        h = self._attend(q, k, v, attention_mask, is_causal=is_causal)
 
         # Concatenate heads and transform linearly
         h = rearrange(
@@ -207,10 +218,13 @@ class BaselineSelfAttention(nn.Module):
         )
         outputs = self.out_linear(h)  # (..., num_items, out_channels)
 
+        if self.dropout is not None:
+            outputs = self.dropout(outputs)
+
         return outputs
 
     @staticmethod
-    def _attend(q, k, v, attention_mask=None):
+    def _attend(q, k, v, attention_mask=None, is_causal=False):
         """Scaled dot-product attention."""
 
         # Add batch dimension if needed
@@ -225,6 +239,7 @@ class BaselineSelfAttention(nn.Module):
             k.expand_as(q).contiguous(),
             v.expand_as(q),
             attn_mask=attention_mask,
+            is_causal=is_causal,
         )
 
         # Return batch dimensions to inputs
@@ -266,6 +281,7 @@ class BaselineTransformerBlock(nn.Module):
         pos_encoding_base: int = 4096,
         increase_hidden_channels=1,
         multi_query: bool = True,
+        dropout_prob=None,
     ) -> None:
         super().__init__()
 
@@ -286,15 +302,20 @@ class BaselineTransformerBlock(nn.Module):
             pos_encoding=pos_encoding,
             pos_enc_base=pos_encoding_base,
             multi_query=multi_query,
+            dropout_prob=dropout_prob,
         )
 
         self.mlp = nn.Sequential(
             nn.Linear(channels, 2 * channels),
+            nn.Dropout(dropout_prob) if dropout_prob is not None else nn.Identity(),
             nn.GELU(),
             nn.Linear(2 * channels, channels),
+            nn.Dropout(dropout_prob) if dropout_prob is not None else nn.Identity(),
         )
 
-    def forward(self, inputs: torch.Tensor, attention_mask=None) -> torch.Tensor:
+    def forward(
+        self, inputs: torch.Tensor, attention_mask=None, is_causal=False
+    ) -> torch.Tensor:
         """Forward pass.
 
         Parameters
@@ -312,7 +333,7 @@ class BaselineTransformerBlock(nn.Module):
 
         # Residual attention
         h = self.norm(inputs)
-        h = self.attention(h, attention_mask)
+        h = self.attention(h, attention_mask=attention_mask, is_causal=is_causal)
         outputs = inputs + h
 
         # Residual MLP
@@ -365,6 +386,7 @@ class Transformer(nn.Module):
         checkpoint_blocks: bool = False,
         increase_hidden_channels=1,
         multi_query: bool = False,
+        dropout_prob=None,
     ) -> None:
         super().__init__()
         self.checkpoint_blocks = checkpoint_blocks
@@ -378,13 +400,16 @@ class Transformer(nn.Module):
                     pos_encoding_base=pos_encoding_base,
                     increase_hidden_channels=increase_hidden_channels,
                     multi_query=multi_query,
+                    dropout_prob=dropout_prob,
                 )
                 for _ in range(num_blocks)
             ]
         )
         self.linear_out = nn.Linear(hidden_channels, out_channels)
 
-    def forward(self, inputs: torch.Tensor, attention_mask=None) -> torch.Tensor:
+    def forward(
+        self, inputs: torch.Tensor, attention_mask=None, is_causal=False
+    ) -> torch.Tensor:
         """Forward pass.
 
         Parameters
@@ -393,6 +418,7 @@ class Transformer(nn.Module):
             Input data
         attention_mask : None or Tensor or xformers.ops.AttentionBias
             Optional attention mask
+        is_causal: bool
 
         Returns
         -------
@@ -402,10 +428,10 @@ class Transformer(nn.Module):
         h = self.linear_in(inputs)
         for block in self.blocks:
             if self.checkpoint_blocks:
-                fn = partial(block, attention_mask=attention_mask)
+                fn = partial(block, attention_mask=attention_mask, is_causal=is_causal)
                 h = checkpoint(fn, h)
             else:
-                h = block(h, attention_mask=attention_mask)
+                h = block(h, attention_mask=attention_mask, is_causal=is_causal)
         outputs = self.linear_out(h)
         return outputs
 
