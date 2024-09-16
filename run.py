@@ -1,13 +1,13 @@
 import hydra
 from experiments.amplitudes.experiment import AmplitudeExperiment
-from experiments.toptagging.experiment import TopTaggingExperiment
+from experiments.tagging.experiment import TopTaggingExperiment, QGTaggingExperiment
 from experiments.eventgen.processes import (
     ttbarExperiment,
     zmumuExperiment,
     z5gExperiment,
 )
-from experiments.toptagging.experiment import QGTaggingExperiment
-from experiments.toptagging.jetclassexperiment import JetClassTaggingExperiment
+from experiments.tagging.jetclassexperiment import JetClassTaggingExperiment
+
 
 @hydra.main(config_path="config", config_name="jctagging", version_base=None)
 def main(cfg):

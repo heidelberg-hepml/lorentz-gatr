@@ -10,14 +10,14 @@ from sklearn.metrics import roc_curve, roc_auc_score, accuracy_score
 from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
 
-from experiments.toptagging.experiment import TaggingExperiment
-from experiments.toptagging.embedding import (
+from experiments.tagging.experiment import TaggingExperiment
+from experiments.tagging.embedding import (
     dense_to_sparse_jet,
     embed_tagging_data_into_ga,
 )
 
-from experiments.toptagging.weaver.dataset import SimpleIterDataset
-from experiments.toptagging.weaver.loader import to_filelist
+from experiments.tagging.miniweaver.dataset import SimpleIterDataset
+from experiments.tagging.miniweaver.loader import to_filelist
 
 
 class JetClassTaggingExperiment(TaggingExperiment):
@@ -27,10 +27,19 @@ class JetClassTaggingExperiment(TaggingExperiment):
             not self.cfg.model.mean_aggregation
         ), "Mean-aggregation not implemented for multi-class classification"
         with open_dict(self.cfg):
-            self.cfg.data.num_global_tokens = 1
+            if self.cfg.data.score_token:
+                raise NotImplementedError
+            else:
+                self.cfg.data.num_global_tokens = 1
+                self.cfg.model.net.out_mv_channels = 10
 
-            self.cfg.model.net.in_s_channels = 0
-            self.cfg.model.net.out_mv_channels = 10
+            if self.cfg.data.all_features:
+                raise NotImplementedError
+            else:
+                self.cfg.model.net.in_s_channels = 0
+                self.cfg.data.data_config = (
+                    "experiments/tagging/miniweaver/fourmomenta.yaml"
+                )
 
     def _init_loss(self):
         self.loss = torch.nn.CrossEntropyLoss()

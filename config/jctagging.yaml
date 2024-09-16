@@ -2,8 +2,9 @@ exp_type: jctagging
 exp_name: jc_local_debug
 
 data:
- data_dir: /remote/gpu02/breso/lorentz-gatr-pretrain/data/JetClass/Pythia
- data_config: data/data_config.yaml
+ data_dir: data/jetclass/
+ score_token: false
+ all_features: false
 
 jc_params:
  num_workers: 1
@@ -24,8 +25,7 @@ jc_params:
  num_classes: 10
 
 defaults:
- - model: gatr_toptagging
- - toptagging
+ - default_tagging
  - default
  - hydra
  - _self_

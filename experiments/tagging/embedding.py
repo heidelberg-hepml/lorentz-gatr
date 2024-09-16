@@ -1,7 +1,7 @@
 import torch
 from torch.nn.functional import one_hot
 
-from experiments.toptagging.dataset import EPS
+from experiments.tagging.dataset import EPS
 from gatr.interface import embed_vector
 
 

@@ -1,6 +1,7 @@
 exp_name: ???
 exp_type: ???
 run_name: null
+base_dir: .
 
 seed: null
 debug: false

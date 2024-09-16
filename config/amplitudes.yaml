@@ -1,10 +1,9 @@
 exp_type: amplitudes
 exp_name: amp_local_debug
-base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
 
 data:
  dataset : [zgg]
- data_path : /media/jspinner/shared/Studium/project3/data/
+ data_path : data/
  subsample : 10000
  include_permsym: true
  train_test_val: [.4, .5, .1]

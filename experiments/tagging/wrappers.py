@@ -34,9 +34,9 @@ def xformers_sa_mask(batch, materialize=False):
     return mask
 
 
-class TopTaggingGATrWrapper(nn.Module):
+class TaggingGATrWrapper(nn.Module):
     """
-    L-GATr for toptagging
+    L-GATr for tagging
     """
 
     def __init__(

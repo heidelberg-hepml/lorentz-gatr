@@ -2,11 +2,10 @@ exp_type: qgtagging
 exp_name: qg_local_debug
 
 data:
- data_dir : /remote/gpu02/breso/lorentz-gatr/data
+ data_dir : data/
+ dataset: mini
 
 defaults:
- - model: gatr_qgtagging
- - default
+ - default_tagging
  - hydra
  - _self_
- - toptagging
