@@ -28,7 +28,8 @@ class JetClassTaggingExperiment(TaggingExperiment):
         ), "Mean-aggregation not implemented for multi-class classification"
         with open_dict(self.cfg):
             if self.cfg.data.score_token:
-                raise NotImplementedError
+                self.cfg.data.num_global_tokens = 10
+                self.cfg.model.net.out_mv_channels = 1
             else:
                 self.cfg.data.num_global_tokens = 1
                 self.cfg.model.net.out_mv_channels = 10
@@ -242,4 +243,9 @@ class JetClassTaggingExperiment(TaggingExperiment):
         fourmomenta, scalars, ptr = dense_to_sparse_jet(fourmomenta, scalars)
         embedding = embed_tagging_data_into_ga(fourmomenta, scalars, ptr, self.cfg.data)
         y_pred = self.model(embedding)
+        if self.cfg.data.score_token:
+            y_pred = y_pred.reshape(
+                y_pred.shape[0] // self.cfg.data.num_global_tokens,
+                self.cfg.data.num_global_tokens,
+            )
         return y_pred, label
