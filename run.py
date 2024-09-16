@@ -7,9 +7,10 @@ from experiments.eventgen.processes import (
     z5gExperiment,
 )
 from experiments.tagging.jetclassexperiment import JetClassTaggingExperiment
+from experiments.tagging.finetuneexperiment import TopTaggingFineTuneExperiment
 
 
-@hydra.main(config_path="config", config_name="jctagging", version_base=None)
+@hydra.main(config_path="config", config_name="amplitudes", version_base=None)
 def main(cfg):
     if cfg.exp_type == "amplitudes":
         exp = AmplitudeExperiment(cfg)
@@ -19,6 +20,8 @@ def main(cfg):
         exp = QGTaggingExperiment(cfg)
     elif cfg.exp_type == "jctagging":
         exp = JetClassTaggingExperiment(cfg)
+    elif cfg.exp_type == "toptaggingft":
+        exp = TopTaggingFineTuneExperiment(cfg)
     elif cfg.exp_type == "ttbar":
         exp = ttbarExperiment(cfg)
     elif cfg.exp_type == "zmumu":

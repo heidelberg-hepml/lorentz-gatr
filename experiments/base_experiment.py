@@ -338,42 +338,42 @@ class BaseExperiment:
             LOGGER.debug("Forcing use of xformers' attention implementation")
             gatr.primitives.attention.FORCE_XFORMERS = True
 
-    def _init_optimizer(self):
+    def _init_optimizer(self, param_groups=None):
+        if param_groups is None:
+            param_groups = [
+                {"params": self.model.parameters(), "lr": self.cfg.training.lr}
+            ]
+
         if self.cfg.training.optimizer == "Adam":
             self.optimizer = torch.optim.Adam(
-                self.model.parameters(),
-                lr=self.cfg.training.lr,
+                param_groups,
                 betas=self.cfg.training.betas,
                 eps=self.cfg.training.eps,
                 weight_decay=self.cfg.training.weight_decay,
             )
         elif self.cfg.training.optimizer == "AdamW":
             self.optimizer = torch.optim.AdamW(
-                self.model.parameters(),
-                lr=self.cfg.training.lr,
+                param_groups,
                 betas=self.cfg.training.betas,
                 eps=self.cfg.training.eps,
                 weight_decay=self.cfg.training.weight_decay,
             )
         elif self.cfg.training.optimizer == "RAdam":
             self.optimizer = torch.optim.RAdam(
-                self.model.parameters(),
-                lr=self.cfg.training.lr,
+                param_groups,
                 betas=self.cfg.training.betas,
                 eps=self.cfg.training.eps,
                 weight_decay=self.cfg.training.weight_decay,
             )
         elif self.cfg.training.optimizer == "Lion":
             self.optimizer = Lion(
-                self.model.parameters(),
-                lr=self.cfg.training.lr,
+                param_groups,
                 betas=self.cfg.training.betas,
                 weight_decay=self.cfg.training.weight_decay,
             )
         elif self.cfg.training.optimizer == "ScheduleFree":
             self.optimizer = schedulefree.AdamWScheduleFree(
-                self.model.parameters(),
-                lr=self.cfg.training.lr,
+                param_groups,
                 betas=self.cfg.training.betas,
                 weight_decay=self.cfg.training.weight_decay,
             )
