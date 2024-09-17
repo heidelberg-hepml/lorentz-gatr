@@ -59,11 +59,11 @@ class JetClassTaggingExperiment(TaggingExperiment):
             "HToCC",
             "HToGG",
             "HToWW4Q",
-            "HToWW2Q1L",            
+            "HToWW2Q1L",
             "TTBar",
             "TTBarLep",
             "WToQQ",
-            "ZToQQ",     
+            "ZToQQ",
         ]
         frange = (0, 1)
         datasets = {"train": None, "test": None, "val": None}
@@ -86,8 +86,12 @@ class JetClassTaggingExperiment(TaggingExperiment):
                 for_training=True,
                 extra_selection=self.cfg.jc_params.extra_selection,
                 remake_weights=not self.cfg.jc_params.not_remake_weights,
-                load_range_and_fraction=(frange, self.cfg.jc_params.data_fraction),
-                file_fraction=self.cfg.jc_params.file_fraction,
+                load_range_and_fraction=((0, 1), 1)
+                if label == "test"
+                else (frange, self.cfg.jc_params.data_fraction),
+                file_fraction=1
+                if label == "test"
+                else self.cfg.jc_params.file_fraction,
                 fetch_by_files=self.cfg.jc_params.fetch_by_files,
                 fetch_step=self.cfg.jc_params.fetch_step,
                 infinity_mode=self.cfg.jc_params.steps_per_epoch is not None,
