@@ -47,7 +47,7 @@ class TopTaggingFineTuneExperiment(TopTaggingExperiment):
             self.cfg.model.net.out_mv_channels,
             in_s_channels=self.cfg.model.net.hidden_s_channels,
             out_s_channels=self.cfg.model.net.out_s_channels,
-        )
+        ).to(self.device)
 
     def _init_optimizer(self):
         # collect parameter lists
