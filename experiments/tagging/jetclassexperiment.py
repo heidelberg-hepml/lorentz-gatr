@@ -54,16 +54,16 @@ class JetClassTaggingExperiment(TaggingExperiment):
         t0 = time.time()
 
         classes = [
+            "ZJetsToNuNu",
             "HToBB",
             "HToCC",
             "HToGG",
-            "HToWW2Q1L",
             "HToWW4Q",
+            "HToWW2Q1L",            
             "TTBar",
             "TTBarLep",
             "WToQQ",
-            "ZToQQ",
-            "ZJetsToNuNu",
+            "ZToQQ",     
         ]
         frange = (0, 1)
         datasets = {"train": None, "test": None, "val": None}
