@@ -86,7 +86,13 @@ def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
         # prepend global tokens to the token list
         num_global_tokens = cfg_data.num_global_tokens
         global_idxs = torch.cat(
-            [ptr[:-1] + arange + i for i in range(num_global_tokens)]
+            [
+                torch.arange(
+                    ptr_start + i * num_global_tokens,
+                    ptr_start + (i + 1) * num_global_tokens,
+                )
+                for i, ptr_start in enumerate(ptr[:-1])
+            ]
         )
         is_global = torch.zeros(
             multivectors.shape[0] + batchsize * num_global_tokens,

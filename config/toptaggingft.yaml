@@ -5,7 +5,7 @@ finetune:
  backbone_path: null
  backbone_cfg: config.yaml
  lr_backbone: 1e-4
- lr_head: 1e-3
+ lr_head: 5e-3
 
 defaults:
  - toptagging
