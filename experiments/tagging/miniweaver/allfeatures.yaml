@@ -43,7 +43,7 @@ labels:
    ### type can be `simple`, `custom`
    ### [option 1] use `simple` for binary/multi-class classification, then `value` is a list of 0-1 labels
    type: simple
-   value: [label_QCD, label_Hbb, label_Hcc, label_Hgg, label_H4q, label_Hqql, label_Zqq, label_Wqq, label_Tbqq, label_Tbl]
+   value: [label_QCD, label_Hbb, label_Hcc, label_Hgg, label_H4q, label_Hqql, label_Tbqq, label_Tbl, label_Wqq, label_Zqq]
    ### [option 2] otherwise use `custom` to define the label, then `value` is a map
    # type: custom
    # value: 
