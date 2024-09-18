@@ -51,7 +51,15 @@ def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
     n_spurions = spurions.shape[0]
     if cfg_data.beam_token:
         # prepend spurions to the token list (within each block)
-        spurion_idxs = torch.cat([ptr[:-1] + arange + i for i in range(n_spurions)])
+        spurion_idxs = torch.cat(
+            [
+                torch.arange(
+                    ptr_start + i * n_spurions,
+                    ptr_start + (i + 1) * n_spurions,
+                )
+                for i, ptr_start in enumerate(ptr[:-1])
+            ]
+        )
         insert_spurion = torch.zeros(
             multivectors.shape[0] + n_spurions * batchsize,
             dtype=torch.bool,
