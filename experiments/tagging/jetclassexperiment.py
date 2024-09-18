@@ -27,13 +27,14 @@ class JetClassTaggingExperiment(TaggingExperiment):
             not self.cfg.model.mean_aggregation
         ), "Mean-aggregation not implemented for multi-class classification"
         assert not self.cfg.plotting.roc and not self.cfg.plotting.score
+        assert self.cfg.jc_params.num_classes == 10
         with open_dict(self.cfg):
             if self.cfg.data.score_token:
-                self.cfg.data.num_global_tokens = 10
+                self.cfg.data.num_global_tokens = self.cfg.jc_params.num_classes
                 self.cfg.model.net.out_mv_channels = 1
             else:
                 self.cfg.data.num_global_tokens = 1
-                self.cfg.model.net.out_mv_channels = 10
+                self.cfg.model.net.out_mv_channels = self.cfg.jc_params.num_classes
 
             if self.cfg.data.features == "fourmomenta":
                 self.cfg.model.net.in_s_channels = 0
@@ -58,6 +59,19 @@ class JetClassTaggingExperiment(TaggingExperiment):
                     f"Input feature option {self.cfg.data.features} not implemented"
                 )
 
+            self.class_names = [
+                "ZJetsToNuNu",
+                "HToBB",
+                "HToCC",
+                "HToGG",
+                "HToWW4Q",
+                "HToWW2Q1L",
+                "TTBar",
+                "TTBarLep",
+                "WToQQ",
+                "ZToQQ",
+            ]
+
     def _init_loss(self):
         self.loss = torch.nn.CrossEntropyLoss()
 
@@ -65,18 +79,6 @@ class JetClassTaggingExperiment(TaggingExperiment):
         LOGGER.info(f"Creating SimpleIterDataset")
         t0 = time.time()
 
-        classes = [
-            "ZJetsToNuNu",
-            "HToBB",
-            "HToCC",
-            "HToGG",
-            "HToWW4Q",
-            "HToWW2Q1L",
-            "TTBar",
-            "TTBarLep",
-            "WToQQ",
-            "ZToQQ",
-        ]
         frange = (0, 1)
         datasets = {"train": None, "test": None, "val": None}
         self.num_files = {"train": None, "test": None, "val": None}
@@ -85,7 +87,10 @@ class JetClassTaggingExperiment(TaggingExperiment):
         folder = {"train": "train_100M", "test": "test_20M", "val": "val_5M"}
         for label in ["train", "test", "val"]:
             path = os.path.join(self.cfg.data.data_dir, folder[label])
-            flist = [f"{classname}:{path}/{classname}_*.root" for classname in classes]
+            flist = [
+                f"{classname}:{path}/{classname}_*.root"
+                for classname in self.class_names
+            ]
             file_dict, files = to_filelist(flist)
             self.num_files[label] = len(files)
 
@@ -192,46 +197,51 @@ class JetClassTaggingExperiment(TaggingExperiment):
             labels_true, np.round(labels_predict_score)
         )
         if mode == "eval":
-            LOGGER.info(f"Accuracy on {title} dataset: {metrics['accuracy']:.4f}")
+            LOGGER.info(f"Accuracy on {title} dataset:\t{metrics['accuracy']:.4f}")
 
         # auc and roc (fpr = epsB, tpr = epsS)
         metrics["auc_ovo"] = roc_auc_score(
             labels_true, labels_predict, multi_class="ovo", average="macro"
         )  # unweighted mean of AUCs across classes
         if mode == "eval":
-            LOGGER.info(f"The AUC is {metrics['auc_ovo']}")
-        fpr_list, tpr_list, auc_scores = [], [], []
+            LOGGER.info(f"The ovo mean AUC is\t\t{metrics['auc_ovo']:.5f}")
+        fpr_list, tpr_list = [], []
         for i in range(self.cfg.jc_params.num_classes):
             fpr, tpr, _ = roc_curve(labels_true == i, labels_predict[:, i])
-            auc_score = roc_auc_score(labels_true == i, labels_predict[:, i])
-            auc_scores.append(auc_score)
             fpr_list.append(fpr)
             tpr_list.append(tpr)
-            metrics["auc_class_{}".format(i)] = auc_score
-            if mode == "eval":
-                LOGGER.info(
-                    f"AUC score for class {i} on {title} dataset: {auc_score:.4f}"
-                )
 
-        metrics["auc_total"] = np.mean(auc_scores)
         # 1/epsB at fixed epsS
         def get_rej(epsS, class_idx):
             idx = np.argmin(np.abs(tpr_list[class_idx] - epsS))
             return 1 / fpr_list[class_idx][idx]
 
-        for i in range(self.cfg.jc_params.num_classes):
-            metrics["rej05_{}".format(i)] = get_rej(0.5, i)
-            metrics["rej099_{}".format(i)] = get_rej(0.99, i)
-            metrics["rej0995_{}".format(i)] = get_rej(0.995, i)
+        # turn the below dict into a list please
+        class_rej_dict = [None, 0.5, 0.5, 0.5, 0.5, 0.99, 0.5, 0.995, 0.5, 0.5]
+
+        for i, rej in enumerate(class_rej_dict):
+            if rej is None:
+                continue
+            rej_string = str(rej).replace(".", "")
+            metrics[f"rej{rej_string}_{i}"] = get_rej(rej, i)
             if mode == "eval":
                 LOGGER.info(
-                    f"Rejection rate for class {i} on {title} dataset: {metrics[f'rej05_{i}']:.0f} (epsS=0.5), "
-                    f"{metrics[f'rej099_{i}']:.0f} (epsS=0.99), {metrics[f'rej0995_{i}']:.0f} (epsS=0.995)"
+                    f"Rejection rate for class {self.class_names[i]:>10} on {title} dataset:{metrics[f'rej{rej_string}_{i}']:>5.0f} (epsS={rej})"
                 )
+
+        # create latex string
+        tex_string = f"{self.cfg.run_name} & {metrics['accuracy']:.3f} & {metrics['auc_ovo']:.3f}"
+        for i, rej in enumerate(class_rej_dict):
+            if rej is None:
+                continue
+            rej_string = str(rej).replace(".", "")
+            tex_string += f" & {metrics[f'rej{rej_string}_{i}']:.0f}"
+        tex_string += r" \\"
+        LOGGER.info(tex_string)
 
         if self.cfg.use_mlflow:
             for key, value in metrics.items():
-                if key in ["labels_true", "labels_predict", "fpr", "tpr"]:
+                if key in ["labels_true", "labels_predict"]:
                     # do not log matrices
                     continue
                 name = f"{mode}.{title}" if mode == "eval" else "val"
