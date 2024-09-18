@@ -17,6 +17,8 @@ from experiments.mlflow import log_mlflow
 
 MODEL_TITLE_DICT = {"GATr": "GATr"}
 
+UNITS = 40  # We use units of 40 GeV for all tagging experiments
+
 
 class TaggingExperiment(BaseExperiment):
     """
@@ -75,11 +77,9 @@ class TaggingExperiment(BaseExperiment):
         self.data_train = Dataset(**kwargs)
         self.data_test = Dataset(**kwargs)
         self.data_val = Dataset(**kwargs)
-        self.data_train.load_data(data_path, "train", data_scale=None)
-        self.data_test.load_data(
-            data_path, "test", data_scale=self.data_train.data_scale
-        )
-        self.data_val.load_data(data_path, "val", data_scale=self.data_train.data_scale)
+        self.data_train.load_data(data_path, "train", data_scale=UNITS)
+        self.data_test.load_data(data_path, "test", data_scale=UNITS)
+        self.data_val.load_data(data_path, "val", data_scale=UNITS)
         dt = time.time() - t0
         LOGGER.info(f"Finished creating datasets after {dt:.2f} s = {dt/60:.2f} min")
 

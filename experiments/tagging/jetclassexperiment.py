@@ -10,7 +10,7 @@ from sklearn.metrics import roc_curve, roc_auc_score, accuracy_score
 from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
 
-from experiments.tagging.experiment import TaggingExperiment
+from experiments.tagging.experiment import TaggingExperiment, UNITS
 from experiments.tagging.embedding import (
     dense_to_sparse_jet,
     embed_tagging_data_into_ga,
@@ -252,7 +252,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
         return metrics
 
     def _get_ypred_and_label(self, batch):
-        fourmomenta = batch[0]["pf_vectors"].to(self.device)
+        fourmomenta = batch[0]["pf_vectors"].to(self.device) / UNITS
         if self.cfg.data.features == "fourmomenta":
             scalars = torch.empty(
                 fourmomenta.shape[0],
