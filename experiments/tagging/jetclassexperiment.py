@@ -79,23 +79,29 @@ class JetClassTaggingExperiment(TaggingExperiment):
         LOGGER.info(f"Creating SimpleIterDataset")
         t0 = time.time()
 
-        frange = (0, 1)
         datasets = {"train": None, "test": None, "val": None}
-        self.num_files = {"train": None, "test": None, "val": None}
 
         for_training = {"train": True, "val": True, "test": False}
         folder = {"train": "train_100M", "test": "test_20M", "val": "val_5M"}
+        files_range = {
+            "train": self.cfg.data.train_files_range,
+            "test": self.cfg.data.test_files_range,
+            "val": self.cfg.data.val_files_range,
+        }
+        self.num_files = {
+            label: frange[1] - frange[0] for label, frange in files_range.items()
+        }
         for label in ["train", "test", "val"]:
             path = os.path.join(self.cfg.data.data_dir, folder[label])
             flist = [
-                f"{classname}:{path}/{classname}_*.root"
+                f"{path}/{classname}_{str(i).zfill(3)}.root"
                 for classname in self.class_names
+                for i in range(*files_range[label])
             ]
             file_dict, files = to_filelist(flist)
-            self.num_files[label] = len(files)
 
             LOGGER.info(
-                f"Using {self.num_files[label]} files for {label}ing, range: {str(frange)}"
+                f"Using {self.num_files[label]} files for {label}ing from {path}"
             )
             datasets[label] = SimpleIterDataset(
                 file_dict,
@@ -103,12 +109,8 @@ class JetClassTaggingExperiment(TaggingExperiment):
                 for_training=True,
                 extra_selection=self.cfg.jc_params.extra_selection,
                 remake_weights=not self.cfg.jc_params.not_remake_weights,
-                load_range_and_fraction=((0, 1), 1)
-                if label == "test"
-                else (frange, self.cfg.jc_params.data_fraction),
-                file_fraction=1
-                if label == "test"
-                else self.cfg.jc_params.file_fraction,
+                load_range_and_fraction=((0, 1), 1),
+                file_fraction=1,
                 fetch_by_files=self.cfg.jc_params.fetch_by_files,
                 fetch_step=self.cfg.jc_params.fetch_step,
                 infinity_mode=self.cfg.jc_params.steps_per_epoch is not None,

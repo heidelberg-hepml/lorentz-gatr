@@ -5,14 +5,15 @@ data:
  data_dir: data/jetclass/
  score_token: false
  features: default
+ train_files_range: [0,100]
+ test_files_range: [100,120]
+ val_files_range: [120,125]
 
 jc_params:
  num_workers: 1
  fetch_step: 0.01
  extra_selection: null
  extra-test-selection: null
- data_fraction: 1.0
- file_fraction: 1.0
  fetch_by_files: False
  in_memory: False
  not_remake_weights: False
