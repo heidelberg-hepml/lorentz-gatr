@@ -4,7 +4,7 @@ exp_name: jc_local_debug
 data:
  data_dir: data/jetclass/
  score_token: false
- all_features: false
+ features: default
 
 jc_params:
  num_workers: 1

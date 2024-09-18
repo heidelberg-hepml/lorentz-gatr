@@ -35,15 +35,27 @@ class JetClassTaggingExperiment(TaggingExperiment):
                 self.cfg.data.num_global_tokens = 1
                 self.cfg.model.net.out_mv_channels = 10
 
-            if self.cfg.data.all_features:
-                self.cfg.model.net.in_s_channels = 10
-                self.cfg.data.data_config = (
-                    "experiments/tagging/miniweaver/allfeatures.yaml"
-                )
-            else:
+            if self.cfg.data.features == "fourmomenta":
                 self.cfg.model.net.in_s_channels = 0
                 self.cfg.data.data_config = (
                     "experiments/tagging/miniweaver/fourmomenta.yaml"
+                )
+            elif self.cfg.data.features == "pid":
+                self.cfg.model.net.in_s_channels = 6
+                self.cfg.data.data_config = "experiments/tagging/miniweaver/pid.yaml"
+            elif self.cfg.data.features == "default":
+                self.cfg.model.net.in_s_channels = 10
+                self.cfg.data.data_config = (
+                    "experiments/tagging/miniweaver/default.yaml"
+                )
+            elif self.cfg.data.features == "kitchensink":
+                self.cfg.model.net.in_s_channels = 17
+                self.cfg.data.data_config = (
+                    "experiments/tagging/miniweaver/kitchensink.yaml"
+                )
+            else:
+                raise ValueError(
+                    f"Input feature option {self.cfg.data.features} not implemented"
                 )
 
     def _init_loss(self):
@@ -229,9 +241,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
 
     def _get_ypred_and_label(self, batch):
         fourmomenta = batch[0]["pf_vectors"].to(self.device)
-        if self.cfg.data.all_features:
-            scalars = batch[0]["pf_features"].to(self.device)
-        else:
+        if self.cfg.data.features == "fourmomenta":
             scalars = torch.empty(
                 fourmomenta.shape[0],
                 0,
@@ -239,6 +249,8 @@ class JetClassTaggingExperiment(TaggingExperiment):
                 device=fourmomenta.device,
                 dtype=fourmomenta.dtype,
             )
+        else:
+            scalars = batch[0]["pf_features"].to(self.device)
         label = batch[1]["_label_"].to(self.device)
         fourmomenta, scalars, ptr = dense_to_sparse_jet(fourmomenta, scalars)
         embedding = embed_tagging_data_into_ga(fourmomenta, scalars, ptr, self.cfg.data)
