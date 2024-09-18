@@ -177,7 +177,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
         # accuracy
         labels_predict_score = np.argmax(labels_predict, axis=1)
         metrics["accuracy"] = accuracy_score(
-            labels_true.flatten(), np.round(labels_predict_score).flatten()
+            labels_true, np.round(labels_predict_score)
         )
         if mode == "eval":
             LOGGER.info(f"Accuracy on {title} dataset: {metrics['accuracy']:.4f}")
@@ -185,7 +185,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
         # auc and roc (fpr = epsB, tpr = epsS)
         metrics["auc_ovo"] = roc_auc_score(
             labels_true, labels_predict, multi_class="ovo", average="macro"
-        )
+        )  # unweighted mean of AUCs across classes
         if mode == "eval":
             LOGGER.info(f"The AUC is {metrics['auc_ovo']}")
         fpr_list, tpr_list, auc_scores = [], [], []
