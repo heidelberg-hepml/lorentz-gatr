@@ -250,7 +250,7 @@ def get_spurion(beam_reference, add_time_reference, two_beams, device, dtype):
         beam[..., 8] = 1
 
     elif beam_reference is None:
-        beam = torch.empty(0, 16)
+        beam = torch.empty(0, 16, device=device, dtype=dtype)
 
     else:
         raise ValueError(f"beam_reference {beam_reference} not implemented")
