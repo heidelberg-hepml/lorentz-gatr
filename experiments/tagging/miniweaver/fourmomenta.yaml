@@ -4,7 +4,7 @@ selection: null
 
 inputs:
  pf_vectors:
-  length: 120
+  length: 128
   pad_mode: constant
   vars:
    - [part_energy, null]

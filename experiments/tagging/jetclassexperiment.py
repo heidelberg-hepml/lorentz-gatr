@@ -232,14 +232,15 @@ class JetClassTaggingExperiment(TaggingExperiment):
                 )
 
         # create latex string
-        tex_string = f"{self.cfg.run_name} & {metrics['accuracy']:.3f} & {metrics['auc_ovo']:.3f}"
-        for i, rej in enumerate(class_rej_dict):
-            if rej is None:
-                continue
-            rej_string = str(rej).replace(".", "")
-            tex_string += f" & {metrics[f'rej{rej_string}_{i}']:.0f}"
-        tex_string += r" \\"
-        LOGGER.info(tex_string)
+        if mode == "eval":
+            tex_string = f"{self.cfg.run_name} & {metrics['accuracy']:.3f} & {metrics['auc_ovo']:.3f}"
+            for i, rej in enumerate(class_rej_dict):
+                if rej is None:
+                    continue
+                rej_string = str(rej).replace(".", "")
+                tex_string += f" & {metrics[f'rej{rej_string}_{i}']:.0f}"
+            tex_string += r" \\"
+            LOGGER.info(tex_string)
 
         if self.cfg.use_mlflow:
             for key, value in metrics.items():
