@@ -24,10 +24,10 @@ inputs:
       length: 128
       pad_mode: constant
       vars: 
+         - [part_energy, null]
          - [part_px, null]
          - [part_py, null]
          - [part_pz, null]
-         - [part_energy, null]
 
 labels:
    ### type can be `simple`, `custom`
