@@ -100,9 +100,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
             ]
             file_dict, files = to_filelist(flist)
 
-            LOGGER.info(
-                f"Using {self.num_files[label]} files for {label}ing from {path}"
-            )
+            LOGGER.info(f"Using {len(flist)} files for {label}ing from {path}")
             datasets[label] = SimpleIterDataset(
                 file_dict,
                 self.cfg.data.data_config,
