@@ -44,7 +44,7 @@ class TopTaggingDataset(TaggingDataset):
         self,
         filename,
         mode,
-        data_scale=None,
+        data_scale,
         dtype=torch.float32,
     ):
         """
@@ -64,14 +64,9 @@ class TopTaggingDataset(TaggingDataset):
         labels = data[f"labels_{mode}"]
 
         # preprocessing
-        if mode == "train":
-            data_scale = kinematics.std()
-        else:
-            assert data_scale is not None
-        self.data_scale = data_scale
-
         if self.rescale_data:
-            kinematics = kinematics / self.data_scale
+            kinematics = kinematics / data_scale
+
         kinematics = torch.tensor(kinematics, dtype=dtype)
         labels = torch.tensor(labels, dtype=torch.bool)
 
@@ -96,7 +91,7 @@ class QGTaggingDataset(TaggingDataset):
         self,
         filename,
         mode,
-        data_scale=None,
+        data_scale,
         dtype=torch.float32,
     ):
         """
@@ -117,14 +112,9 @@ class QGTaggingDataset(TaggingDataset):
         labels = data[f"labels_{mode}"]
 
         # preprocessing
-        if mode == "train":
-            data_scale = kinematics.std()
-        else:
-            assert data_scale is not None
-        self.data_scale = data_scale
-
         if self.rescale_data:
-            kinematics = kinematics / self.data_scale
+            kinematics = kinematics / data_scale
+
         kinematics = torch.tensor(kinematics, dtype=dtype)
         pids = torch.tensor(pids, dtype=dtype)
         labels = torch.tensor(labels, dtype=torch.bool)
