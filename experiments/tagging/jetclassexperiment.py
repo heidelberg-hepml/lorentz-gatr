@@ -125,26 +125,32 @@ class JetClassTaggingExperiment(TaggingExperiment):
     def _init_dataloader(self):
         self.loader_kwargs = {
             "pin_memory": True,
-            "num_workers": self.cfg.jc_params.num_workers,
             "persistent_workers": self.cfg.jc_params.num_workers > 0
             and self.cfg.jc_params.steps_per_epoch is not None,
+        }
+        num_workers = {
+            label: min(self.cfg.jc_params.num_workers, self.num_files[label])
+            for label in ["train", "test", "val"]
         }
         self.train_loader = DataLoader(
             dataset=self.data_train,
             batch_size=self.cfg.training.batchsize,
             drop_last=True,
+            num_workers=num_workers["train"],
             **self.loader_kwargs,
         )
         self.val_loader = DataLoader(
             dataset=self.data_val,
             batch_size=self.cfg.evaluation.batchsize,
             drop_last=True,
+            num_workers=num_workers["val"],
             **self.loader_kwargs,
         )
         self.test_loader = DataLoader(
             dataset=self.data_test,
             batch_size=self.cfg.evaluation.batchsize,
             drop_last=False,
+            num_workers=num_workers["test"],
             **self.loader_kwargs,
         )
 
