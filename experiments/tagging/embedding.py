@@ -116,6 +116,7 @@ def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
             device=multivectors.device,
         )
         multivectors[~is_global] = multivectors_buffer
+        multivectors[is_global][..., 1] = 1  # set global token energy to 1 (why?)
         scalars_buffer = scalars.clone()
         scalars = torch.zeros(
             multivectors.shape[0],
