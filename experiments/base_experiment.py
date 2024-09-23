@@ -552,36 +552,15 @@ class BaseExperiment:
                 self.cfg.training.clip_grad_value,
             )
         # rescale gradients such that their norm matches a given number
-        try:
-            grad_norm = (
-                torch.nn.utils.clip_grad_norm_(
-                    self.model.parameters(),
-                    self.cfg.training.clip_grad_norm,
-                    error_if_nonfinite=True,
-                )
-                .cpu()
-                .item()
+        grad_norm = (
+            torch.nn.utils.clip_grad_norm_(
+                self.model.parameters(),
+                self.cfg.training.clip_grad_norm,
+                error_if_nonfinite=True,
             )
-        except RuntimeError:
-            LOGGER.info(
-                "RuntimeError when computing grad_norm, most probably caused by nan gradient in backward pass"
-            )
-            torch.autograd.set_detect_anomaly(True)
-            loss, metrics = self._batch_loss(data)
-            self.optimizer.zero_grad()
-            loss.backward()
-            grad_norm = (
-                torch.nn.utils.clip_grad_norm_(
-                    self.model.parameters(),
-                    self.cfg.training.clip_grad_norm,
-                    error_if_nonfinite=True,
-                )
-                .cpu()
-                .item()
-            )
-            LOGGER.info(f"Wohooo, no nan if we just repeat the backward pass!")
-            torch.autograd.set_detect_anomaly(False)
-
+            .cpu()
+            .item()
+        )
         self.optimizer.step()
         if self.ema is not None:
             self.ema.update()
