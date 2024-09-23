@@ -15,7 +15,7 @@ class TopTaggingFineTuneExperiment(TopTaggingExperiment):
         )
         warmstart_cfg = OmegaConf.load(warmstart_path)
         assert warmstart_cfg.exp_type == "jctagging"
-        assert not warmstart_cfg.data.all_features
+        assert warmstart_cfg.data.features == "fourmomenta"
         if warmstart_cfg.data.score_token:
             raise NotImplementedError(
                 "Score-token option not properly implemented yet to be transferred from jc to top"
