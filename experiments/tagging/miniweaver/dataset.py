@@ -368,6 +368,7 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
         async_load=False,
         infinity_mode=False,
         in_memory=False,
+        events_per_file=10000,  # assumes files from JetClass dataset
         name="",
     ):
         self._iters = {} if infinity_mode or in_memory else None
@@ -381,6 +382,7 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
         self._infinity_mode = infinity_mode
         self._in_memory = in_memory
         self._name = name
+        self._events_per_file = events_per_file
 
         # ==== sampling parameters ====
         self._sampler_options = {
@@ -465,3 +467,6 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
                 kwargs = {k: copy.deepcopy(self.__dict__[k]) for k in self._init_args}
                 self._iters[worker_id] = _SimpleIter(**kwargs)
                 return self._iters[worker_id]
+
+    def __len__(self):
+        return len(self._init_file_dict) * self._events_per_file
