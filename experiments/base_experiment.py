@@ -75,7 +75,6 @@ class BaseExperiment:
 
         self.init_physics()
         self.init_model()
-        self.init_ema()
         self.init_data()
         self._init_dataloader()
         self._init_loss()
@@ -123,6 +122,15 @@ class BaseExperiment:
             f"Instantiated model {type(self.model.net).__name__} with {num_parameters} learnable parameters"
         )
 
+        if self.cfg.ema:
+            LOGGER.info(f"Using EMA for validation and eval")
+            self.ema = ExponentialMovingAverage(
+                self.model.parameters(), decay=self.cfg.training.ema_decay
+            )
+        else:
+            LOGGER.info(f"Not using EMA")
+            self.ema = None
+
         # load existing model if specified
         if self.warm_start:
             model_path = os.path.join(
@@ -139,17 +147,10 @@ class BaseExperiment:
                 LOGGER.info(f"Loading EMA from {model_path}")
                 state_dict = torch.load(model_path, map_location="cpu")["ema"]
                 self.ema.load_state_dict(state_dict)
-        self.model.to(self.device, dtype=self.dtype)
 
-    def init_ema(self):
-        if self.cfg.ema:
-            LOGGER.info(f"Using EMA for validation and eval")
-            self.ema = ExponentialMovingAverage(
-                self.model.parameters(), decay=self.cfg.training.ema_decay
-            ).to(self.device)
-        else:
-            LOGGER.info(f"Not using EMA")
-            self.ema = None
+        self.model.to(self.device, dtype=self.dtype)
+        if self.ema is not None:
+            self.ema.to(self.device)
 
     def _init(self):
         run_name = self._init_experiment()

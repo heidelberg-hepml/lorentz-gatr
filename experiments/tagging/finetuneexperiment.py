@@ -49,6 +49,12 @@ class TopTaggingFineTuneExperiment(TopTaggingExperiment):
             out_s_channels=self.cfg.model.net.out_s_channels,
         ).to(self.device)
 
+        if self.cfg.ema:
+            LOGGER.info(f"Re-initializing EMA")
+            self.ema = ExponentialMovingAverage(
+                self.model.parameters(), decay=self.cfg.training.ema_decay
+            ).to(self.device)
+
     def _init_optimizer(self):
         # collect parameter lists
         params_backbone = list(self.model.net.linear_in.parameters()) + list(
