@@ -6,6 +6,7 @@ from omegaconf import open_dict
 import os, time
 
 from sklearn.metrics import roc_curve, roc_auc_score, accuracy_score
+from scipy.interpolate import interp1d
 
 from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
@@ -198,10 +199,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
         )
 
         # accuracy
-        labels_predict_score = np.argmax(labels_predict, axis=1)
-        metrics["accuracy"] = accuracy_score(
-            labels_true, np.round(labels_predict_score)
-        )
+        metrics["accuracy"] = accuracy_score(labels_true, labels_predict.argmax(1))
         if mode == "eval":
             LOGGER.info(f"Accuracy on {title} dataset:\t{metrics['accuracy']:.4f}")
 
@@ -219,10 +217,9 @@ class JetClassTaggingExperiment(TaggingExperiment):
 
         # 1/epsB at fixed epsS
         def get_rej(epsS, class_idx):
-            idx = np.argmin(np.abs(tpr_list[class_idx] - epsS))
-            return 1 / fpr_list[class_idx][idx]
+            background_eff_fn = interp1d(tpr_list[class_idx], fpr_list[class_idx])
+            return 1 / background_eff_fn(epsS)
 
-        # turn the below dict into a list please
         class_rej_dict = [None, 0.5, 0.5, 0.5, 0.5, 0.99, 0.5, 0.995, 0.5, 0.5]
 
         for i, rej in enumerate(class_rej_dict):
