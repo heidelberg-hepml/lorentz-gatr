@@ -2,7 +2,7 @@ data:
  beam_reference: spacelike
  two_beams: true
  beam_token: true
- add_time_reference: false
+ add_time_reference: true
  add_pt: false
  reinsert_channels: false
  rescale_data: true
