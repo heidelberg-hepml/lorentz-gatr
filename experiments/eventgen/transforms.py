@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-import math
 
 from experiments.eventgen.helpers import (
     unpack_last,
