@@ -28,14 +28,25 @@ class JetClassTaggingExperiment(TaggingExperiment):
             not self.cfg.model.mean_aggregation
         ), "Mean-aggregation not implemented for multi-class classification"
         assert not self.cfg.plotting.roc and not self.cfg.plotting.score
-        assert self.cfg.jc_params.num_classes == 10
+        self.class_names = [
+            "ZJetsToNuNu",
+            "HToBB",
+            "HToCC",
+            "HToGG",
+            "HToWW4Q",
+            "HToWW2Q1L",
+            "TTBar",
+            "TTBarLep",
+            "WToQQ",
+            "ZToQQ",
+        ]
         with open_dict(self.cfg):
             if self.cfg.data.score_token:
-                self.cfg.data.num_global_tokens = self.cfg.jc_params.num_classes
+                self.cfg.data.num_global_tokens = len(self.class_names)
                 self.cfg.model.net.out_mv_channels = 1
             else:
                 self.cfg.data.num_global_tokens = 1
-                self.cfg.model.net.out_mv_channels = self.cfg.jc_params.num_classes
+                self.cfg.model.net.out_mv_channels = len(self.class_names)
 
             if self.cfg.data.features == "fourmomenta":
                 self.cfg.model.net.in_s_channels = 0
@@ -59,19 +70,6 @@ class JetClassTaggingExperiment(TaggingExperiment):
                 raise ValueError(
                     f"Input feature option {self.cfg.data.features} not implemented"
                 )
-
-            self.class_names = [
-                "ZJetsToNuNu",
-                "HToBB",
-                "HToCC",
-                "HToGG",
-                "HToWW4Q",
-                "HToWW2Q1L",
-                "TTBar",
-                "TTBarLep",
-                "WToQQ",
-                "ZToQQ",
-            ]
 
     def _init_loss(self):
         self.loss = torch.nn.CrossEntropyLoss()
@@ -210,7 +208,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
         if mode == "eval":
             LOGGER.info(f"The ovo mean AUC is\t\t{metrics['auc_ovo']:.5f}")
         fpr_list, tpr_list = [], []
-        for i in range(self.cfg.jc_params.num_classes):
+        for i in range(len(self.class_names)):
             fpr, tpr, _ = roc_curve(labels_true == i, labels_predict[:, i])
             fpr_list.append(fpr)
             tpr_list.append(tpr)

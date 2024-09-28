@@ -10,7 +10,7 @@ data:
  val_files_range: [120,125]
 
 jc_params:
- num_workers: 1
+ num_workers: 4
  fetch_step: 0.01
  extra_selection: null
  extra-test-selection: null
@@ -19,11 +19,6 @@ jc_params:
  not_remake_weights: False
  steps_per_epoch: null
  steps_per_epoch_val: null
- samples_per_epoch: null
- samples_per_epoch_val: null
- local_rank: null
- copy_inputs: False
- num_classes: 10
 
 plotting:
  roc: false
