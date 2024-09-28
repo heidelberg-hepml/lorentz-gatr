@@ -1,11 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-# ignore warnings here
-import warnings
-
-warnings.filterwarnings("ignore")
-
 # load fonts
 import matplotlib.font_manager as font_manager
 

@@ -1,9 +1,8 @@
-import math
 import torch
 import numpy as np
 from torch import nn
 
-from gatr.interface import embed_vector, extract_vector, extract_scalar
+from gatr.interface import embed_vector, extract_vector
 from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity
 from experiments.toptagging.dataset import embed_beam_reference
 from experiments.eventgen.cfm import EventCFM

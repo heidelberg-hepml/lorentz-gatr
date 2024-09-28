@@ -1,5 +1,4 @@
 from collections.abc import Mapping
-import numpy as np
 import torch
 
 
