@@ -3,7 +3,7 @@ import torch
 from torch_geometric.loader import DataLoader
 
 import os, time
-from omegaconf import open_dict
+from omegaconf import OmegaConf, open_dict
 
 from sklearn.metrics import roc_curve, roc_auc_score, accuracy_score
 
@@ -11,11 +11,14 @@ from experiments.base_experiment import BaseExperiment
 from experiments.toptagging.dataset import TopTaggingDataset
 from experiments.toptagging.dataset import QGTaggingDataset
 from experiments.toptagging.plots import plot_mixer
-from experiments.toptagging.embedding import embed_tagging_data_into_ga
 from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
 
-MODEL_TITLE_DICT = {"GATr": "GATr"}
+MODEL_TITLE_DICT = {
+    "GATr": "GATr",
+    "Transformer": "Tr",
+    "MLP": "MLP",
+}
 
 
 class TaggingExperiment(BaseExperiment):
@@ -31,15 +34,30 @@ class TaggingExperiment(BaseExperiment):
 
         # dynamically extend dict
         with open_dict(self.cfg):
+            gatr_name = "experiments.toptagging.wrappers.TopTaggingGATrWrapper"
+            assert self.cfg.model._target_ in [gatr_name]
+
             # global token?
-            self.cfg.data.include_global_token = not self.cfg.model.mean_aggregation
-            self.cfg.model.net.in_mv_channels = 1
+            if self.cfg.model._target_ == gatr_name:
+                self.cfg.data.include_global_token = not self.cfg.model.mean_aggregation
+            else:
+                raise ValueError(f"model {self.cfg.model._target_} not implemented")
+
+            if self.cfg.exp_type == "toptagging":
+                # make sure we know where we start from
+                self.cfg.model.net.in_s_channels = 0
+                self.cfg.model.net.in_mv_channels = 1
+            elif self.cfg.exp_type == "qgtagging":
+                # We add 7 scalar channels, 1 for the global token and 6 for the particle id features
+                # (charge, electron, muon, photon, charged hadron and neutral hadron)
+                self.cfg.model.net.in_s_channels = 6
+                self.cfg.model.net.in_mv_channels = 1
 
             # extra scalar channels
             if self.cfg.data.add_pt:
                 self.cfg.model.net.in_s_channels += 1
             if self.cfg.data.include_global_token:
-                self.cfg.model.net.in_s_channels += self.cfg.data.num_global_tokens
+                self.cfg.model.net.in_s_channels += 1
 
             # extra mv channels for beam_reference and time_reference
             if not self.cfg.data.beam_token:
@@ -68,15 +86,18 @@ class TaggingExperiment(BaseExperiment):
     def _init_data(self, Dataset, data_path):
         LOGGER.info(f"Creating {Dataset.__name__} from {data_path}")
         t0 = time.time()
-        kwargs = {"rescale_data": self.cfg.data.rescale_data}
-        self.data_train = Dataset(**kwargs)
-        self.data_test = Dataset(**kwargs)
-        self.data_val = Dataset(**kwargs)
-        self.data_train.load_data(data_path, "train", data_scale=None)
-        self.data_test.load_data(
-            data_path, "test", data_scale=self.data_train.data_scale
+        kwargs = {
+            "cfg": self.cfg,
+            "dtype": self.dtype,
+            "device": self.device,
+        }
+        self.data_train = Dataset(data_path, "train", data_scale=None, **kwargs)
+        self.data_test = Dataset(
+            data_path, "test", data_scale=self.data_train.data_scale, **kwargs
         )
-        self.data_val.load_data(data_path, "val", data_scale=self.data_train.data_scale)
+        self.data_val = Dataset(
+            data_path, "val", data_scale=self.data_train.data_scale, **kwargs
+        )
         dt = time.time() - t0
         LOGGER.info(f"Finished creating datasets after {dt:.2f} s = {dt/60:.2f} min")
 
@@ -105,31 +126,38 @@ class TaggingExperiment(BaseExperiment):
 
     def evaluate(self):
         self.results = {}
-        loader_dict = {
-            "train": self.train_loader,
-            "test": self.test_loader,
-            "val": self.val_loader,
-        }
-        for set_label in self.cfg.evaluation.eval_set:
-            if self.ema is not None:
-                with self.ema.average_parameters():
-                    self.results[set_label] = self._evaluate_single(
-                        loader_dict[set_label], set_label, mode="eval"
-                    )
 
-                self._evaluate_single(
-                    loader_dict[set_label], f"{set_label}_noema", mode="eval"
+        # this is a bit ugly, but it does the job
+        if self.ema is not None:
+            with self.ema.average_parameters():
+                self.results["train"] = self._evaluate_single(
+                    self.train_loader, "train", mode="eval"
+                )
+                self.results["val"] = self._evaluate_single(
+                    self.val_loader, "val", mode="eval"
+                )
+                self.results["test"] = self._evaluate_single(
+                    self.test_loader, "test", mode="eval"
                 )
 
-            else:
-                self.results[set_label] = self._evaluate_single(
-                    loader_dict[set_label], set_label, mode="eval"
-                )
+            self._evaluate_single(self.train_loader, "train_noema", mode="eval")
+            self._evaluate_single(self.val_loader, "val_noema", mode="eval")
+            self._evaluate_single(self.test_loader, "test_noema", mode="eval")
+
+        else:
+            self.results["train"] = self._evaluate_single(
+                self.train_loader, "train", mode="eval"
+            )
+            self.results["val"] = self._evaluate_single(
+                self.val_loader, "val", mode="eval"
+            )
+            self.results["test"] = self._evaluate_single(
+                self.test_loader, "test", mode="eval"
+            )
 
     def _evaluate_single(self, loader, title, mode, step=None):
         assert mode in ["val", "eval"]
-        # re-initialize dataloader to make sure it is using the evaluation batchsize
-        # (makes a difference for trainloader)
+        # re-initialize dataloader to make sure it is using the evaluation batchsize (makes a difference for trainloader)
         loader = DataLoader(
             dataset=loader.dataset,
             batch_size=self.cfg.evaluation.batchsize,
@@ -150,9 +178,10 @@ class TaggingExperiment(BaseExperiment):
             self.optimizer.eval()
         with torch.no_grad():
             for batch in loader:
-                y_pred, label = self._get_ypred_and_label(batch)
+                batch = batch.to(self.device)
+                y_pred = self.model(batch)
                 y_pred = torch.nn.functional.sigmoid(y_pred)
-                labels_true.append(label.cpu().float())
+                labels_true.append(batch.label.cpu().float())
                 labels_predict.append(y_pred.cpu().float())
         labels_true, labels_predict = torch.cat(labels_true), torch.cat(labels_predict)
         if mode == "eval":
@@ -210,11 +239,7 @@ class TaggingExperiment(BaseExperiment):
         title = model_title
         LOGGER.info(f"Creating plots in {plot_path}")
 
-        if (
-            self.cfg.evaluation.save_roc
-            and self.cfg.evaluate
-            and ("test" in self.cfg.evaluation.eval_set)
-        ):
+        if self.cfg.evaluate and self.cfg.evaluation.save_roc:
             file = f"{plot_path}/roc.txt"
             roc = np.stack(
                 (self.results["test"]["fpr"], self.results["test"]["tpr"]), axis=-1
@@ -222,7 +247,7 @@ class TaggingExperiment(BaseExperiment):
             np.savetxt(file, roc)
 
         plot_dict = {}
-        if self.cfg.evaluate and ("test" in self.cfg.evaluation.eval_set):
+        if self.cfg.evaluate:
             plot_dict = {"results_test": self.results["test"]}
         if self.cfg.train:
             plot_dict["train_loss"] = self.train_loss
@@ -233,7 +258,7 @@ class TaggingExperiment(BaseExperiment):
         plot_mixer(self.cfg, plot_path, title, plot_dict)
 
     def _init_loss(self):
-        raise NotImplementedError
+        self.loss = torch.nn.BCEWithLogitsLoss()
 
     # overwrite _validate method to compute metrics over the full validation set
     def _validate(self, step):
@@ -250,37 +275,18 @@ class TaggingExperiment(BaseExperiment):
         return metrics["bce"]
 
     def _batch_loss(self, batch):
-        y_pred, label = self._get_ypred_and_label(batch)
-        loss = self.loss(y_pred, label)
+        y_pred = self.model(batch)
+        loss = self.loss(y_pred, batch.label.to(self.dtype))
         assert torch.isfinite(loss).all()
 
         metrics = {}
         return loss, metrics
-
-    def _get_ypred_and_label(self, batch):
-        batch = batch.to(self.device)
-        embedding = embed_tagging_data_into_ga(
-            batch.x, batch.scalars, batch.ptr, self.cfg.data
-        )
-        y_pred = self.model(embedding)
-        return y_pred, batch.label.to(self.dtype)
 
     def _init_metrics(self):
         return {}
 
 
 class TopTaggingExperiment(TaggingExperiment):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        with open_dict(self.cfg):
-            self.cfg.data.num_global_tokens = 1
-
-            # no fundamental scalar information available
-            self.cfg.model.net.in_s_channels = 0
-
-    def _init_loss(self):
-        self.loss = torch.nn.BCEWithLogitsLoss()
-
     def init_data(self):
         data_path = os.path.join(
             self.cfg.data.data_dir, f"toptagging_{self.cfg.data.dataset}.npz"
@@ -289,18 +295,6 @@ class TopTaggingExperiment(TaggingExperiment):
 
 
 class QGTaggingExperiment(TaggingExperiment):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        with open_dict(self.cfg):
-            self.cfg.data.num_global_tokens = 1
-
-            # We add 6 scalar channels for the particle id features
-            # (charge, electron, muon, photon, charged hadron and neutral hadron)
-            self.cfg.model.net.in_s_channels = 6
-
-    def _init_loss(self):
-        self.loss = torch.nn.BCEWithLogitsLoss()
-
     def init_data(self):
         data_path = os.path.join(
             self.cfg.data.data_dir, f"qg_tagging_{self.cfg.data.dataset}.npz"

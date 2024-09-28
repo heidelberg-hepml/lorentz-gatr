@@ -2,7 +2,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 
-from experiments.base_plots import plot_loss
+# turn off warnings from 1/0 when plotting roc curves
+import warnings
+
+warnings.simplefilter("ignore", RuntimeWarning)
+
+from experiments.base_plots import plot_loss, plot_metric
 
 plt.rcParams["font.family"] = "serif"
 plt.rcParams["font.serif"] = "Charter"
@@ -14,7 +19,6 @@ plt.rcParams[
 FONTSIZE = 14
 FONTSIZE_LEGEND = 13
 FONTSIZE_TICK = 12
-EPS = 1e-10
 
 colors = ["black", "#0343DE", "#A52A2A", "darkorange"]
 
@@ -62,7 +66,7 @@ def plot_mixer(cfg, plot_path, title, plot_dict):
 
 def plot_roc(out, fpr, tpr, auc, title=None):
     color = colors[2]
-    rnd = np.linspace(EPS, 1, 100)
+    rnd = np.linspace(1e-3, 1, 100)
 
     # usual roc
     fig, ax = plt.subplots(figsize=(5, 4))
@@ -97,8 +101,7 @@ def plot_roc(out, fpr, tpr, auc, title=None):
     ax.set_ylabel(r"$1 / \epsilon_B$", fontsize=FONTSIZE)
     ax.set_yscale("log")
     ax.plot(rnd, 1 / rnd, "k--")
-    fpr_inv = np.where(fpr > EPS, 1 / fpr, np.zeros_like(fpr))
-    ax.plot(tpr, fpr_inv, color=color)
+    ax.plot(tpr, 1 / fpr, color=color)
     ax.text(
         0.05,
         0.05,
@@ -125,8 +128,7 @@ def plot_roc(out, fpr, tpr, auc, title=None):
     ax.set_xlabel(r"$\epsilon_S$", fontsize=FONTSIZE)
     ax.set_ylabel(r"$\epsilon_S / \sqrt{\epsilon_B}$", fontsize=FONTSIZE)
     ax.plot(rnd, rnd**0.5, "k--")
-    sic = np.where(fpr > EPS, tpr / fpr**0.5, np.zeros_like(fpr))
-    ax.plot(tpr, sic, color=color)
+    ax.plot(tpr, tpr / fpr**0.5, color=color)
     ax.text(
         0.95,
         0.05,
