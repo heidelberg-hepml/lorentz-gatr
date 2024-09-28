@@ -1,37 +1,9 @@
 exp_type: qgtagging
-exp_name: qgtag_local_debug
-base_dir: /remote/gpu02/breso/lorentz-gatr
+exp_name: qg_local_debug
 
 data:
- data_dir : /remote/gpu02/breso/lorentz-gatr/data
- dataset: qg_data
- beam_reference: spacelike
- two_beams: false
- beam_token: true
- add_time_reference: false
- add_pt: false
- reinsert_channels: true
- rescale_data: true
-
-train: true
-training:
- iterations: 10
- batchsize: 128
- lr: 1e-3
-
- force_xformers: false
-
-evaluation:
- batchsize: 128
- save_roc: false
-
-plotting:
- roc: true
- loss: true
- score: true
+ data_dir : data/
+ dataset: mini
 
 defaults:
- - model: gatr_qgtagging
- - default
- - hydra
- - _self_
+ - default_tagging

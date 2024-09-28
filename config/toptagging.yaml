@@ -1,37 +1,9 @@
 exp_type: toptagging
 exp_name: topt_local_debug
-base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
 
 data:
- data_dir : /media/jspinner/shared/Studium/project3/data
+ data_dir : data/
  dataset: mini
- beam_reference: spacelike
- two_beams: true
- beam_token: true
- add_time_reference: false
- add_pt: false
- reinsert_channels: false
- rescale_data: true
-
-train: true
-training:
- iterations: 10
- batchsize: 128
- lr: 1e-3
-
- force_xformers: false
-
-evaluation:
- batchsize: 128
- save_roc: false
-
-plotting:
- roc: true
- loss: true
- score: true
 
 defaults:
- - model: gatr_toptagging
- - default
- - hydra
- - _self_
+ - default_tagging

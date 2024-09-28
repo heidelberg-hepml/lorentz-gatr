@@ -1,4 +1,4 @@
-_target_: experiments.toptagging.wrappers.TopTaggingGATrWrapper
+_target_: experiments.tagging.wrappers.TaggingGATrWrapper
 force_xformers: '${training.force_xformers}'
 mean_aggregation: false
 

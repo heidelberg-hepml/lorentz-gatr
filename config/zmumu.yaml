@@ -1,12 +1,11 @@
 exp_type: zmumu
 exp_name: zmumu_local_debug
-base_dir: /media/jspinner/shared/Studium/project3/lorentz-gatr
 
 data:
- n_jets: [2]
- data_path_1j: /media/jspinner/shared/Studium/project3/data/zmumu_1j.npy
- data_path_2j: /media/jspinner/shared/Studium/project3/data/zmumu_2j.npy
- data_path_3j: /media/jspinner/shared/Studium/project3/data/zmumu_3j.npy
+ n_jets: [1]
+ data_path_1j: data/Z_1.npy
+ data_path_2j: data/Z_2.npy
+ data_path_3j: data/Z_3.npy
  subsample: 100000
  train_test_val: [.4, .5, .1]
 

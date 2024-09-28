@@ -1,0 +1,26 @@
+selection: null
+### use `&`, `|`, `~` for logical operations on numpy arrays
+### can use functions from `math`, `np` (numpy), and `awkward` in the expression
+
+inputs:
+ pf_vectors:
+  length: 128
+  pad_mode: constant
+  vars:
+   - [part_energy, null]
+   - [part_px, null]
+   - [part_py, null]
+   - [part_pz, null]
+
+labels:
+ ### type can be `simple`, `custom`
+ ### [option 1] use `simple` for binary/multi-class classification, then `value` is a list of 0-1 labels
+ type: simple
+ value: [label_QCD, label_Hbb, label_Hcc, label_Hgg, label_H4q, label_Hqql, label_Tbqq, label_Tbl, label_Wqq, label_Zqq]
+ ### [option 2] otherwise use `custom` to define the label, then `value` is a map
+ # type: custom
+ # value: 
+ #    truth_label: label.argmax(1)
+
+weights: None
+
