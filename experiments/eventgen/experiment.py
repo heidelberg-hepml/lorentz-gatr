@@ -115,6 +115,7 @@ class EventGenerationExperiment(BaseExperiment):
             self.delta_r_min,
             self.onshell_list,
             self.onshell_mass,
+            self.virtual_components,
             self.cfg.data.base_type,
             self.cfg.data.use_pt_min,
             self.cfg.data.use_delta_r_min,
@@ -136,11 +137,11 @@ class EventGenerationExperiment(BaseExperiment):
         self.model.init_distribution()
         self.model.init_coordinates()
         fit_data = [x / self.units for x in self.events_raw]
-        self.model.init_anything(fit_data)
         for coordinates in self.model.coordinates:
             coordinates.init_fit(fit_data)
         if hasattr(self.model, "distribution"):
             self.model.distribution.coordinates.init_fit(fit_data)
+        self.model.init_anything(fit_data)
 
     def _init_dataloader(self):
         assert sum(self.cfg.data.train_test_val) <= 1

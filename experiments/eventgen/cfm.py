@@ -18,6 +18,7 @@ from experiments.eventgen.coordinates import (
     convert_coordinates,
     convert_velocity,
 )
+from experiments.eventgen.mfm import MassMFM
 
 
 def hutchinson_trace(x_out, x_in):
@@ -400,6 +401,7 @@ class EventCFM(CFM):
         delta_r_min,
         onshell_list,
         onshell_mass,
+        virtual_components,
         base_type,
         use_pt_min,
         use_delta_r_min,
@@ -426,6 +428,8 @@ class EventCFM(CFM):
         onshell_mass: List[float]
             Masses of the onshell particles in the same order as in onshell_list
             Hard-coded in EventGenerationExperiment
+        virtual_components: List[List[int]]
+            Indices of the virtual particles
         base_type: int
             Which base distribution to use
         use_delta_r_min: bool
@@ -438,6 +442,7 @@ class EventCFM(CFM):
         self.delta_r_min = delta_r_min
         self.onshell_list = onshell_list
         self.onshell_mass = onshell_mass
+        self.virtual_components = virtual_components
         self.base_type = base_type
         self.use_delta_r_min = use_delta_r_min
         self.use_pt_min = use_pt_min
@@ -507,13 +512,28 @@ class EventCFM(CFM):
                 self.pt_min,
                 self.units,
             )
+        elif coordinates_label == "MassMFM":
+            coordinates = MassMFM(
+                self.cfm,
+                self.virtual_components,
+                self.pt_min,
+                self.units,
+            )
         else:
             raise ValueError(f"coordinates={coordinates_label} not implemented")
         return coordinates
 
     def init_anything(self, fourmomenta):
         # placeholder for any initialization that needs to be done
-        pass
+        if self.cfm.coordinates_straight == "MassMFM":
+            assert (
+                len(fourmomenta) == 1
+            ), "MassMFM only implemented for single-multiplicity training for now"
+            fourmomenta = fourmomenta[0]
+            base = self.sample_base(
+                fourmomenta.shape, fourmomenta.device, fourmomenta.dtype
+            )
+            self.coordinates_straight.initialize(base, fourmomenta)
 
     def preprocess(self, fourmomenta):
         fourmomenta = fourmomenta / self.units
