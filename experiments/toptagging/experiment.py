@@ -3,7 +3,7 @@ import torch
 from torch_geometric.loader import DataLoader
 
 import os, time
-from omegaconf import open_dict
+from omegaconf import OmegaConf, open_dict
 
 from sklearn.metrics import roc_curve, roc_auc_score, accuracy_score
 

@@ -7,7 +7,7 @@ import warnings
 
 warnings.simplefilter("ignore", RuntimeWarning)
 
-from experiments.base_plots import plot_loss
+from experiments.base_plots import plot_loss, plot_metric
 
 plt.rcParams["font.family"] = "serif"
 plt.rcParams["font.serif"] = "Charter"
