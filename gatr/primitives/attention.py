@@ -1,5 +1,6 @@
 from typing import Optional, Tuple, Union
 
+import numpy as np
 import torch
 from einops import rearrange
 from torch import Tensor

@@ -1,5 +1,6 @@
 """Self-attention layers."""
 
+import torch
 from torch import nn
 
 from gatr.layers.attention.config import SelfAttentionConfig

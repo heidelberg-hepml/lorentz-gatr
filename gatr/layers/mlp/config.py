@@ -15,7 +15,7 @@ class MLPConfig:
     s_channels : None or iterable of int
         If not None, sets the number of scalar channels at each layer, from input to output. Length
         needs to match mv_channels
-    activation : {"relu", "sigmoid", "gelu", "silu"}
+    activation : {"relu", "sigmoid", "gelu"}
         Which (gated) activation function to use
     dropout_prob : float or None
         Dropout probability
@@ -24,7 +24,6 @@ class MLPConfig:
     mv_channels: Optional[List[int]] = None
     s_channels: Optional[List[int]] = None
     activation: str = "gelu"
-    glu: bool = False
     dropout_prob: Optional[float] = None
 
     def __post_init__(self):

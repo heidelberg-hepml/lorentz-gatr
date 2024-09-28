@@ -25,10 +25,6 @@ net:
   increase_hidden_channels: 2
   head_scale: false
 
- mlp:
-  activation: gelu
-  glu: false
-
 defaults:
  - /base_attention@net.attention
  - /base_mlp@net.mlp
