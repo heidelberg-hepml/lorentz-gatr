@@ -57,6 +57,10 @@ class TaggingExperiment(BaseExperiment):
                     )
                 if self.cfg.data.add_time_reference:
                     self.cfg.model.net.in_mv_channels += 1
+                if self.cfg.data.add_xzplane:
+                    self.cfg.model.net.in_mv_channels += 1
+                if self.cfg.data.add_yzplane:
+                    self.cfg.model.net.in_mv_channels += 1
 
             # reinsert channels
             if self.cfg.data.reinsert_channels:

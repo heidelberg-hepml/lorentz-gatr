@@ -45,6 +45,8 @@ def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
         cfg_data.beam_reference,
         cfg_data.add_time_reference,
         cfg_data.two_beams,
+        cfg_data.add_xzplane,
+        cfg_data.add_yzplane,
         fourmomenta.device,
         fourmomenta.dtype,
     )
@@ -207,7 +209,15 @@ def dense_to_sparse_jet(fourmomenta_dense, scalars_dense):
     return fourmomenta_sparse, scalars_sparse, ptr
 
 
-def get_spurion(beam_reference, add_time_reference, two_beams, device, dtype):
+def get_spurion(
+    beam_reference,
+    add_time_reference,
+    two_beams,
+    add_xzplane,
+    add_yzplane,
+    device,
+    dtype,
+):
     """
     Construct spurion
 
@@ -219,6 +229,10 @@ def get_spurion(beam_reference, add_time_reference, two_beams, device, dtype):
         Whether to add the time direction as a reference to the network
     two_beams: bool
         Whether we only want (x, 0, 0, 1) or both (x, 0, 0, +/- 1) for the beam
+    add_xzplane: bool
+        Whether to add the x-z-plane as a reference to the network
+    add_yzplane: bool
+        Whether to add the y-z-plane as a reference to the network
     device
     dtype
 
@@ -255,6 +269,20 @@ def get_spurion(beam_reference, add_time_reference, two_beams, device, dtype):
     else:
         raise ValueError(f"beam_reference {beam_reference} not implemented")
 
+    if add_xzplane:
+        # add the x-z-plane, embedded as a bivector
+        xzplane = torch.zeros(1, 16, device=device, dtype=dtype)
+        xzplane[..., 10] = 1
+    else:
+        xzplane = torch.empty(0, 16, device=device, dtype=dtype)
+
+    if add_yzplane:
+        # add the y-z-plane, embedded as a bivector
+        yzplane = torch.zeros(1, 16, device=device, dtype=dtype)
+        yzplane[..., 9] = 1
+    else:
+        yzplane = torch.empty(0, 16, device=device, dtype=dtype)
+
     if add_time_reference:
         time = [1, 0, 0, 0]
         time = torch.tensor(time, device=device, dtype=dtype).reshape(1, 4)
@@ -262,7 +290,7 @@ def get_spurion(beam_reference, add_time_reference, two_beams, device, dtype):
     else:
         time = torch.empty(0, 16, device=device, dtype=dtype)
 
-    spurion = torch.cat((beam, time), dim=-2)
+    spurion = torch.cat((beam, xzplane, yzplane, time), dim=-2)
     return spurion
 
 

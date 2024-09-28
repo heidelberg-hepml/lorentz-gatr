@@ -3,6 +3,8 @@ data:
  two_beams: true
  beam_token: true
  add_time_reference: true
+ add_xzplane: false
+ add_yzplane: false
  add_pt: false
  reinsert_channels: false
  rescale_data: true
