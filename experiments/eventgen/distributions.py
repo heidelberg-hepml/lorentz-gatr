@@ -4,7 +4,6 @@ import math
 from experiments.eventgen.helpers import (
     get_pt,
     delta_r_fast,
-    unpack_last,
     fourmomenta_to_jetmomenta,
 )
 import experiments.eventgen.coordinates as c
@@ -177,7 +176,7 @@ class StandardPPPLogM2(RejectionDistribution):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.coordinates = c.StandardPPPLogM2()
+        self.coordinates = c.StandardPPPLogM2(self.onshell_list)
 
     def propose(self, shape, device, dtype, generator=None):
         shape = list(shape)
@@ -213,7 +212,9 @@ class StandardLogPtPhiEtaLogM2(RejectionDistribution):
         assert (
             self.use_pt_min
         ), f"use_pt_min=False not implemented for distribution StandardLogPtPhiEtaLogM2"
-        self.coordinates = c.StandardLogPtPhiEtaLogM2(self.pt_min, self.units)
+        self.coordinates = c.StandardLogPtPhiEtaLogM2(
+            self.pt_min, self.units, self.onshell_list
+        )
 
     def propose(self, shape, device, dtype, generator=None):
         """Base distribution for precisesiast: pt, eta gaussian; phi uniform; mass shifted gaussian"""

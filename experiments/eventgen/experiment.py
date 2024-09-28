@@ -2,7 +2,7 @@ import numpy as np
 import torch
 
 import os, time
-from omegaconf import OmegaConf, open_dict
+from omegaconf import open_dict
 from hydra.utils import instantiate
 from tqdm import trange, tqdm
 
@@ -145,7 +145,6 @@ class EventGenerationExperiment(BaseExperiment):
         assert sum(self.cfg.data.train_test_val) <= 1
 
         # seperate data into train, test and validation subsets for each dataset
-        train_sets, test_sets, val_sets = [], [], []
         self.data_raw, self.data_prepd = [], []
         for ijet, n_jets in enumerate(self.cfg.data.n_jets):
             n_data = self.events_raw[ijet].shape[0]
@@ -279,9 +278,6 @@ class EventGenerationExperiment(BaseExperiment):
         return classifier
 
     def _evaluate_loss_single(self, loader, title):
-        # use the same random numbers for all datasets to get comparable results
-        gen = torch.Generator().manual_seed(42)
-
         self.model.eval()
         losses = []
         mses = {f"{n_jets}j": [] for n_jets in self.cfg.data.n_jets}

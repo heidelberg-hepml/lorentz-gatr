@@ -10,7 +10,6 @@ from hydra.core.config_store import ConfigStore
 from hydra.utils import instantiate
 import mlflow
 from torch_ema import ExponentialMovingAverage
-from tqdm import trange
 
 import gatr.primitives.attention
 import gatr.layers.linear
@@ -28,6 +27,9 @@ import schedulefree
 cs = ConfigStore.instance()
 cs.store(name="base_attention", node=SelfAttentionConfig)
 cs.store(name="base_mlp", node=MLPConfig)
+
+# set to 'True' to debug autograd issues (slows down code)
+torch.autograd.set_detect_anomaly(False)
 
 
 class BaseExperiment:
