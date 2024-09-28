@@ -78,7 +78,6 @@ class CFM(nn.Module):
         self.trace_fn = hutchinson_trace if cfm.hutchinson else autograd_trace
         self.odeint = odeint
         self.cfm = cfm
-        self.loss = lambda v1, v2: nn.functional.mse_loss(v1, v2)
 
         # initialize to base objects, this will be overwritten later
         self.distribution = BaseDistribution()
@@ -185,10 +184,11 @@ class CFM(nn.Module):
         vp_sampling = self.get_velocity_sampling(xt_network, t, ijet=ijet)[0]
 
         # evaluate conditional flow matching objective
-        loss = self.loss(vp_sampling, vt_sampling)
-        return loss, [
-            self.loss(vp_sampling[..., i], vt_sampling[..., i]) for i in range(4)
+        distance = self.coordinates_sampling.get_metric(vp_sampling, vt_sampling).mean()
+        distance_particlewise = [
+            ((vp_sampling - vt_sampling) ** 2)[:, i].mean() for i in range(4)
         ]
+        return distance, distance_particlewise
 
     def sample(
         self, ijet, shape, device, dtype, trajectory_path=None, n_trajectories=100
@@ -533,6 +533,10 @@ class EventCFM(CFM):
         else:
             raise ValueError(f"coordinates={coordinates_label} not implemented")
         return coordinates
+
+    def init_anything(self, fourmomenta):
+        # placeholder for any initialization that needs to be done
+        pass
 
     def preprocess(self, fourmomenta):
         fourmomenta = fourmomenta / self.units

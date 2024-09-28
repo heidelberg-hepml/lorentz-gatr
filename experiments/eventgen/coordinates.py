@@ -49,7 +49,13 @@ class BaseCoordinates:
     def init_unit(self, particles_list):
         self.transforms[-1].init_unit(particles_list)
 
+    def get_metric(self, x1, x2):
+        # default: euclidean metric
+        se = (x1 - x2) ** 2 / 2
+        return se.sum(dim=[-1, -2])
+
     def get_trajectory(self, x1, x2, t):
+        # default: straight trajectories
         v_t = x2 - x1
         x_t = x1 + t * v_t
         return x_t, v_t

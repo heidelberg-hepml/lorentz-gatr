@@ -136,6 +136,7 @@ class EventGenerationExperiment(BaseExperiment):
         self.model.init_distribution()
         self.model.init_coordinates()
         fit_data = [x / self.units for x in self.events_raw]
+        self.model.init_anything(fit_data)
         for coordinates in self.model.coordinates:
             coordinates.init_fit(fit_data)
         if hasattr(self.model, "distribution"):
