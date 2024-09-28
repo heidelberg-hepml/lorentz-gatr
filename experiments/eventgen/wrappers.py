@@ -125,6 +125,8 @@ class GAPCFM(EventCFM):
             self.beam_reference,
             self.add_time_reference,
             self.two_beams,
+            add_xzplane=False,
+            add_yzplane=False,
             device=mv.device,
             dtype=mv.dtype,
         )
@@ -270,6 +272,8 @@ class GATrCFM(EventCFM):
             self.beam_reference,
             self.add_time_reference,
             self.two_beams,
+            add_xzplane=False,
+            add_yzplane=False,
             device=mv.device,
             dtype=mv.dtype,
         )
