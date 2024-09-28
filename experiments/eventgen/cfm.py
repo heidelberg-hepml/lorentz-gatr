@@ -83,11 +83,9 @@ class CFM(nn.Module):
         self.distribution = BaseDistribution()
         self.coordinates_straight = c.BaseCoordinates()
         self.coordinates_network = c.BaseCoordinates()
-        self.coordinates_sampling = c.BaseCoordinates()
         self.coordinates_list = [
             self.coordinates_straight,
             self.coordinates_network,
-            self.coordinates_sampling,
         ]
 
         if cfm.transforms_float64:
@@ -118,7 +116,7 @@ class CFM(nn.Module):
         # implemented by architecture-specific subclasses
         raise NotImplementedError
 
-    def get_velocity_sampling(self, xt_network, t, ijet):
+    def get_velocity_straight(self, xt_network, t, ijet):
         """
         Parameters
         ----------
@@ -128,10 +126,10 @@ class CFM(nn.Module):
         """
         # This method is only overwritten by GATrCFM and GAPCFM
         vp_network = self.get_velocity(xt_network, t, ijet=ijet)
-        vp_sampling, xt_sampling = convert_velocity(
-            vp_network, xt_network, self.coordinates_network, self.coordinates_sampling
+        vp_straight, xt_straight = convert_velocity(
+            vp_network, xt_network, self.coordinates_network, self.coordinates_straight
         )
-        return vp_sampling, xt_sampling
+        return vp_straight, xt_straight
 
     def handle_velocity(self, v):
         # default: do nothing
@@ -170,23 +168,17 @@ class CFM(nn.Module):
         xt_straight, vt_straight = self.coordinates_straight.get_trajectory(
             x0_straight, x1_straight, t
         )
-        vt_sampling = convert_velocity(
-            vt_straight,
-            xt_straight,
-            self.coordinates_straight,
-            self.coordinates_sampling,
-        )[0]
 
         # predict velocity
         xt_network = convert_coordinates(
             xt_straight, self.coordinates_straight, self.coordinates_network
         )
-        vp_sampling = self.get_velocity_sampling(xt_network, t, ijet=ijet)[0]
+        vp_straight = self.get_velocity_straight(xt_network, t, ijet=ijet)[0]
 
         # evaluate conditional flow matching objective
-        distance = self.coordinates_sampling.get_metric(vp_sampling, vt_sampling).mean()
+        distance = self.coordinates_straight.get_metric(vp_straight, vt_straight).mean()
         distance_particlewise = [
-            ((vp_sampling - vt_sampling) ** 2)[:, i].mean() for i in range(4)
+            ((vp_straight - vt_straight) ** 2)[:, i].mean() for i in range(4)
         ]
         return distance, distance_particlewise
 
@@ -220,35 +212,35 @@ class CFM(nn.Module):
         # overhead for saving trajectories
         save_trajectory = trajectory_path is not None
         if save_trajectory:
-            xts_sampling, vts_sampling, ts = [], [], []
+            xts_straight, vts_straight, ts = [], [], []
 
-        def velocity(t, xt_sampling):
+        def velocity(t, xt_straight):
             t = t * torch.ones(
-                shape[0], 1, 1, dtype=xt_sampling.dtype, device=xt_sampling.device
+                shape[0], 1, 1, dtype=xt_straight.dtype, device=xt_straight.device
             )
             xt_network = convert_coordinates(
-                xt_sampling, self.coordinates_sampling, self.coordinates_network
+                xt_straight, self.coordinates_straight, self.coordinates_network
             )
-            vt_sampling, xt_sampling = self.get_velocity_sampling(
+            vt_straight, xt_straight = self.get_velocity_straight(
                 xt_network, t, ijet=ijet
             )
-            vt_sampling = self.handle_velocity(vt_sampling)
+            vt_straight = self.handle_velocity(vt_straight)
 
             # collect trajectories
             if save_trajectory:
-                xts_sampling.append(xt_sampling[:n_trajectories, ...])
-                vts_sampling.append(vt_sampling[:n_trajectories, ...])
+                xts_straight.append(xt_straight[:n_trajectories, ...])
+                vts_straight.append(vt_straight[:n_trajectories, ...])
                 ts.append(t[0, 0, 0])
-            return vt_sampling
+            return vt_straight
 
         # sample fourmomenta from base distribution
         x1_fourmomenta = self.sample_base(shape, device, dtype)
-        x1_sampling = self.coordinates_sampling.fourmomenta_to_x(x1_fourmomenta)
+        x1_straight = self.coordinates_straight.fourmomenta_to_x(x1_fourmomenta)
 
-        # solve ODE in sampling space
-        x0_sampling = odeint(
+        # solve ODE in straight space
+        x0_straight = odeint(
             velocity,
-            x1_sampling,
+            x1_straight,
             torch.tensor([1.0, 0.0]),
             **self.odeint,
         )[-1]
@@ -257,23 +249,23 @@ class CFM(nn.Module):
         # (MLP sometimes returns nan for single events,
         # and all components of the event are nan...
         # just sample another event in this case)
-        mask = torch.isfinite(x0_sampling).all(dim=[1, 2])
-        x0_sampling = x0_sampling[mask, ...]
+        mask = torch.isfinite(x0_straight).all(dim=[1, 2])
+        x0_straight = x0_straight[mask, ...]
         x1_fourmomenta = x1_fourmomenta[mask, ...]
 
         # transform generated event back to fourmomenta
-        x0_fourmomenta = self.coordinates_sampling.x_to_fourmomenta(x0_sampling)
+        x0_fourmomenta = self.coordinates_straight.x_to_fourmomenta(x0_straight)
 
         # save trajectories to file
         if save_trajectory:
             # collect trajectories
-            xts_sampling = torch.stack(xts_sampling, dim=0)
-            vts_sampling = torch.stack(vts_sampling, dim=0)
+            xts_straight = torch.stack(xts_straight, dim=0)
+            vts_straight = torch.stack(vts_straight, dim=0)
             ts = torch.stack(ts, dim=0)
 
             # determine true trajectories
             xts_straight = convert_coordinates(
-                xts_sampling, self.coordinates_sampling, self.coordinates_straight
+                xts_straight, self.coordinates_straight, self.coordinates_straight
             )
             vts_straight_t, xts_straight_t = self.coordinates_straight.get_trajectory(
                 xts_straight[-1, ...]
@@ -295,8 +287,8 @@ class CFM(nn.Module):
             (
                 vts_fourmomenta,
                 xts_fourmomenta,
-            ) = self.coordinates_sampling.velocity_x_to_fourmomenta(
-                vts_sampling, xts_sampling
+            ) = self.coordinates_straight.velocity_x_to_fourmomenta(
+                vts_straight, xts_straight
             )
 
             # save
@@ -336,56 +328,56 @@ class CFM(nn.Module):
 
         def net_wrapper(t, state):
             with torch.set_grad_enabled(True):
-                xt_sampling = state[0].detach().requires_grad_(True)
+                xt_straight = state[0].detach().requires_grad_(True)
                 t = t * torch.ones(
-                    xt_sampling.shape[0],
+                    xt_straight.shape[0],
                     1,
                     1,
-                    dtype=xt_sampling.dtype,
-                    device=xt_sampling.device,
+                    dtype=xt_straight.dtype,
+                    device=xt_straight.device,
                 )
                 xt_network = convert_coordinates(
-                    xt_sampling, self.coordinates_sampling, self.coordinates_network
+                    xt_straight, self.coordinates_straight, self.coordinates_network
                 )
-                vt_sampling = self.get_velocity_sampling(xt_network, t, ijet=ijet)[0]
-                vt_sampling = self.handle_velocity(vt_sampling)
-                dlogp_dt_sampling = (
-                    -self.trace_fn(vt_sampling, xt_sampling).unsqueeze(-1).detach()
+                vt_straight = self.get_velocity_straight(xt_network, t, ijet=ijet)[0]
+                vt_straight = self.handle_velocity(vt_straight)
+                dlogp_dt_straight = (
+                    -self.trace_fn(vt_straight, xt_straight).unsqueeze(-1).detach()
                 )
-            return vt_sampling, dlogp_dt_sampling
+            return vt_straight, dlogp_dt_straight
 
-        # solve ODE in coordinates_sampling
-        x0_sampling = self.coordinates_sampling.fourmomenta_to_x(x0_fourmomenta)
-        logdetjac0_cfm_sampling = torch.zeros(
-            (x0_sampling.shape[0], 1),
-            dtype=x0_sampling.dtype,
-            device=x0_sampling.device,
+        # solve ODE in coordinates_straight
+        x0_straight = self.coordinates_straight.fourmomenta_to_x(x0_fourmomenta)
+        logdetjac0_cfm_straight = torch.zeros(
+            (x0_straight.shape[0], 1),
+            dtype=x0_straight.dtype,
+            device=x0_straight.device,
         )
-        state0 = (x0_sampling, logdetjac0_cfm_sampling)
-        xt_sampling, logdetjact_cfm_sampling = odeint(
+        state0 = (x0_straight, logdetjac0_cfm_straight)
+        xt_straight, logdetjact_cfm_straight = odeint(
             net_wrapper,
             state0,
             torch.tensor(
-                [0.0, 1.0], dtype=x0_sampling.dtype, device=x0_sampling.device
+                [0.0, 1.0], dtype=x0_straight.dtype, device=x0_straight.device
             ),
             **self.odeint,
         )
-        logdetjac_cfm_sampling = logdetjact_cfm_sampling[-1].detach()
-        x1_sampling = xt_sampling[-1].detach()
+        logdetjac_cfm_straight = logdetjact_cfm_straight[-1].detach()
+        x1_straight = xt_straight[-1].detach()
 
         # the infamous nan remover
         # (MLP sometimes returns nan for single events,
         # just remove these events from the log_prob computation)
-        mask = torch.isfinite(x1_sampling).all(dim=[1, 2])
-        logdetjac_cfm_sampling = logdetjac_cfm_sampling[mask, ...]
-        x1_sampling = x1_sampling[mask, ...]
+        mask = torch.isfinite(x1_straight).all(dim=[1, 2])
+        logdetjac_cfm_straight = logdetjac_cfm_straight[mask, ...]
+        x1_straight = x1_straight[mask, ...]
         x0_fourmomenta = x0_fourmomenta[mask, ...]
 
-        x1_fourmomenta = self.coordinates_sampling.x_to_fourmomenta(x1_sampling)
-        logdetjac_forward = self.coordinates_sampling.logdetjac_fourmomenta_to_x(
+        x1_fourmomenta = self.coordinates_straight.x_to_fourmomenta(x1_straight)
+        logdetjac_forward = self.coordinates_straight.logdetjac_fourmomenta_to_x(
             x0_fourmomenta
         )[0]
-        logdetjac_inverse = -self.coordinates_sampling.logdetjac_fourmomenta_to_x(
+        logdetjac_inverse = -self.coordinates_straight.logdetjac_fourmomenta_to_x(
             x1_fourmomenta
         )[0]
 
@@ -393,7 +385,7 @@ class CFM(nn.Module):
         log_prob_base_fourmomenta = self.distribution.log_prob(x1_fourmomenta)
         log_prob_fourmomenta = (
             log_prob_base_fourmomenta
-            - logdetjac_cfm_sampling
+            - logdetjac_cfm_straight
             - logdetjac_forward
             - logdetjac_inverse
         )
@@ -493,13 +485,12 @@ class EventCFM(CFM):
             self.cfm.coordinates_straight
         )
         self.coordinates_network = self._init_coordinates(self.cfm.coordinates_network)
-        self.coordinates_sampling = self._init_coordinates(
-            self.cfm.coordinates_sampling
+        self.coordinates_straight = self._init_coordinates(
+            self.cfm.coordinates_straight
         )
         self.coordinates = [
             self.coordinates_straight,
             self.coordinates_network,
-            self.coordinates_sampling,
         ]
 
     def _init_coordinates(self, coordinates_label):

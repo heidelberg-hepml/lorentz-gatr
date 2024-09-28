@@ -25,9 +25,8 @@ cfm:
  embed_t_dim: 8
  embed_t_scale: 30.
  hutchinson: true
- coordinates_straight: ${cfm.coordinates_sampling}
+ coordinates_straight: StandardLogPtPhiEtaLogM2
  coordinates_network: Fourmomenta
- coordinates_sampling: StandardLogPtPhiEtaLogM2
  transforms_float64: true
 
 gpt:
