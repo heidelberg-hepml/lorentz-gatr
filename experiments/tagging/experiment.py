@@ -17,7 +17,7 @@ from experiments.mlflow import log_mlflow
 
 MODEL_TITLE_DICT = {"GATr": "GATr"}
 
-UNITS = 40  # We use units of 40 GeV for all tagging experiments
+UNITS = 20  # We use units of 20 GeV for all tagging experiments
 
 
 class TaggingExperiment(BaseExperiment):
