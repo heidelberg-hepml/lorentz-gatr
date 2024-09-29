@@ -163,7 +163,6 @@ class TaggingExperiment(BaseExperiment):
                 y_pred = torch.nn.functional.sigmoid(y_pred)
                 labels_true.append(label.cpu().float())
                 labels_predict.append(y_pred.cpu().float())
-                break
 
         labels_true, labels_predict = torch.cat(labels_true), torch.cat(labels_predict)
         if mode == "eval":
@@ -246,6 +245,7 @@ class TaggingExperiment(BaseExperiment):
             plot_dict["train_lr"] = self.train_lr
             plot_dict["train_metrics"] = self.train_metrics
             plot_dict["val_metrics"] = self.val_metrics
+            plot_dict["grad_norm"] = self.train_grad_norm
         plot_mixer(self.cfg, plot_path, title, plot_dict)
 
     # overwrite _validate method to compute metrics over the full validation set
