@@ -4,6 +4,7 @@ exp_name: qg_local_debug
 data:
  data_dir : data/
  dataset: mini
+ include_pid: true
 
 defaults:
  - default_tagging
