@@ -161,6 +161,7 @@ class TaggingExperiment(BaseExperiment):
                 y_pred = torch.nn.functional.sigmoid(y_pred)
                 labels_true.append(label.cpu().float())
                 labels_predict.append(y_pred.cpu().float())
+                break
 
         labels_true, labels_predict = torch.cat(labels_true), torch.cat(labels_predict)
         if mode == "eval":
@@ -201,6 +202,11 @@ class TaggingExperiment(BaseExperiment):
                 f"Rejection rate {title} dataset: {metrics['rej03']:.0f} (epsS=0.3), "
                 f"{metrics['rej05']:.0f} (epsS=0.5), {metrics['rej08']:.0f}"
             )
+
+        # create latex string
+        if mode == "eval":
+            tex_string = f"{self.cfg.run_name} & {metrics['accuracy']:.4f} & {metrics['auc']:.4f} & {metrics['rej03']:.0f} & {metrics['rej05']:.0f} \\\\"
+            LOGGER.info(tex_string)
 
         if self.cfg.use_mlflow:
             for key, value in metrics.items():
