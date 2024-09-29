@@ -141,7 +141,15 @@ class EventGenerationExperiment(BaseExperiment):
             coordinates.init_fit(fit_data)
         if hasattr(self.model, "distribution"):
             self.model.distribution.coordinates.init_fit(fit_data)
-        self.model.init_anything(fit_data)
+
+        plot_path = (
+            os.path.join(self.cfg.run_dir, f"plots_{self.cfg.run_idx}")
+            if self.cfg.save and self.cfg.plot
+            else None
+        )
+        self.model.init_anything(
+            fit_data, plot_path=plot_path, device=self.device, dtype=self.dtype
+        )
 
     def _init_dataloader(self):
         assert sum(self.cfg.data.train_test_val) <= 1

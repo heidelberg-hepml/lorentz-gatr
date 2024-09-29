@@ -523,7 +523,7 @@ class EventCFM(CFM):
             raise ValueError(f"coordinates={coordinates_label} not implemented")
         return coordinates
 
-    def init_anything(self, fourmomenta):
+    def init_anything(self, fourmomenta, **kwargs):
         # placeholder for any initialization that needs to be done
         if self.cfm.coordinates_straight == "MassMFM":
             assert (
@@ -533,7 +533,7 @@ class EventCFM(CFM):
             base = self.sample_base(
                 fourmomenta.shape, fourmomenta.device, fourmomenta.dtype
             )
-            self.coordinates_straight.initialize(base, fourmomenta)
+            self.coordinates_straight.initialize(base, fourmomenta, **kwargs)
 
     def preprocess(self, fourmomenta):
         fourmomenta = fourmomenta / self.units

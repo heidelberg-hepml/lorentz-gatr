@@ -29,12 +29,15 @@ cfm:
  coordinates_network: Fourmomenta
  transforms_float64: true
  mfm:
-  alpha: 1.
+  alpha: 2.
   use_logmass: true
   startup:
-   iterations: 100
+   iterations: 10000
    batchsize: 1024
    lr: 1e-3
+   clip_grad_norm: 10
+   plot_training: true
+   patience: 500
   dnet:
    hidden_channels: 32
    hidden_layers: 3
