@@ -6,6 +6,7 @@ data:
  add_xzplane: false
  add_yzplane: false
  add_pt: false
+ add_energy: false
  reinsert_channels: false
  rescale_data: true
 
