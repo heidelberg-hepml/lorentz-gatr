@@ -270,15 +270,8 @@ class TaggingExperiment(BaseExperiment):
 
     def _get_ypred_and_label(self, batch):
         batch = batch.to(self.device)
-        scalars = (
-            batch.scalars
-            if self.cfg.data.include_pid
-            else torch.zeros(
-                batch.x.shape[0], 0, device=batch.x.device, dtype=batch.x.dtype
-            )
-        )
         embedding = embed_tagging_data_into_ga(
-            batch.x, scalars, batch.ptr, self.cfg.data
+            batch.x, batch.scalars, batch.ptr, self.cfg.data
         )
         y_pred = self.model(embedding)[:, 0]
         return y_pred, batch.label.to(self.dtype)
@@ -294,7 +287,6 @@ class TopTaggingExperiment(TaggingExperiment):
             self.cfg.data.num_global_tokens = 1
 
             # no fundamental scalar information available
-            self.cfg.data.include_pid = False
             self.cfg.model.net.in_s_channels = 0
 
     def init_data(self):
@@ -312,7 +304,7 @@ class QGTaggingExperiment(TaggingExperiment):
 
             # We add 6 scalar channels for the particle id features
             # (charge, electron, muon, photon, charged hadron and neutral hadron)
-            self.cfg.model.net.in_s_channels = 6 if self.cfg.data.include_pid else 0
+            self.cfg.model.net.in_s_channels = 6
 
     def init_data(self):
         data_path = os.path.join(
