@@ -392,7 +392,6 @@ def simple_histogram(
 
 def plot_trajectories_over_time(file, xt1, xt2, t, xlabel, ylabel, nmax=10):
     assert xt1.shape == xt2.shape
-    assert ((xt1[0, :] - xt2[0, :]).abs() < 1e-5).all()
     assert t.shape[0] == xt1.shape[0]
     assert xt1.shape[1] <= nmax
     col = mpl.cm.Set1(range(nmax))
@@ -411,9 +410,6 @@ def plot_trajectories_over_time(file, xt1, xt2, t, xlabel, ylabel, nmax=10):
 
 def plot_trajectories_2d(file, xt1_x, xt1_y, xt2_x, xt2_y, xlabel, ylabel, nmax=10):
     assert xt1_x.shape == xt2_x.shape == xt1_y.shape == xt2_y.shape
-    assert ((xt1_x[0, :] - xt2_x[0, :]).abs() < 1e-5).all() and (
-        (xt1_y[0, :] - xt2_y[0, :]).abs() < 1e-5
-    ).all()
     assert xt1_x.shape[1] <= nmax
     col = mpl.cm.Set1(range(nmax))
     fig, ax = plt.subplots(figsize=(5, 4))

@@ -530,8 +530,13 @@ class EventCFM(CFM):
                 len(fourmomenta) == 1
             ), "MassMFM only implemented for single-multiplicity training for now"
             fourmomenta = fourmomenta[0]
+            generator = torch.Generator()
+            generator.manual_seed(self.cfm.mfm.seed_base)
             base = self.sample_base(
-                fourmomenta.shape, fourmomenta.device, fourmomenta.dtype
+                fourmomenta.shape,
+                fourmomenta.device,
+                fourmomenta.dtype,
+                generator=generator,
             )
             self.coordinates_straight.initialize(base, fourmomenta, **kwargs)
 

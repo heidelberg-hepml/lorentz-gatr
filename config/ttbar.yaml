@@ -30,6 +30,7 @@ cfm:
  transforms_float64: true
  mfm:
   alpha: 2.
+  seed_base: 42
   use_logmass: true
   startup:
    iterations: 10000

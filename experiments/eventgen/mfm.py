@@ -232,7 +232,7 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
         )
 
     def _plot_trajectories(
-        self, file, base, target, device, dtype, nsamples=10, nt=100
+        self, file, base, target, device, dtype, nsamples=10, nt=1000
     ):
         t = (
             torch.linspace(0, 1, nt)
