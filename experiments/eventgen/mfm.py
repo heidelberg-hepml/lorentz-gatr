@@ -80,7 +80,7 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
                 scale=self.cfm.embed_t_scale,
             ),
             nn.Linear(self.cfm.embed_t_dim, self.cfm.embed_t_dim),
-        )
+        ).to(device, dtype)
         self.dnet = MLP(
             in_shape=2 * n_features + self.cfm.embed_t_dim,
             out_shape=n_features,
