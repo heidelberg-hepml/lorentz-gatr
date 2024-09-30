@@ -2,6 +2,7 @@ import torch
 from torch import nn
 import os
 import time
+import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 
 from experiments.eventgen.coordinates import StandardLogPtPhiEtaLogM2
@@ -142,7 +143,11 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
                 if patience > self.cfm.mfm.startup.patience:
                     break
         dt = time.time() - t0
-        LOGGER.info(f"Finished training dnet after {iteration} iterations / {dt:.2f}s")
+        LOGGER.info(
+            f"Finished training dnet after {iteration} iterations / {dt/60:.2f}min"
+        )
+        mean_loss = np.mean(metrics["full"][-patience:])
+        LOGGER.info(f"Mean dnet loss: {mean_loss:.2f}")
 
         # create plots
         if plot_path is not None:
