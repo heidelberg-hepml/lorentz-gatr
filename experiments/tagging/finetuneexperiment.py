@@ -17,7 +17,10 @@ class TopTaggingFineTuneExperiment(TopTaggingExperiment):
         assert warmstart_cfg.exp_type == "jctagging"
         assert warmstart_cfg.data.features == "fourmomenta"
         assert (
-            warmstart_cfg.ema and self.cfg.ema or not warmstart_cfg.ema and not self.ema
+            warmstart_cfg.ema
+            and self.cfg.ema
+            or not warmstart_cfg.ema
+            and not self.cfg.ema
         ), "Current implementation only works if pretrained and finetune model use the same EMA setting"
         if warmstart_cfg.data.score_token:
             raise NotImplementedError(
