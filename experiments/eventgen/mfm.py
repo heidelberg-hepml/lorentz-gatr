@@ -16,7 +16,7 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
     def __init__(self, cfm, virtual_components, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.cfm = cfm
-        self.virtual_components = virtual_components
+        self.virtual_components = virtual_components[1:]
         self.dnet = None  # displacement net
 
     def _get_displacement(self, x_base, x_target, t):
@@ -37,8 +37,8 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
         x2_fourmomenta = self.x_to_fourmomenta(x2)
         mass_term = []
         for particle in self.virtual_components:
-            x1_particle = x1_fourmomenta[:, particle, :].sum(dim=-2)
-            x2_particle = x2_fourmomenta[:, particle, :].sum(dim=-2)
+            x1_particle = x1_fourmomenta[..., particle, :].sum(dim=-2)
+            x2_particle = x2_fourmomenta[..., particle, :].sum(dim=-2)
             m1 = self._get_mass(x1_particle)
             m2 = self._get_mass(x2_particle)
             mass_term0 = 0.5 * ((m1 - m2) ** 2)
@@ -55,12 +55,12 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
         xt = x_base + t * (x_target - x_base) + t * (1 - t) * phi
 
         dphi_dt = []
-        for i in range(xt.shape[1]):
+        for i in range(xt.shape[-2]):
             dphi_dt0 = []
-            for j in range(xt.shape[2]):
+            for j in range(xt.shape[-1]):
                 grad_outputs = torch.ones_like(t)
                 dphi_dt1 = torch.autograd.grad(
-                    phi[:, [i]][..., [j]],
+                    phi[..., [i], :][..., [j]],
                     t,
                     grad_outputs=grad_outputs,
                     create_graph=True,
@@ -247,7 +247,7 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
         mass_term = []
         x_fourmomenta = self.x_to_fourmomenta(x)
         for particles in self.virtual_components:
-            x_particle = x_fourmomenta[:, particles, :].sum(dim=-2)
+            x_particle = x_fourmomenta[..., particles, :].sum(dim=-2)
             mass = self._get_mass(x_particle)[:, None, None]
             grad_outputs = torch.ones_like(mass)
             dmass_dx = torch.autograd.grad(
