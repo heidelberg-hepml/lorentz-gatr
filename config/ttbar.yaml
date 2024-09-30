@@ -32,6 +32,7 @@ cfm:
   alpha: 2.
   seed_base: 42
   use_logmass: true
+  virtual_particles: [1,2,3,4]
   startup:
    iterations: 10000
    batchsize: 1024

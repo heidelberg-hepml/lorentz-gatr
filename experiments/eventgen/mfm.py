@@ -17,7 +17,9 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
     def __init__(self, cfm, virtual_components, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.cfm = cfm
-        self.virtual_components = virtual_components[1:]
+        self.virtual_components = np.array(virtual_components)[
+            self.cfm.mfm.virtual_particles
+        ]
         self.dnet = None  # displacement net
 
     def _get_displacement(self, x_base, x_target, t):
@@ -148,7 +150,11 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
             f"Finished training dnet after {iteration} iterations / {dt/60:.2f}min"
         )
         mean_loss = np.mean(metrics["full"][-patience:])
-        LOGGER.info(f"Mean dnet loss: {mean_loss:.2f}")
+        mean_loss_naive = np.mean(metrics["naive"][-patience:])
+        mean_loss_mass = np.mean(metrics["mass"][-patience:])
+        LOGGER.info(
+            f"Mean dnet loss: {mean_loss:.2f} = {mean_loss_naive:.2f} + {mean_loss_mass:.2f}"
+        )
 
         # create plots
         if plot_path is not None:
