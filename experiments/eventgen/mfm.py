@@ -9,6 +9,7 @@ from experiments.eventgen.coordinates import StandardLogPtPhiEtaLogM2
 from experiments.eventgen.cfm import GaussianFourierProjection
 from experiments.baselines.mlp import MLP
 from experiments.base_plots import plot_loss, plot_metric
+from experiments.eventgen.plots import plot_trajectories_2d, plot_trajectories_over_time
 from experiments.logger import LOGGER
 
 
@@ -152,7 +153,15 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
         # create plots
         if plot_path is not None:
             os.makedirs(plot_path, exist_ok=True)
-            self._create_plots(plot_path, metrics)
+            LOGGER.info(f"Starting to create dnet plots in {plot_path}.")
+            if self.cfm.mfm.startup.plot_training:
+                filename = os.path.join(plot_path, "dnet_training.pdf")
+                with PdfPages(filename) as file:
+                    self._training_plots(file, metrics)
+            if self.cfm.mfm.startup.plot_trajectories:
+                filename = os.path.join(plot_path, "dnet_trajectories.pdf")
+                with PdfPages(filename) as file:
+                    self._plot_trajectories(file, base, target, device, dtype)
 
     def _step(self, x_base, x_target, metrics, optimizer):
         t = torch.rand(x_base.shape[0], 1, 1, device=x_base.device, dtype=x_base.dtype)
@@ -186,44 +195,84 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
 
         return loss.item()
 
-    def _create_plots(self, plot_path, metrics):
-        if self.cfm.mfm.startup.plot_training:
-            filename = os.path.join(plot_path, "dnet_training.pdf")
-            with PdfPages(filename) as file:
-                plot_loss(
+    def _training_plots(self, file, metrics):
+        plot_loss(
+            file,
+            [metrics["full"], metrics["full_phi0"]],
+            metrics["lr"],
+            labels=["full loss", r"full loss with $\varphi=0$"],
+            logy=False,
+        )
+        plot_loss(
+            file,
+            [
+                metrics["full"],
+                metrics["naive"],
+                metrics["mass"],
+                metrics["full_phi0"],
+                metrics["naive_phi0"],
+                metrics["mass_phi0"],
+            ],
+            metrics["lr"],
+            labels=[
+                "full",
+                "naive",
+                "mass",
+                r"full with $\varphi=0$",
+                r"naive with $\varphi=0$",
+                r"mass with $\varphi=0$",
+            ],
+            logy=False,
+        )
+        plot_metric(
+            file,
+            [metrics["grad_norm"]],
+            "Gradient norm",
+            logy=True,
+        )
+
+    def _plot_trajectories(
+        self, file, base, target, device, dtype, nsamples=10, nt=100
+    ):
+        t = (
+            torch.linspace(0, 1, nt)
+            .reshape(-1, 1, 1, 1)
+            .repeat(1, nsamples, 1, 1)
+            .to(device, dtype)
+        )
+        x_base = base[None, :nsamples].repeat(nt, 1, 1, 1).to(device, dtype)
+        x_target = target[None, :nsamples].repeat(nt, 1, 1, 1).to(device, dtype)
+        xt = self.get_trajectory(x_base, x_target, t)[0].detach().cpu()
+        xt_straight = super().get_trajectory(x_base, x_target, t)[0].detach().cpu()
+        t = t.detach().cpu()
+
+        for i in range(base.shape[-2]):
+            for j in range(base.shape[-1]):
+                plot_trajectories_over_time(
                     file,
-                    [metrics["full"], metrics["full_phi0"]],
-                    metrics["lr"],
-                    labels=["full loss", r"full loss with $\varphi=0$"],
-                    logy=False,
+                    xt[:, :, i, j],
+                    xt_straight[:, :, i, j],
+                    t[:, :, 0, 0],
+                    xlabel=r"$t$",
+                    ylabel=r"$x(t)$",
                 )
-                plot_loss(
-                    file,
-                    [
-                        metrics["full"],
-                        metrics["naive"],
-                        metrics["mass"],
-                        metrics["full_phi0"],
-                        metrics["naive_phi0"],
-                        metrics["mass_phi0"],
-                    ],
-                    metrics["lr"],
-                    labels=[
-                        "full",
-                        "naive",
-                        "mass",
-                        r"full with $\varphi=0$",
-                        r"naive with $\varphi=0$",
-                        r"mass with $\varphi=0$",
-                    ],
-                    logy=False,
-                )
-                plot_metric(
-                    file,
-                    [metrics["grad_norm"]],
-                    "Gradient norm",
-                    logy=True,
-                )
+
+        xt_fourmomenta = self.x_to_fourmomenta(xt)
+        xt_straight_fourmomenta = self.x_to_fourmomenta(xt_straight)
+        for particles in self.virtual_components:
+            x_particle = xt_fourmomenta[..., particles, :].sum(dim=-2)
+            x_straight_particle = xt_straight_fourmomenta[..., particles, :].sum(dim=-2)
+            mass = self._get_mass(x_particle)
+            mass_straight = self._get_mass(x_straight_particle)
+            plot_trajectories_over_time(
+                file,
+                mass,
+                mass_straight,
+                t[:, :, 0, 0],
+                xlabel=r"$t$",
+                ylabel=r"$m(t)$",
+                nmax=nsamples,
+            )
 
     def _get_mass(self, particle):
         # particle has to be in 'Fourmomenta' format

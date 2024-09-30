@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 
 # load fonts
 import matplotlib.font_manager as font_manager
@@ -386,4 +387,43 @@ def simple_histogram(
     ax.set_xlim(xrange)
     ax.tick_params(axis="both", labelsize=TICKLABELSIZE)
     plt.savefig(file, bbox_inches="tight", format="pdf")
+    plt.close()
+
+
+def plot_trajectories_over_time(file, xt1, xt2, t, xlabel, ylabel, nmax=10):
+    assert xt1.shape == xt2.shape
+    assert ((xt1[0, :] - xt2[0, :]).abs() < 1e-5).all()
+    assert t.shape[0] == xt1.shape[0]
+    assert xt1.shape[1] <= nmax
+    col = mpl.cm.Set1(range(nmax))
+    fig, ax = plt.subplots(figsize=(5, 4))
+    for i in range(xt1.shape[1]):
+        ax.plot(t[:, i], xt1[:, i], color=col[i], linestyle="-")
+        ax.plot(t[:, i], xt2[:, i], color=col[i], linestyle="--")
+        ax.plot(t[0, i], xt1[0, i], "o", color=col[i])
+        ax.plot(t[-1, i], xt1[-1, i], "x", color=col[i])
+    ax.set_xlabel(xlabel, fontsize=FONTSIZE)
+    ax.set_ylabel(ylabel, fontsize=FONTSIZE)
+    ax.tick_params(axis="both", labelsize=TICKLABELSIZE)
+    plt.savefig(file, format="pdf", bbox_inches="tight")
+    plt.close()
+
+
+def plot_trajectories_2d(file, xt1_x, xt1_y, xt2_x, xt2_y, xlabel, ylabel, nmax=10):
+    assert xt1_x.shape == xt2_x.shape == xt1_y.shape == xt2_y.shape
+    assert ((xt1_x[0, :] - xt2_x[0, :]).abs() < 1e-5).all() and (
+        (xt1_y[0, :] - xt2_y[0, :]).abs() < 1e-5
+    ).all()
+    assert xt1_x.shape[1] <= nmax
+    col = mpl.cm.Set1(range(nmax))
+    fig, ax = plt.subplots(figsize=(5, 4))
+    for i in range(xt1_x.shape[1]):
+        ax.plot(xt1_x[:, i], xt1_y[:, i], color=col[i], linestyle="--")
+        ax.plot(xt2_x[:, i], xt2_y[:, i], color=col[i], linestyle="-")
+        ax.plot(xt1_x[0, i], xt1_y[0, i], "o", color=col[i])
+        ax.plot(xt1_x[-1, i], xt1_y[-1, i], "x", color=col[i])
+    ax.set_xlabel(xlabel, fontsize=FONTSIZE)
+    ax.set_ylabel(ylabel, fontsize=FONTSIZE)
+    ax.tick_params(axis="both", labelsize=TICKLABELSIZE)
+    plt.savefig(file, format="pdf", bbox_inches="tight")
     plt.close()
