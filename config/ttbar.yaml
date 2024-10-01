@@ -37,7 +37,7 @@ cfm:
    iterations: 10000
    batchsize: 1024
    lr: 1e-3
-   clip_grad_norm: 10
+   clip_grad_norm: 1000
    plot_training: true
    plot_trajectories: true
    patience: 100

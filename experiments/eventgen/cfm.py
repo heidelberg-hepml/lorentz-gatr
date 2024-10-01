@@ -18,7 +18,7 @@ from experiments.eventgen.coordinates import (
     convert_coordinates,
     convert_velocity,
 )
-from experiments.eventgen.mfm import MassMFM
+from experiments.eventgen.mfm import MassMFM, LANDMFM
 
 
 def hutchinson_trace(x_out, x_in):
@@ -514,8 +514,14 @@ class EventCFM(CFM):
             )
         elif coordinates_label == "MassMFM":
             coordinates = MassMFM(
-                self.cfm,
                 self.virtual_components,
+                self.cfm,
+                self.pt_min,
+                self.units,
+            )
+        elif coordinates_label == "LANDMFM":
+            coordinates = LANDMFM(
+                self.cfm,
                 self.pt_min,
                 self.units,
             )
@@ -525,7 +531,7 @@ class EventCFM(CFM):
 
     def init_anything(self, fourmomenta, **kwargs):
         # placeholder for any initialization that needs to be done
-        if self.cfm.coordinates_straight == "MassMFM":
+        if self.cfm.coordinates_straight in ["LANDMFM", "MassMFM"]:
             assert (
                 len(fourmomenta) == 1
             ), "MassMFM only implemented for single-multiplicity training for now"

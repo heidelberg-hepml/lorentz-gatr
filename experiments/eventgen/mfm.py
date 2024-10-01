@@ -13,14 +13,20 @@ from experiments.eventgen.plots import plot_trajectories_2d, plot_trajectories_o
 from experiments.logger import LOGGER
 
 
-class MassMFM(StandardLogPtPhiEtaLogM2):
-    def __init__(self, cfm, virtual_components, *args, **kwargs):
+class MFM(StandardLogPtPhiEtaLogM2):
+    def __init__(self, cfm, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.cfm = cfm
-        self.virtual_components = np.array(virtual_components)[
-            self.cfm.mfm.virtual_particles
-        ]
-        self.dnet = None  # displacement net
+        self.dnet = None
+
+    def _init_metrics(self, metrics):
+        pass
+
+    def get_loss(self, metrics):
+        raise NotImplementedError
+
+    def get_metric(self, x1, x2):
+        raise NotImplementedError
 
     def _get_displacement(self, x_base, x_target, t):
         t_emb = self.t_embedding(t[..., 0])
@@ -32,24 +38,6 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
         )
         phi = self.dnet(embedding).reshape_as(x_base)
         return phi
-
-    def get_metric(self, x1, x2):
-        naive_term = 0.5 * ((x1 - x2) ** 2).sum(dim=[-1, -2])
-
-        x1_fourmomenta = self.x_to_fourmomenta(x1)
-        x2_fourmomenta = self.x_to_fourmomenta(x2)
-        mass_term = []
-        for particle in self.virtual_components:
-            x1_particle = x1_fourmomenta[..., particle, :].sum(dim=-2)
-            x2_particle = x2_fourmomenta[..., particle, :].sum(dim=-2)
-            m1 = self._get_mass(x1_particle)
-            m2 = self._get_mass(x2_particle)
-            mass_term0 = 0.5 * ((m1 - m2) ** 2)
-            mass_term.append(mass_term0)
-        mass_term = torch.stack(mass_term, dim=-1).sum(dim=-1)
-
-        metric = naive_term + self.cfm.mfm.alpha * mass_term
-        return metric
 
     @torch.enable_grad()
     def get_trajectory(self, x_base, x_target, t):
@@ -75,9 +63,7 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
         vt = x_target - x_base + t * (1 - t) * dphi_dt + (1 - 2 * t) * phi
         return xt, vt
 
-    def initialize(self, base, target, plot_path=None, device=None, dtype=None):
-        # initialize dnet
-        n_features = base.flatten(start_dim=-2).shape[-1]
+    def _init_dnet(self, n_features, device, dtype):
         self.t_embedding = nn.Sequential(
             GaussianFourierProjection(
                 embed_dim=self.cfm.embed_t_dim,
@@ -98,6 +84,11 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
             f"Instantiated dnet net with {num_parameters} learnable parameters."
         )
 
+    def initialize(self, base, target, plot_path=None, device=None, dtype=None):
+        # initialize dnet
+        n_features = base.flatten(start_dim=-2).shape[-1]
+        self._init_dnet(n_features, device, dtype)
+
         # train dnet
         LOGGER.info(
             f"Using base/target datasets of shape {tuple(base.shape)}/{tuple(target.shape)}."
@@ -117,14 +108,11 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
         optimizer = torch.optim.Adam(self.dnet.parameters(), lr=self.cfm.mfm.startup.lr)
         metrics = {
             "full": [],
+            "full_phi0": [],
             "lr": [],
             "grad_norm": [],
-            "naive": [],
-            "mass": [],
-            "full_phi0": [],
-            "naive_phi0": [],
-            "mass_phi0": [],
         }
+        self._init_metrics(metrics)
         kwargs = {"optimizer": optimizer, "metrics": metrics}
         loss_min, patience = float("inf"), 0
         t0 = time.time()
@@ -150,11 +138,7 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
             f"Finished training dnet after {iteration} iterations / {dt/60:.2f}min"
         )
         mean_loss = np.mean(metrics["full"][-patience:])
-        mean_loss_naive = np.mean(metrics["naive"][-patience:])
-        mean_loss_mass = np.mean(metrics["mass"][-patience:])
-        LOGGER.info(
-            f"Mean dnet loss: {mean_loss:.2f} = {mean_loss_naive:.2f} + {mean_loss_mass:.2f}"
-        )
+        LOGGER.info(f"Mean dnet loss: {mean_loss:.2f}")
 
         # create plots
         if plot_path is not None:
@@ -172,7 +156,7 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
     def _step(self, x_base, x_target, metrics, optimizer):
         t = torch.rand(x_base.shape[0], 1, 1, device=x_base.device, dtype=x_base.dtype)
         xt, vt = self.get_trajectory(x_base, x_target, t)
-        loss, loss_naive, loss_mass = self._get_loss(xt, vt)
+        loss, metrics_phi = self.get_loss(xt, vt)
         optimizer.zero_grad()
         loss.backward()
         grad_norm = (
@@ -187,17 +171,16 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
         optimizer.step()
 
         # evaluate loss also for straight trajectories (phi=0)
-        xt, vt = super().get_trajectory(x_base, x_target, t)
-        loss_phi0, loss_naive_phi0, loss_mass_phi0 = self._get_loss(xt, vt)
+        xt, vt = StandardLogPtPhiEtaLogM2.get_trajectory(self, x_base, x_target, t)
+        loss_phi0, metrics_phi0 = self.get_loss(xt, vt)
 
         metrics["full"].append(loss.item())
+        metrics["full_phi0"].append(loss_phi0.item())
         metrics["lr"].append(optimizer.param_groups[0]["lr"])
         metrics["grad_norm"].append(grad_norm)
-        metrics["naive"].append(loss_naive.item())
-        metrics["mass"].append(loss_mass.item())
-        metrics["full_phi0"].append(loss_phi0.item())
-        metrics["naive_phi0"].append(loss_naive_phi0.item())
-        metrics["mass_phi0"].append(loss_mass_phi0.item())
+        for key in metrics_phi.keys():
+            metrics[key].append(metrics_phi[key].item())
+            metrics[f"{key}_phi0"].append(metrics_phi0[key].item())
 
         return loss.item()
 
@@ -209,32 +192,23 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
             labels=["full loss", r"full loss with $\varphi=0$"],
             logy=False,
         )
-        plot_loss(
-            file,
-            [
-                metrics["full"],
-                metrics["naive"],
-                metrics["mass"],
-                metrics["full_phi0"],
-                metrics["naive_phi0"],
-                metrics["mass_phi0"],
-            ],
-            metrics["lr"],
-            labels=[
-                "full",
-                "naive",
-                "mass",
-                r"full with $\varphi=0$",
-                r"naive with $\varphi=0$",
-                r"mass with $\varphi=0$",
-            ],
-            logy=False,
-        )
         plot_metric(
             file,
             [metrics["grad_norm"]],
             "Gradient norm",
             logy=True,
+        )
+        metrics_plot = [metrics["full"], metrics["full_phi0"]]
+        labels = ["full", r"full with $\varphi=0$"]
+        for key in metrics.keys():
+            metrics_plot.append(metrics[key])
+            labels.append(key)
+        plot_loss(
+            file,
+            metrics_plot,
+            metrics["lr"],
+            labels=labels,
+            logy=False,
         )
 
     def _plot_trajectories(
@@ -249,7 +223,11 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
         x_base = base[None, :nsamples].repeat(nt, 1, 1, 1).to(device, dtype)
         x_target = target[None, :nsamples].repeat(nt, 1, 1, 1).to(device, dtype)
         xt = self.get_trajectory(x_base, x_target, t)[0].detach().cpu()
-        xt_straight = super().get_trajectory(x_base, x_target, t)[0].detach().cpu()
+        xt_straight = (
+            StandardLogPtPhiEtaLogM2.get_trajectory(self, x_base, x_target, t)[0]
+            .detach()
+            .cpu()
+        )
         t = t.detach().cpu()
 
         for i in range(base.shape[-2]):
@@ -280,23 +258,33 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
                 nmax=nsamples,
             )
 
-    def _get_mass(self, particle):
-        # particle has to be in 'Fourmomenta' format
-        unpack = lambda x: [x[..., j] for j in range(4)]
-        E, px, py, pz = unpack(particle)
-        mass2 = E**2 - px**2 - py**2 - pz**2
 
-        # preprocessing
-        prepd = mass2.clamp(min=1e-5) ** 0.5
-        if self.cfm.mfm.use_logmass:
-            prepd = prepd.log()
+class MassMFM(MFM):
+    def __init__(self, virtual_components, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.virtual_components = np.array(virtual_components)[
+            self.cfm.mfm.virtual_particles
+        ]
 
-        assert torch.isfinite(
-            prepd
-        ).all(), f"{torch.isnan(prepd).sum()} {torch.isinf(prepd).sum()}"
-        return prepd
+    def get_metric(self, x1, x2):
+        naive_term = 0.5 * ((x1 - x2) ** 2).sum(dim=[-1, -2])
 
-    def _get_loss(self, x, v):
+        x1_fourmomenta = self.x_to_fourmomenta(x1)
+        x2_fourmomenta = self.x_to_fourmomenta(x2)
+        mass_term = []
+        for particle in self.virtual_components:
+            x1_particle = x1_fourmomenta[..., particle, :].sum(dim=-2)
+            x2_particle = x2_fourmomenta[..., particle, :].sum(dim=-2)
+            m1 = self._get_mass(x1_particle)
+            m2 = self._get_mass(x2_particle)
+            mass_term0 = 0.5 * ((m1 - m2) ** 2)
+            mass_term.append(mass_term0)
+        mass_term = torch.stack(mass_term, dim=-1).sum(dim=-1)
+
+        metric = naive_term + self.cfm.mfm.alpha * mass_term
+        return metric
+
+    def get_loss(self, x, v):
         naive_term = (v**2).sum(dim=[-1, -2]).mean()
 
         mass_term = []
@@ -314,4 +302,34 @@ class MassMFM(StandardLogPtPhiEtaLogM2):
         mass_term *= self.cfm.mfm.alpha
 
         loss = naive_term + mass_term
-        return loss, naive_term, mass_term
+        metrics = {"naive": naive_term, "mass": mass_term}
+        return loss, metrics
+
+    def _get_mass(self, particle):
+        # particle has to be in 'Fourmomenta' format
+        unpack = lambda x: [x[..., j] for j in range(4)]
+        E, px, py, pz = unpack(particle)
+        mass2 = E**2 - px**2 - py**2 - pz**2
+
+        # preprocessing
+        prepd = mass2.clamp(min=1e-5) ** 0.5
+        if self.cfm.mfm.use_logmass:
+            prepd = prepd.log()
+
+        assert torch.isfinite(
+            prepd
+        ).all(), f"{torch.isnan(prepd).sum()} {torch.isinf(prepd).sum()}"
+        return prepd
+
+    def _init_metrics(self, metrics):
+        for key in ["naive", "mass"]:
+            metrics[key] = []
+            metrics[f"{key}_phi0"] = []
+
+
+class LANDMFM(MFM):
+    def get_metric(self, x1, x2):
+        raise NotImplementedError
+
+    def get_loss(self, x, v):
+        raise NotImplementedError
