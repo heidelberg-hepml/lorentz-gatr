@@ -31,7 +31,7 @@ class MFM(StandardLogPtPhiEtaLogM2):
         raise NotImplementedError
 
     @torch.enable_grad()
-    def get_trajectory(self, x_base, x_target, t):
+    def _get_trajectory(self, x_base, x_target, t):
         t.requires_grad_()
         phi = self.dnet(x_base, x_target, t)
         xt = x_base + t * (x_target - x_base) + t * (1 - t) * phi
