@@ -76,7 +76,6 @@ plotting:
  virtual: true
  delta: true
  deta_dphi: true
- save_trajectories: false
  log_prob: true
  reweighted: true
  create_mask: false

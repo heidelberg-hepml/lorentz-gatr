@@ -169,9 +169,7 @@ class CFM(nn.Module):
         ]
         return distance, distance_particlewise
 
-    def sample(
-        self, ijet, shape, device, dtype, trajectory_path=None, n_trajectories=100
-    ):
+    def sample(self, ijet, shape, device, dtype):
         """
         Sample from CFM model
         Solve an ODE using a NN-parametrized velocity field
@@ -185,21 +183,12 @@ class CFM(nn.Module):
             Shape of events that should be generated
         device : torch.device
         dtype : torch.dtype
-        trajectory_path : str
-            path where trajectories should be saved
-            no trajectories will be saved if 'trajectory_path is None'
-        n_trajectories: int
-            Number of trajectories to keep, out of the full batchsize trajectories
 
         Returns
         -------
         x0_fourmomenta : torch.tensor with shape shape = (batchsize, n_particles, 4)
             Generated events
         """
-        # overhead for saving trajectories
-        save_trajectory = trajectory_path is not None
-        if save_trajectory:
-            xts_straight, vts_straight, ts = [], [], []
 
         def velocity(t, xt_straight):
             t = t * torch.ones(
@@ -212,12 +201,6 @@ class CFM(nn.Module):
                 xt_network, t, ijet=ijet
             )
             vt_straight = self.handle_velocity(vt_straight)
-
-            # collect trajectories
-            if save_trajectory:
-                xts_straight.append(xt_straight[:n_trajectories, ...])
-                vts_straight.append(vt_straight[:n_trajectories, ...])
-                ts.append(t[0, 0, 0])
             return vt_straight
 
         # sample fourmomenta from base distribution
@@ -242,52 +225,6 @@ class CFM(nn.Module):
 
         # transform generated event back to fourmomenta
         x0_fourmomenta = self.coordinates_straight.x_to_fourmomenta(x0_straight)
-
-        # save trajectories to file
-        if save_trajectory:
-            # collect trajectories
-            xts_straight = torch.stack(xts_straight, dim=0)
-            vts_straight = torch.stack(vts_straight, dim=0)
-            ts = torch.stack(ts, dim=0)
-
-            # determine true trajectories
-            xts_straight = convert_coordinates(
-                xts_straight, self.coordinates_straight, self.coordinates_straight
-            )
-            vts_straight_t, xts_straight_t = self.coordinates_straight.get_trajectory(
-                xts_straight[-1, ...]
-                .reshape(1, *xts_straight.shape[1:])
-                .expand(xts_straight.shape),
-                xts_straight[0, ...]
-                .reshape(1, *xts_straight.shape[1:])
-                .expand(xts_straight.shape),
-                ts.reshape(ts.shape[0], 1, 1, 1),
-            )
-
-            # transform to fourmomenta space
-            (
-                vts_fourmomenta_t,
-                xts_fourmomenta_t,
-            ) = self.coordinates_straight.velocity_x_to_fourmomenta(
-                vts_straight_t, xts_straight_t
-            )
-            (
-                vts_fourmomenta,
-                xts_fourmomenta,
-            ) = self.coordinates_straight.velocity_x_to_fourmomenta(
-                vts_straight, xts_straight
-            )
-
-            # save
-            np.savez_compressed(
-                trajectory_path,
-                xts_learned=xts_fourmomenta.cpu() * self.units,
-                vts_learned=vts_fourmomenta.cpu() * self.units,
-                xts_true=xts_fourmomenta_t.cpu() * self.units,
-                vts_true=vts_fourmomenta_t.cpu() * self.units,
-                ts=ts.cpu(),
-            )
-
         return x0_fourmomenta
 
     def log_prob(self, x0_fourmomenta, ijet):

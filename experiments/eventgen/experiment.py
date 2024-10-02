@@ -336,19 +336,6 @@ class EventGenerationExperiment(BaseExperiment):
         self.model.eval()
 
         for ijet, n_jets in enumerate(self.cfg.data.n_jets):
-            if self.cfg.save and self.cfg.plotting.save_trajectories:
-                os.makedirs(
-                    os.path.join(self.cfg.run_dir, "trajectories"), exist_ok=True
-                )
-                trajectory_path = os.path.join(
-                    self.cfg.run_dir,
-                    "trajectories",
-                    f"run{self.cfg.run_idx}_{n_jets}j.npz",
-                )
-                LOGGER.info(f"Will save {n_jets}j trajectories to {trajectory_path}")
-            else:
-                trajectory_path = None
-
             sample = []
             shape = (self.cfg.evaluation.batchsize, self.n_hard_particles + n_jets, 4)
             n_batches = (
@@ -364,7 +351,6 @@ class EventGenerationExperiment(BaseExperiment):
                     shape,
                     self.device,
                     self.dtype,
-                    trajectory_path=trajectory_path if i == 0 else None,
                 )
                 sample.append(x_t)
             t1 = time.time()
