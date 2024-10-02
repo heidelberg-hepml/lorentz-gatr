@@ -32,25 +32,12 @@ class MFM(StandardLogPtPhiEtaLogM2):
 
     @torch.enable_grad()
     def _get_trajectory(self, x_base, x_target, t):
-        t.requires_grad_()
         phi = self.dnet(x_base, x_target, t)
         xt = x_base + t * (x_target - x_base) + t * (1 - t) * phi
 
-        dphi_dt = []
-        for i in range(xt.shape[-2]):
-            dphi_dt0 = []
-            for j in range(xt.shape[-1]):
-                grad_outputs = torch.ones_like(t)
-                dphi_dt1 = torch.autograd.grad(
-                    phi[..., [i], :][..., [j]],
-                    t,
-                    grad_outputs=grad_outputs,
-                    create_graph=True,
-                )[0]
-                dphi_dt0.append(dphi_dt1)
-            dphi_dt0 = torch.cat(dphi_dt0, dim=-1)
-            dphi_dt.append(dphi_dt0)
-        dphi_dt = torch.cat(dphi_dt, dim=-2)
+        dphi_dt = torch.autograd.functional.jvp(
+            lambda t: self.dnet(x_base, x_target, t), t, torch.ones_like(t)
+        )[1]
         vt = x_target - x_base + t * (1 - t) * dphi_dt + (1 - 2 * t) * phi
         return xt, vt
 
@@ -111,7 +98,7 @@ class MFM(StandardLogPtPhiEtaLogM2):
         loss_min, patience = float("inf"), 0
         t0 = time.time()
         LOGGER.info(
-            f"Starting to train dnet net for {self.cfm.mfm.startup.iterations} iterations "
+            f"Starting to train dnet {self.cfm.mfm.net_type} for {self.cfm.mfm.startup.iterations} iterations "
             f"(batchsize={self.cfm.mfm.startup.batchsize}, lr={self.cfm.mfm.startup.lr}, "
             f"patience={self.cfm.mfm.startup.patience})"
         )
