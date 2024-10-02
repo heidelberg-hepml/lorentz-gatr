@@ -16,18 +16,18 @@ from experiments.eventgen.mfm_net import DisplacementMLP, DisplacementTransforme
 
 
 class MFM(StandardLogPtPhiEtaLogM2):
-    def __init__(self, cfm, *args, **kwargs):
+    def __init__(self, virtual_components, cfm, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.cfm = cfm
         self.dnet = None
+        self.virtual_components = np.array(virtual_components)[
+            self.cfm.mfm.virtual_particles
+        ]
 
     def _init_metrics(self, metrics):
         pass
 
     def get_loss(self, metrics):
-        raise NotImplementedError
-
-    def get_metric(self, x1, x2):
         raise NotImplementedError
 
     @torch.enable_grad()
@@ -245,16 +245,27 @@ class MFM(StandardLogPtPhiEtaLogM2):
                 nmax=nsamples,
             )
 
+    def _get_mass(self, particle):
+        # particle has to be in 'Fourmomenta' format
+        unpack = lambda x: [x[..., j] for j in range(4)]
+        E, px, py, pz = unpack(particle)
+        mass2 = E**2 - px**2 - py**2 - pz**2
+
+        # preprocessing
+        prepd = mass2.clamp(min=1e-5) ** 0.5
+        if self.cfm.mfm.use_logmass:
+            prepd = prepd.log()
+
+        assert torch.isfinite(
+            prepd
+        ).all(), f"{torch.isnan(prepd).sum()} {torch.isinf(prepd).sum()}"
+        return prepd
+
 
 class MassMFM(MFM):
-    def __init__(self, virtual_components, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.virtual_components = np.array(virtual_components)[
-            self.cfm.mfm.virtual_particles
-        ]
-
-    def get_metric(self, x1, x2):
-        naive_term = 0.5 * ((x1 - x2) ** 2).sum(dim=[-1, -2])
+    """
+    def get_metric(self, x1, x2, x):
+        naive_term = 0.5 * ((x1-x2) ** 2).sum(dim=[-1, -2])
 
         x1_fourmomenta = self.x_to_fourmomenta(x1)
         x2_fourmomenta = self.x_to_fourmomenta(x2)
@@ -270,6 +281,7 @@ class MassMFM(MFM):
 
         metric = naive_term + self.cfm.mfm.alpha * mass_term
         return metric
+    """
 
     def get_loss(self, x, v):
         naive_term = (v**2).sum(dim=[-1, -2]).mean()
@@ -291,22 +303,6 @@ class MassMFM(MFM):
         loss = naive_term + mass_term
         metrics = {"naive": naive_term, "mass": mass_term}
         return loss, metrics
-
-    def _get_mass(self, particle):
-        # particle has to be in 'Fourmomenta' format
-        unpack = lambda x: [x[..., j] for j in range(4)]
-        E, px, py, pz = unpack(particle)
-        mass2 = E**2 - px**2 - py**2 - pz**2
-
-        # preprocessing
-        prepd = mass2.clamp(min=1e-5) ** 0.5
-        if self.cfm.mfm.use_logmass:
-            prepd = prepd.log()
-
-        assert torch.isfinite(
-            prepd
-        ).all(), f"{torch.isnan(prepd).sum()} {torch.isinf(prepd).sum()}"
-        return prepd
 
     def _init_metrics(self, metrics):
         for key in ["naive", "mass"]:

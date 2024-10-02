@@ -49,7 +49,8 @@ class BaseCoordinates:
     def init_unit(self, particles_list):
         self.transforms[-1].init_unit(particles_list)
 
-    def get_metric(self, x1, x2):
+    def get_metric(self, x1, x2, x):
+        # norm of the vector 'diff' at the point 'x'
         # default: euclidean metric
         se = (x1 - x2) ** 2 / 2
         return se.sum(dim=[-1, -2])
