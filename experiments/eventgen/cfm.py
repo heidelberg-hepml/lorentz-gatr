@@ -475,10 +475,13 @@ class EventCFM(CFM):
         self.coordinates_straight = self._init_coordinates(
             self.cfm.coordinates_straight
         )
-        self.coordinates_network = self._init_coordinates(self.cfm.coordinates_network)
-        self.coordinates_straight = self._init_coordinates(
-            self.cfm.coordinates_straight
-        )
+        if self.cfm.coordinates_straight == self.cfm.coordinates_network:
+            self.coordinates_network = self.coordinates_straight
+        else:
+            self.coordinates_network = self._init_coordinates(
+                self.cfm.coordinates_network
+            )
+
         self.coordinates = [
             self.coordinates_straight,
             self.coordinates_network,
