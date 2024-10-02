@@ -80,9 +80,14 @@ class DisplacementTransformer(DisplacementNet):
     def forward(self, x_base, x_target, t):
         x_base_emb, x_target_emb, t_emb = self.embed_everything(x_base, x_target, t)
         x_base_emb, x_target_emb = x_base_emb.unsqueeze(-1), x_target_emb.unsqueeze(-1)
-        t_emb = t_emb.unsqueeze(-2).repeat(1, x_base_emb.shape[-2], 1)
+        t_emb = torch.repeat_interleave(
+            t_emb.unsqueeze(-2), x_base_emb.shape[-2], dim=-2
+        )
         idx = torch.arange(x_base_emb.shape[-2], device=x_base_emb.device)
-        idx_emb = torch.nn.functional.one_hot(idx).repeat(x_base_emb.shape[0], 1, 1)
+        idx_emb = torch.nn.functional.one_hot(idx).repeat(
+            [1 for _ in range(len(x_base_emb.shape))]
+        )
+        idx_emb = idx_emb.repeat(list(x_base_emb.shape[:-2]) + [1, 1])
         embedding = torch.cat((x_base_emb, x_target_emb, t_emb, idx_emb), dim=-1)
 
         phi = self.net(embedding)
