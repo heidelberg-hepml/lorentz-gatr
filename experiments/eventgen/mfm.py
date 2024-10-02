@@ -87,6 +87,11 @@ class MFM(StandardLogPtPhiEtaLogM2):
         constructor = lambda tensor: iter(cycle(loader(dataset(tensor))))
         iter_base, iter_target = constructor(base), constructor(target)
         optimizer = torch.optim.Adam(self.dnet.parameters(), lr=self.cfm.mfm.startup.lr)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            factor=self.cfm.mfm.startup.lr_factor,
+            patience=self.cfm.mfm.startup.lr_patience,
+        )
         metrics = {
             "full": [],
             "full_phi0": [],
@@ -106,6 +111,7 @@ class MFM(StandardLogPtPhiEtaLogM2):
             x_base = next(iter_base)[0].to(device, dtype)
             x_target = next(iter_target)[0].to(device, dtype)
             loss = self._step(x_base, x_target, **kwargs)
+            scheduler.step(loss)
 
             if loss < loss_min:
                 loss_min = loss

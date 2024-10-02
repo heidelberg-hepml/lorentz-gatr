@@ -42,6 +42,8 @@ cfm:
    plot_training: true
    plot_trajectories: true
    patience: 100
+   lr_patience: 20
+   lr_factor: 0.5
   dnet:
    hidden_channels: 64
    hidden_layers: 2
