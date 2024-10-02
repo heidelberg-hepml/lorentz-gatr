@@ -23,7 +23,7 @@ from gatr.layers import MLPConfig, SelfAttentionConfig
 
 from lion_pytorch import Lion
 import schedulefree
-import torch_optimizer
+import pytorch_optimizer
 
 cs = ConfigStore.instance()
 cs.store(name="base_attention", node=SelfAttentionConfig)
@@ -380,19 +380,21 @@ class BaseExperiment:
                 betas=self.cfg.training.betas,
                 weight_decay=self.cfg.training.weight_decay,
             )
-        elif self.cfg.training.optimizer == "LookAhead":
-            radam = torch.optim.RAdam(
-                param_groups,
-                betas=self.cfg.training.betas,
-                eps=self.cfg.training.eps,
-                weight_decay=self.cfg.training.weight_decay,
-            )
-            self.optimizer = torch_optimizer.Lookahead(radam, k=6, alpha=0.5)
         else:
             raise ValueError(f"Optimizer {self.cfg.training.optimizer} not implemented")
         LOGGER.debug(
             f"Using optimizer {self.cfg.training.optimizer} with lr={self.cfg.training.lr}"
         )
+
+        if self.cfg.training.use_lookahead:
+            self.optimizer = pytorch_optimizer.Lookahead(
+                self.optimizer,
+                k=self.cfg.training.lookahead_k,
+                alpha=self.cfg.training.lookahead_alpha,
+            )
+            LOGGER.debug(
+                f"Apply LookAhead with k={self.cfg.training.lookahead_k}, alpha={self.cfg.training.lookahead_alpha}"
+            )
 
         # load existing optimizer if specified
         if self.warm_start:
@@ -404,10 +406,7 @@ class BaseExperiment:
             except FileNotFoundError:
                 raise ValueError(f"Cannot load optimizer from {model_path}")
             LOGGER.info(f"Loading optimizer from {model_path}")
-            if self.cfg.training.optimizer == "LookAhead":
-                self.optimizer.optimizer.load_state_dict(state_dict)
-            else:
-                self.optimizer.load_state_dict(state_dict)
+            self.optimizer.load_state_dict(state_dict)
 
     def _init_scheduler(self):
         if self.cfg.training.scheduler is None:
@@ -661,7 +660,7 @@ class BaseExperiment:
         torch.save(
             {
                 "model": self.model.state_dict(),
-                "optimizer": self.optimizer.optimizer.state_dict() if self.cfg.training.optimizer=="LookAhead" else self.optimizer.state_dict(),
+                "optimizer": self.optimizer.state_dict(),
                 "scheduler": self.scheduler.state_dict()
                 if self.scheduler is not None
                 else None,
