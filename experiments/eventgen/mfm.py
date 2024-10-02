@@ -311,8 +311,29 @@ class MassMFM(MFM):
 
 
 class LANDMFM(MFM):
-    def get_metric(self, x1, x2):
-        raise NotImplementedError
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.sigma = self.cfm.mfm.sigma_LAND
+        self.eps = self.cfm.mfm.eps_LAND
+
+    def _get_diag_entries(self, x):
+        # see (9) in arXiv:2405.14780
+        x_emb = x.flatten(start_dim=-2)
+        x1, x2 = x_emb[:, None, :], x_emb[None, :, :]
+        exponent = -torch.sum((x1 - x2) ** 2, dim=-1) / (2 * self.sigma**2)
+        h = (x1 - x2) ** 2 * torch.exp(exponent.unsqueeze(-1))
+        h = h.sum(dim=0)
+        h = h.reshape_as(x)
+        return h
+
+    def get_metric(self, x1, x2, x):
+        diag_entries = self._get_diag_entries(x)
+        metric = (x1 - x2) ** 2 / (diag_entries + self.eps)
+        metric = metric.sum(dim=[-1, -2])
+        return metric
 
     def get_loss(self, x, v):
-        raise NotImplementedError
+        diag_entries = self._get_diag_entries(x)
+        loss = v**2 / (diag_entries + self.eps)
+        loss = loss.sum(dim=[-1, -2]).mean()
+        return loss, {}

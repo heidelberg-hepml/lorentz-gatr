@@ -463,6 +463,7 @@ class EventCFM(CFM):
             )
         elif coordinates_label == "LANDMFM":
             coordinates = LANDMFM(
+                self.virtual_components,
                 self.cfm,
                 self.pt_min,
                 self.units,

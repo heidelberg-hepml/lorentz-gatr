@@ -34,6 +34,8 @@ cfm:
   use_logmass: true
   virtual_particles: [1,2,3,4]
   net_type: mlp
+  sigma_LAND: 1
+  eps_LAND: 1e-3
   startup:
    iterations: 10000
    batchsize: 1024
