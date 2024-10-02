@@ -4,6 +4,7 @@ import os
 import time
 import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
+from hydra.utils import instantiate
 
 from experiments.eventgen.coordinates import StandardLogPtPhiEtaLogM2
 from experiments.eventgen.cfm import GaussianFourierProjection
@@ -11,6 +12,7 @@ from experiments.baselines.mlp import MLP
 from experiments.base_plots import plot_loss, plot_metric
 from experiments.eventgen.plots import plot_trajectories_2d, plot_trajectories_over_time
 from experiments.logger import LOGGER
+from experiments.eventgen.mfm_net import DisplacementMLP, DisplacementTransformer
 
 
 class MFM(StandardLogPtPhiEtaLogM2):
@@ -28,21 +30,10 @@ class MFM(StandardLogPtPhiEtaLogM2):
     def get_metric(self, x1, x2):
         raise NotImplementedError
 
-    def _get_displacement(self, x_base, x_target, t):
-        t_emb = self.t_embedding(t[..., 0])
-        x_base_emb = x_base.flatten(start_dim=-2)
-        x_target_emb = x_target.flatten(start_dim=-2)
-        embedding = torch.cat(
-            (x_base_emb, x_target_emb, t_emb),
-            dim=-1,
-        )
-        phi = self.dnet(embedding).reshape_as(x_base)
-        return phi
-
     @torch.enable_grad()
     def get_trajectory(self, x_base, x_target, t):
         t.requires_grad_()
-        phi = self._get_displacement(x_base, x_target, t)
+        phi = self.dnet(x_base, x_target, t)
         xt = x_base + t * (x_target - x_base) + t * (1 - t) * phi
 
         dphi_dt = []
@@ -63,31 +54,34 @@ class MFM(StandardLogPtPhiEtaLogM2):
         vt = x_target - x_base + t * (1 - t) * dphi_dt + (1 - 2 * t) * phi
         return xt, vt
 
-    def _init_dnet(self, n_features, device, dtype):
-        self.t_embedding = nn.Sequential(
-            GaussianFourierProjection(
-                embed_dim=self.cfm.embed_t_dim,
-                scale=self.cfm.embed_t_scale,
-            ),
-            nn.Linear(self.cfm.embed_t_dim, self.cfm.embed_t_dim),
-        ).to(device, dtype)
-        self.dnet = MLP(
-            in_shape=2 * n_features + self.cfm.embed_t_dim,
-            out_shape=n_features,
-            hidden_channels=self.cfm.mfm.dnet.hidden_channels,
-            hidden_layers=self.cfm.mfm.dnet.hidden_layers,
-        ).to(device, dtype)
+    def initialize(self, base, target, plot_path=None, device=None, dtype=None):
+        # initialize dnet
+        n_features = base.flatten(start_dim=-2).shape[-1]
+        if self.cfm.mfm.net_type == "mlp":
+            self.dnet = DisplacementMLP(
+                n_features=n_features,
+                hidden_channels=self.cfm.mfm.dnet.hidden_channels,
+                hidden_layers=self.cfm.mfm.dnet.hidden_layers,
+                embed_t_dim=self.cfm.embed_t_dim,
+                embed_t_scale=self.cfm.embed_t_scale,
+            )
+        elif self.cfm.mfm.net_type == "transformer":
+            self.dnet = DisplacementTransformer(
+                n_features=n_features,
+                hidden_channels=self.cfm.mfm.dnet.hidden_channels,
+                hidden_layers=self.cfm.mfm.dnet.hidden_layers,
+                embed_t_dim=self.cfm.embed_t_dim,
+                embed_t_scale=self.cfm.embed_t_scale,
+            )
+        else:
+            raise ValueError(f"Unknown net_type {self.cfm.mfm.net_type}.")
+        self.dnet = self.dnet.to(device, dtype)
         num_parameters = sum(
             p.numel() for p in self.dnet.parameters() if p.requires_grad
         )
         LOGGER.info(
-            f"Instantiated dnet net with {num_parameters} learnable parameters."
+            f"Instantiated dnet {self.cfm.mfm.net_type} with {num_parameters} learnable parameters."
         )
-
-    def initialize(self, base, target, plot_path=None, device=None, dtype=None):
-        # initialize dnet
-        n_features = base.flatten(start_dim=-2).shape[-1]
-        self._init_dnet(n_features, device, dtype)
 
         # train dnet
         LOGGER.info(
