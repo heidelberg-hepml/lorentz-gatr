@@ -195,6 +195,8 @@ class MFM(StandardLogPtPhiEtaLogM2):
         metrics_plot = [metrics["full"], metrics["full_phi0"]]
         labels = ["full", r"full with $\varphi=0$"]
         for key in metrics.keys():
+            if key in ["grad_norm", "lr"]:
+                continue
             metrics_plot.append(metrics[key])
             labels.append(key)
         plot_loss(
