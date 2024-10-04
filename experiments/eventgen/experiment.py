@@ -249,7 +249,7 @@ class EventGenerationExperiment(BaseExperiment):
         data_true = self.events_raw[ijet]
         data_fake = self.data_raw[ijet]["gen"]
         LOGGER.info(
-            f"Classifier data true/fake has shape {data_true.shape}/{data_fake.shape}"
+            f"Classifier generated data true/fake has shape {tuple(data_true.shape)}/{tuple(data_fake.shape)}"
         )
 
         # preprocessing
