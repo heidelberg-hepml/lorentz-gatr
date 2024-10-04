@@ -169,9 +169,7 @@ class CFM(nn.Module):
         ]
         return distance, distance_particlewise
 
-    def sample(
-        self, ijet, shape, device, dtype, trajectory_path=None, n_trajectories=100
-    ):
+    def sample(self, ijet, shape, device, dtype):
         """
         Sample from CFM model
         Solve an ODE using a NN-parametrized velocity field
@@ -463,6 +461,7 @@ class EventCFM(CFM):
             )
         elif coordinates_label == "LANDMFM":
             coordinates = LANDMFM(
+                self.virtual_components,
                 self.cfm,
                 self.pt_min,
                 self.units,

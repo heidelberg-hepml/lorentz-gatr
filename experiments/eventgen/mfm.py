@@ -14,8 +14,9 @@ from experiments.logger import LOGGER
 
 
 class MFM(StandardLogPtPhiEtaLogM2):
-    def __init__(self, cfm, *args, **kwargs):
+    def __init__(self, virtual_components, cfm, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.virtual_components_plot = virtual_components
         self.cfm = cfm
         self.dnet = None
 
@@ -112,7 +113,7 @@ class MFM(StandardLogPtPhiEtaLogM2):
             "lr": [],
             "grad_norm": [],
         }
-        self._init_metrics(metrics)
+        self._extend_metrics(metrics)
         kwargs = {"optimizer": optimizer, "metrics": metrics}
         loss_min, patience = float("inf"), 0
         t0 = time.time()
@@ -147,7 +148,7 @@ class MFM(StandardLogPtPhiEtaLogM2):
             if self.cfm.mfm.startup.plot_training:
                 filename = os.path.join(plot_path, "dnet_training.pdf")
                 with PdfPages(filename) as file:
-                    self._training_plots(file, metrics)
+                    self._plot_training(file, metrics)
             if self.cfm.mfm.startup.plot_trajectories:
                 filename = os.path.join(plot_path, "dnet_trajectories.pdf")
                 with PdfPages(filename) as file:
@@ -184,7 +185,7 @@ class MFM(StandardLogPtPhiEtaLogM2):
 
         return loss.item()
 
-    def _training_plots(self, file, metrics):
+    def _plot_training(self, file, metrics):
         plot_loss(
             file,
             [metrics["full"], metrics["full_phi0"]],
@@ -243,7 +244,7 @@ class MFM(StandardLogPtPhiEtaLogM2):
 
         xt_fourmomenta = self.x_to_fourmomenta(xt)
         xt_straight_fourmomenta = self.x_to_fourmomenta(xt_straight)
-        for particles in self.virtual_components:
+        for particles in self.virtual_components_plot:
             x_particle = xt_fourmomenta[..., particles, :].sum(dim=-2)
             x_straight_particle = xt_straight_fourmomenta[..., particles, :].sum(dim=-2)
             mass = self._get_mass(x_particle)
@@ -257,53 +258,6 @@ class MFM(StandardLogPtPhiEtaLogM2):
                 ylabel=r"$m(t)$",
                 nmax=nsamples,
             )
-
-
-class MassMFM(MFM):
-    def __init__(self, virtual_components, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.virtual_components = np.array(virtual_components)[
-            self.cfm.mfm.virtual_particles
-        ]
-
-    def get_metric(self, x1, x2):
-        naive_term = 0.5 * ((x1 - x2) ** 2).sum(dim=[-1, -2])
-
-        x1_fourmomenta = self.x_to_fourmomenta(x1)
-        x2_fourmomenta = self.x_to_fourmomenta(x2)
-        mass_term = []
-        for particle in self.virtual_components:
-            x1_particle = x1_fourmomenta[..., particle, :].sum(dim=-2)
-            x2_particle = x2_fourmomenta[..., particle, :].sum(dim=-2)
-            m1 = self._get_mass(x1_particle)
-            m2 = self._get_mass(x2_particle)
-            mass_term0 = 0.5 * ((m1 - m2) ** 2)
-            mass_term.append(mass_term0)
-        mass_term = torch.stack(mass_term, dim=-1).sum(dim=-1)
-
-        metric = naive_term + self.cfm.mfm.alpha * mass_term
-        return metric
-
-    def get_loss(self, x, v):
-        naive_term = (v**2).sum(dim=[-1, -2]).mean()
-
-        mass_term = []
-        x_fourmomenta = self.x_to_fourmomenta(x)
-        for particles in self.virtual_components:
-            x_particle = x_fourmomenta[..., particles, :].sum(dim=-2)
-            mass = self._get_mass(x_particle)[:, None, None]
-            grad_outputs = torch.ones_like(mass)
-            dmass_dx = torch.autograd.grad(
-                mass, x, grad_outputs=grad_outputs, create_graph=True
-            )[0]
-            mass_term0 = (dmass_dx * v).sum(dim=[-1, -2]) ** 2
-            mass_term.append(mass_term0)
-        mass_term = torch.stack(mass_term, dim=-1).sum(dim=-1).mean()
-        mass_term *= self.cfm.mfm.alpha
-
-        loss = naive_term + mass_term
-        metrics = {"naive": naive_term, "mass": mass_term}
-        return loss, metrics
 
     def _get_mass(self, particle):
         # particle has to be in 'Fourmomenta' format
@@ -321,7 +275,54 @@ class MassMFM(MFM):
         ).all(), f"{torch.isnan(prepd).sum()} {torch.isinf(prepd).sum()}"
         return prepd
 
-    def _init_metrics(self, metrics):
+
+class MassMFM(MFM):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.virtual_components_mfm = np.array(self.virtual_components_plot)[
+            self.cfm.mfm.virtual_particles
+        ]
+
+    def get_metric(self, x1, x2):
+        naive_term = 0.5 * ((x1 - x2) ** 2).sum(dim=[-1, -2])
+
+        x1_fourmomenta = self.x_to_fourmomenta(x1)
+        x2_fourmomenta = self.x_to_fourmomenta(x2)
+        mass_term = []
+        for particle in self.virtual_components_mfm:
+            x1_particle = x1_fourmomenta[..., particle, :].sum(dim=-2)
+            x2_particle = x2_fourmomenta[..., particle, :].sum(dim=-2)
+            m1 = self._get_mass(x1_particle)
+            m2 = self._get_mass(x2_particle)
+            mass_term0 = 0.5 * ((m1 - m2) ** 2)
+            mass_term.append(mass_term0)
+        mass_term = torch.stack(mass_term, dim=-1).sum(dim=-1)
+
+        metric = naive_term + self.cfm.mfm.alpha * mass_term
+        return metric
+
+    def get_loss(self, x, v):
+        naive_term = (v**2).sum(dim=[-1, -2]).mean()
+
+        mass_term = []
+        x_fourmomenta = self.x_to_fourmomenta(x)
+        for particles in self.virtual_components_mfm:
+            x_particle = x_fourmomenta[..., particles, :].sum(dim=-2)
+            mass = self._get_mass(x_particle)[:, None, None]
+            grad_outputs = torch.ones_like(mass)
+            dmass_dx = torch.autograd.grad(
+                mass, x, grad_outputs=grad_outputs, create_graph=True
+            )[0]
+            mass_term0 = (dmass_dx * v).sum(dim=[-1, -2]) ** 2
+            mass_term.append(mass_term0)
+        mass_term = torch.stack(mass_term, dim=-1).sum(dim=-1).mean()
+        mass_term *= self.cfm.mfm.alpha
+
+        loss = naive_term + mass_term
+        metrics = {"naive": naive_term, "mass": mass_term}
+        return loss, metrics
+
+    def _extend_metrics(self, metrics):
         for key in ["naive", "mass"]:
             metrics[key] = []
             metrics[f"{key}_phi0"] = []
