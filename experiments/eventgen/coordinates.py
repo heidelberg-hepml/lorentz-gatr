@@ -49,12 +49,16 @@ class BaseCoordinates:
     def init_unit(self, particles_list):
         self.transforms[-1].init_unit(particles_list)
 
-    def get_metric(self, x1, x2):
+    def get_metric(self, x1, x2, x):
+        # norm of the vector 'diff' at the point 'x'
         # default: euclidean metric
         se = (x1 - x2) ** 2 / 2
         return se.sum(dim=[-1, -2])
 
     def get_trajectory(self, x1, x2, t):
+        return self._get_trajectory(x1, x2, t)
+
+    def _get_trajectory(self, x1, x2, t):
         # default: straight trajectories
         v_t = x2 - x1
         x_t = x1 + t * v_t
@@ -135,9 +139,8 @@ class PPPM2(BaseCoordinates):
 class PhiCoordinates(BaseCoordinates):
     # abstract class for coordinates with phi in component 1
     def get_trajectory(self, x1, x2, t):
-        v_t = x2 - x1
+        x_t, v_t = self._get_trajectory(x1, x2, t)
         v_t[..., 1] = ensure_angle(v_t[..., 1])
-        x_t = x1 + t * v_t
         x_t[..., 1] = ensure_angle(x_t[..., 1])
         return x_t, v_t
 
