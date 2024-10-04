@@ -4,7 +4,6 @@ import os
 import time
 import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
-from hydra.utils import instantiate
 
 from experiments.eventgen.coordinates import StandardLogPtPhiEtaLogM2
 from experiments.eventgen.cfm import GaussianFourierProjection
@@ -12,17 +11,13 @@ from experiments.baselines.mlp import MLP
 from experiments.base_plots import plot_loss, plot_metric
 from experiments.eventgen.plots import plot_trajectories_2d, plot_trajectories_over_time
 from experiments.logger import LOGGER
-from experiments.eventgen.mfm_net import DisplacementMLP, DisplacementTransformer
 
 
 class MFM(StandardLogPtPhiEtaLogM2):
-    def __init__(self, virtual_components, cfm, *args, **kwargs):
+    def __init__(self, cfm, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.cfm = cfm
         self.dnet = None
-        self.virtual_components = np.array(virtual_components)[
-            self.cfm.mfm.virtual_particles
-        ]
 
     def _init_metrics(self, metrics):
         pass
@@ -30,45 +25,69 @@ class MFM(StandardLogPtPhiEtaLogM2):
     def get_loss(self, metrics):
         raise NotImplementedError
 
+    def get_metric(self, x1, x2):
+        raise NotImplementedError
+
+    def _get_displacement(self, x_base, x_target, t):
+        t_emb = self.t_embedding(t[..., 0])
+        x_base_emb = x_base.flatten(start_dim=-2)
+        x_target_emb = x_target.flatten(start_dim=-2)
+        embedding = torch.cat(
+            (x_base_emb, x_target_emb, t_emb),
+            dim=-1,
+        )
+        phi = self.dnet(embedding).reshape_as(x_base)
+        return phi
+
     @torch.enable_grad()
-    def _get_trajectory(self, x_base, x_target, t):
-        phi = self.dnet(x_base, x_target, t)
+    def get_trajectory(self, x_base, x_target, t):
+        t.requires_grad_()
+        phi = self._get_displacement(x_base, x_target, t)
         xt = x_base + t * (x_target - x_base) + t * (1 - t) * phi
 
-        dphi_dt = torch.autograd.functional.jvp(
-            lambda t: self.dnet(x_base, x_target, t), t, torch.ones_like(t)
-        )[1]
+        dphi_dt = []
+        for i in range(xt.shape[-2]):
+            dphi_dt0 = []
+            for j in range(xt.shape[-1]):
+                grad_outputs = torch.ones_like(t)
+                dphi_dt1 = torch.autograd.grad(
+                    phi[..., [i], :][..., [j]],
+                    t,
+                    grad_outputs=grad_outputs,
+                    create_graph=True,
+                )[0]
+                dphi_dt0.append(dphi_dt1)
+            dphi_dt0 = torch.cat(dphi_dt0, dim=-1)
+            dphi_dt.append(dphi_dt0)
+        dphi_dt = torch.cat(dphi_dt, dim=-2)
         vt = x_target - x_base + t * (1 - t) * dphi_dt + (1 - 2 * t) * phi
         return xt, vt
 
-    def initialize(self, base, target, plot_path=None, device=None, dtype=None):
-        # initialize dnet
-        n_features = base.flatten(start_dim=-2).shape[-1]
-        if self.cfm.mfm.net_type == "mlp":
-            self.dnet = DisplacementMLP(
-                n_features=n_features,
-                hidden_channels=self.cfm.mfm.dnet.hidden_channels,
-                hidden_layers=self.cfm.mfm.dnet.hidden_layers,
-                embed_t_dim=self.cfm.embed_t_dim,
-                embed_t_scale=self.cfm.embed_t_scale,
-            )
-        elif self.cfm.mfm.net_type == "transformer":
-            self.dnet = DisplacementTransformer(
-                n_features=n_features,
-                hidden_channels=self.cfm.mfm.dnet.hidden_channels,
-                hidden_layers=self.cfm.mfm.dnet.hidden_layers,
-                embed_t_dim=self.cfm.embed_t_dim,
-                embed_t_scale=self.cfm.embed_t_scale,
-            )
-        else:
-            raise ValueError(f"Unknown net_type {self.cfm.mfm.net_type}.")
-        self.dnet = self.dnet.to(device, dtype)
+    def _init_dnet(self, n_features, device, dtype):
+        self.t_embedding = nn.Sequential(
+            GaussianFourierProjection(
+                embed_dim=self.cfm.embed_t_dim,
+                scale=self.cfm.embed_t_scale,
+            ),
+            nn.Linear(self.cfm.embed_t_dim, self.cfm.embed_t_dim),
+        ).to(device, dtype)
+        self.dnet = MLP(
+            in_shape=2 * n_features + self.cfm.embed_t_dim,
+            out_shape=n_features,
+            hidden_channels=self.cfm.mfm.dnet.hidden_channels,
+            hidden_layers=self.cfm.mfm.dnet.hidden_layers,
+        ).to(device, dtype)
         num_parameters = sum(
             p.numel() for p in self.dnet.parameters() if p.requires_grad
         )
         LOGGER.info(
-            f"Instantiated dnet {self.cfm.mfm.net_type} with {num_parameters} learnable parameters."
+            f"Instantiated dnet net with {num_parameters} learnable parameters."
         )
+
+    def initialize(self, base, target, plot_path=None, device=None, dtype=None):
+        # initialize dnet
+        n_features = base.flatten(start_dim=-2).shape[-1]
+        self._init_dnet(n_features, device, dtype)
 
         # train dnet
         LOGGER.info(
@@ -87,11 +106,6 @@ class MFM(StandardLogPtPhiEtaLogM2):
         constructor = lambda tensor: iter(cycle(loader(dataset(tensor))))
         iter_base, iter_target = constructor(base), constructor(target)
         optimizer = torch.optim.Adam(self.dnet.parameters(), lr=self.cfm.mfm.startup.lr)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer,
-            factor=self.cfm.mfm.startup.lr_factor,
-            patience=self.cfm.mfm.startup.lr_patience,
-        )
         metrics = {
             "full": [],
             "full_phi0": [],
@@ -103,7 +117,7 @@ class MFM(StandardLogPtPhiEtaLogM2):
         loss_min, patience = float("inf"), 0
         t0 = time.time()
         LOGGER.info(
-            f"Starting to train dnet {self.cfm.mfm.net_type} for {self.cfm.mfm.startup.iterations} iterations "
+            f"Starting to train dnet net for {self.cfm.mfm.startup.iterations} iterations "
             f"(batchsize={self.cfm.mfm.startup.batchsize}, lr={self.cfm.mfm.startup.lr}, "
             f"patience={self.cfm.mfm.startup.patience})"
         )
@@ -111,7 +125,6 @@ class MFM(StandardLogPtPhiEtaLogM2):
             x_base = next(iter_base)[0].to(device, dtype)
             x_target = next(iter_target)[0].to(device, dtype)
             loss = self._step(x_base, x_target, **kwargs)
-            scheduler.step(loss)
 
             if loss < loss_min:
                 loss_min = loss
@@ -185,15 +198,15 @@ class MFM(StandardLogPtPhiEtaLogM2):
             "Gradient norm",
             logy=True,
         )
-        metrics_plot, labels = [], []
+        metrics_plot = [metrics["full"], metrics["full_phi0"]]
+        labels = ["full", r"full with $\varphi=0$"]
         for key in metrics.keys():
-            if key in ["grad_norm", "lr"]:
-                continue
             metrics_plot.append(metrics[key])
             labels.append(key)
         plot_loss(
             file,
             metrics_plot,
+            metrics["lr"],
             labels=labels,
             logy=False,
         )
@@ -245,27 +258,16 @@ class MFM(StandardLogPtPhiEtaLogM2):
                 nmax=nsamples,
             )
 
-    def _get_mass(self, particle):
-        # particle has to be in 'Fourmomenta' format
-        unpack = lambda x: [x[..., j] for j in range(4)]
-        E, px, py, pz = unpack(particle)
-        mass2 = E**2 - px**2 - py**2 - pz**2
-
-        # preprocessing
-        prepd = mass2.clamp(min=1e-5) ** 0.5
-        if self.cfm.mfm.use_logmass:
-            prepd = prepd.log()
-
-        assert torch.isfinite(
-            prepd
-        ).all(), f"{torch.isnan(prepd).sum()} {torch.isinf(prepd).sum()}"
-        return prepd
-
 
 class MassMFM(MFM):
-    """
-    def get_metric(self, x1, x2, x):
-        naive_term = 0.5 * ((x1-x2) ** 2).sum(dim=[-1, -2])
+    def __init__(self, virtual_components, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.virtual_components = np.array(virtual_components)[
+            self.cfm.mfm.virtual_particles
+        ]
+
+    def get_metric(self, x1, x2):
+        naive_term = 0.5 * ((x1 - x2) ** 2).sum(dim=[-1, -2])
 
         x1_fourmomenta = self.x_to_fourmomenta(x1)
         x2_fourmomenta = self.x_to_fourmomenta(x2)
@@ -281,7 +283,6 @@ class MassMFM(MFM):
 
         metric = naive_term + self.cfm.mfm.alpha * mass_term
         return metric
-    """
 
     def get_loss(self, x, v):
         naive_term = (v**2).sum(dim=[-1, -2]).mean()
@@ -304,6 +305,22 @@ class MassMFM(MFM):
         metrics = {"naive": naive_term, "mass": mass_term}
         return loss, metrics
 
+    def _get_mass(self, particle):
+        # particle has to be in 'Fourmomenta' format
+        unpack = lambda x: [x[..., j] for j in range(4)]
+        E, px, py, pz = unpack(particle)
+        mass2 = E**2 - px**2 - py**2 - pz**2
+
+        # preprocessing
+        prepd = mass2.clamp(min=1e-5) ** 0.5
+        if self.cfm.mfm.use_logmass:
+            prepd = prepd.log()
+
+        assert torch.isfinite(
+            prepd
+        ).all(), f"{torch.isnan(prepd).sum()} {torch.isinf(prepd).sum()}"
+        return prepd
+
     def _init_metrics(self, metrics):
         for key in ["naive", "mass"]:
             metrics[key] = []
@@ -311,29 +328,8 @@ class MassMFM(MFM):
 
 
 class LANDMFM(MFM):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.sigma = self.cfm.mfm.sigma_LAND
-        self.eps = self.cfm.mfm.eps_LAND
-
-    def _get_diag_entries(self, x):
-        # see (9) in arXiv:2405.14780
-        x_emb = x.flatten(start_dim=-2)
-        x1, x2 = x_emb[:, None, :], x_emb[None, :, :]
-        exponent = -torch.sum((x1 - x2) ** 2, dim=-1) / (2 * self.sigma**2)
-        h = (x1 - x2) ** 2 * torch.exp(exponent.unsqueeze(-1))
-        h = h.sum(dim=0)
-        h = h.reshape_as(x)
-        return h
-
-    def get_metric(self, x1, x2, x):
-        diag_entries = self._get_diag_entries(x)
-        metric = (x1 - x2) ** 2 / (diag_entries + self.eps)
-        metric = metric.sum(dim=[-1, -2])
-        return metric
+    def get_metric(self, x1, x2):
+        raise NotImplementedError
 
     def get_loss(self, x, v):
-        diag_entries = self._get_diag_entries(x)
-        loss = v**2 / (diag_entries + self.eps)
-        loss = loss.sum(dim=[-1, -2]).mean()
-        return loss, {}
+        raise NotImplementedError
