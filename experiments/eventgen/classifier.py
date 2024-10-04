@@ -94,7 +94,7 @@ class MLPClassifier:
 
     def init_data(self, data_true, data_fake):
         LOGGER.info(
-            f"Classifier training data has shape {data_true['trn'].shape}(true) / {data_fake['trn'].shape}(fake)"
+            f"Classifier true/fake training data has shape {tuple(data_true['trn'].shape)} / {tuple(data_fake['trn'].shape)}"
         )
 
         def create_dataloader(x, shuffle):
@@ -117,7 +117,7 @@ class MLPClassifier:
     def init_dataloaders(self, data_true, data_fake):
         # data_true and data_fake have shape (nevents, ncomponents)
         LOGGER.info(
-            f"Classifier true/fake data has shape {data_true.shape}/{data_fake.shape}"
+            f"Classifier true/fake data has shape {tuple(data_true.shape)}/{(data_fake.shape)}"
         )
 
         # train/val split
