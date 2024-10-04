@@ -400,14 +400,22 @@ class EventGenerationExperiment(BaseExperiment):
             "model_label": self.modelname,
         }
 
+        if self.cfg.train:
+            filename = os.path.join(path, "loss.pdf")
+            plotter.plot_losses(filename=filename, **kwargs)
+
+        if not self.cfg.evaluate:
+            return
+
         # set correct masses
-        for label in ["trn", "tst", "gen"]:
-            for ijet in range(len(self.cfg.data.n_jets)):
-                self.data_raw[ijet][label] = ensure_onshell(
-                    self.data_raw[ijet][label],
-                    self.onshell_list,
-                    self.onshell_mass,
-                )
+        if self.cfg.evaluation.sample:
+            for label in ["trn", "tst", "gen"]:
+                for ijet in range(len(self.cfg.data.n_jets)):
+                    self.data_raw[ijet][label] = ensure_onshell(
+                        self.data_raw[ijet][label],
+                        self.onshell_list,
+                        self.onshell_mass,
+                    )
 
         # If specified, collect weights from classifier
         if self.cfg.evaluation.classifier and self.cfg.plotting.reweighted:
@@ -429,55 +437,52 @@ class EventGenerationExperiment(BaseExperiment):
         else:
             mask_dict = {ijet: None for ijet, n_jets in enumerate(self.cfg.data.n_jets)}
 
-        if self.cfg.train:
-            filename = os.path.join(path, "loss.pdf")
-            plotter.plot_losses(filename=filename, **kwargs)
-
-        if self.cfg.plotting.log_prob and len(self.cfg.evaluation.eval_log_prob) > 0:
+        if (
+            self.cfg.plotting.log_prob
+            and len(self.cfg.evaluation.eval_log_prob) > 0
+            and self.cfg.evaluate
+        ):
             filename = os.path.join(path, "neg_log_prob.pdf")
             plotter.plot_log_prob(filename=filename, **kwargs)
 
-        if self.cfg.evaluation.classifier:
+        if self.cfg.evaluation.classifier and self.cfg.evaluate:
             filename = os.path.join(path, "classifier.pdf")
             plotter.plot_classifier(filename=filename, **kwargs)
 
-        if self.cfg.plotting.fourmomenta and self.cfg.evaluation.sample:
-            filename = os.path.join(path, "fourmomenta.pdf")
-            plotter.plot_fourmomenta(
-                filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
-            )
+        if self.cfg.evaluation.sample:
+            if self.cfg.plotting.fourmomenta:
+                filename = os.path.join(path, "fourmomenta.pdf")
+                plotter.plot_fourmomenta(
+                    filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
+                )
 
-        if self.cfg.plotting.jetmomenta and self.cfg.evaluation.sample:
-            filename = os.path.join(path, "jetmomenta.pdf")
-            plotter.plot_jetmomenta(
-                filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
-            )
+            if self.cfg.plotting.jetmomenta:
+                filename = os.path.join(path, "jetmomenta.pdf")
+                plotter.plot_jetmomenta(
+                    filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
+                )
 
-        if self.cfg.plotting.preprocessed and self.cfg.evaluation.sample:
-            filename = os.path.join(path, "preprocessed.pdf")
-            plotter.plot_preprocessed(
-                filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
-            )
+            if self.cfg.plotting.preprocessed:
+                filename = os.path.join(path, "preprocessed.pdf")
+                plotter.plot_preprocessed(
+                    filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
+                )
 
-        if (
-            self.cfg.plotting.virtual
-            and len(self.virtual_components) > 0
-            and self.cfg.evaluation.sample
-        ):
-            filename = os.path.join(path, "virtual.pdf")
-            plotter.plot_virtual(
-                filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
-            )
+            if self.cfg.plotting.virtual and len(self.virtual_components) > 0:
+                filename = os.path.join(path, "virtual.pdf")
+                plotter.plot_virtual(
+                    filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
+                )
 
-        if self.cfg.plotting.delta and self.cfg.evaluation.sample:
-            filename = os.path.join(path, "delta.pdf")
-            plotter.plot_delta(
-                filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
-            )
+            if self.cfg.plotting.delta:
+                filename = os.path.join(path, "delta.pdf")
+                plotter.plot_delta(
+                    filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
+                )
 
-        if self.cfg.plotting.deta_dphi and self.cfg.evaluation.sample:
-            filename = os.path.join(path, "deta_dphi.pdf")
-            plotter.plot_deta_dphi(filename=filename, **kwargs)
+            if self.cfg.plotting.deta_dphi:
+                filename = os.path.join(path, "deta_dphi.pdf")
+                plotter.plot_deta_dphi(filename=filename, **kwargs)
 
     def _init_loss(self):
         # loss defined manually within the model
