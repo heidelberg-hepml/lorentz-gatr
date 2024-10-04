@@ -43,24 +43,16 @@ class MFM(StandardLogPtPhiEtaLogM2):
     @torch.enable_grad()
     def get_trajectory(self, x_base, x_target, t):
         t.requires_grad_()
-        phi = self._get_displacement(x_base, x_target, t)
+        # TODO: understand this line better
+        # (how are gradients constructed, why not torch.func.jvp etc)
+        phi, dphi_dt = torch.autograd.functional.jvp(
+            lambda t: self._get_displacement(x_base, x_target, t),
+            t,
+            torch.ones_like(t),
+            create_graph=True,
+            strict=True,
+        )
         xt = x_base + t * (x_target - x_base) + t * (1 - t) * phi
-
-        dphi_dt = []
-        for i in range(xt.shape[-2]):
-            dphi_dt0 = []
-            for j in range(xt.shape[-1]):
-                grad_outputs = torch.ones_like(t)
-                dphi_dt1 = torch.autograd.grad(
-                    phi[..., [i], :][..., [j]],
-                    t,
-                    grad_outputs=grad_outputs,
-                    create_graph=True,
-                )[0]
-                dphi_dt0.append(dphi_dt1)
-            dphi_dt0 = torch.cat(dphi_dt0, dim=-1)
-            dphi_dt.append(dphi_dt0)
-        dphi_dt = torch.cat(dphi_dt, dim=-2)
         vt = x_target - x_base + t * (1 - t) * dphi_dt + (1 - 2 * t) * phi
         return xt, vt
 
