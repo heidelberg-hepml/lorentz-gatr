@@ -26,12 +26,14 @@ class MFM(StandardLogPtPhiEtaLogM2):
         raise NotImplementedError
 
     def get_trajectory(self, *args, **kwargs):
+        # phi-periodic trajectories not implemented yet
+        # (they lead to unstable trainings for some reason)
         return BaseCoordinates.get_trajectory(self, *args, **kwargs)
 
     @torch.enable_grad()
     def _get_trajectory(self, x_target, x_base, t):
         t.requires_grad_()
-        # TODO: understand this line better
+        # TODO: understand torch.autograd.functional.jvp better
         # (how are gradients constructed, why not torch.func.jvp etc)
         phi, dphi_dt = torch.autograd.functional.jvp(
             lambda t: self.dnet(x_target, x_base, t),
@@ -44,8 +46,29 @@ class MFM(StandardLogPtPhiEtaLogM2):
         vt = x_base - x_target + t * (1 - t) * dphi_dt + (1 - 2 * t) * phi
         return xt, vt
 
+    def initialize(
+        self,
+        base,
+        target,
+        dnet_cfg,
+        model_path=None,
+        plot_path=None,
+        device=None,
+        dtype=None,
+    ):
+        n_features = base.flatten(start_dim=-2).shape[-1]
+        self._initialize_model(dnet_cfg, n_features, device, dtype)
+        if self.cfm.mfm.warmstart_path is None:
+            self._initialize_train(base, target, plot_path, model_path, device, dtype)
+
+        # trajectories plots
+        if plot_path is not None:
+            if self.cfm.mfm.startup.plot_trajectories:
+                filename = os.path.join(plot_path, "dnet_trajectories.pdf")
+                with PdfPages(filename) as file:
+                    self._plot_trajectories(file, base, target, device, dtype)
+
     def _initialize_model(self, dnet_cfg, n_features, device, dtype):
-        # initialize dnet
         self.dnet = instantiate(
             dnet_cfg,
             n_features=n_features,
@@ -60,7 +83,7 @@ class MFM(StandardLogPtPhiEtaLogM2):
             f"Instantiated dnet {type(self.dnet).__name__} with {num_parameters} learnable parameters."
         )
 
-        # load network
+        # load weights if warmstart is provided
         if self.cfm.mfm.warmstart_path is not None:
             model_path = os.path.join(self.cfm.mfm.warmstart_path, "dnet.pt")
             state_dict = torch.load(model_path, map_location=device)
@@ -140,32 +163,10 @@ class MFM(StandardLogPtPhiEtaLogM2):
                 with PdfPages(filename) as file:
                     self._plot_training(file, metrics)
 
-    def initialize(
-        self,
-        base,
-        target,
-        dnet_cfg,
-        model_path=None,
-        plot_path=None,
-        device=None,
-        dtype=None,
-    ):
-        n_features = base.flatten(start_dim=-2).shape[-1]
-        self._initialize_model(dnet_cfg, n_features, device, dtype)
-        if self.cfm.mfm.warmstart_path is None:
-            self._initialize_train(base, target, plot_path, model_path, device, dtype)
-
-        # trajectories plots
-        if plot_path is not None:
-            if self.cfm.mfm.startup.plot_trajectories:
-                filename = os.path.join(plot_path, "dnet_trajectories.pdf")
-                with PdfPages(filename) as file:
-                    self._plot_trajectories(file, base, target, device, dtype)
-
     def _step(self, x_base, x_target, metrics, optimizer):
         t = torch.rand(x_base.shape[0], 1, 1, device=x_base.device, dtype=x_base.dtype)
         xt, vt = self.get_trajectory(x_target, x_base, t)
-        loss, metrics_phi = self.get_loss(xt, vt)
+        loss, metrics_phi = self._get_loss(xt, vt)
         optimizer.zero_grad()
         loss.backward()
         grad_norm = (
@@ -186,7 +187,7 @@ class MFM(StandardLogPtPhiEtaLogM2):
         xt, vt = self.get_trajectory(
             x_target, x_base, t, inner_trajectory_func=inner_trajectory_func
         )
-        loss_phi0, metrics_phi0 = self.get_loss(xt, vt)
+        loss_phi0, metrics_phi0 = self._get_loss(xt, vt)
 
         metrics["full"].append(loss.item())
         metrics["full_phi0"].append(loss_phi0.item())
@@ -301,7 +302,7 @@ class MassMFM(MFM):
             np.array([1, 2, 3, 4])
         ]
 
-    def get_loss(self, x, v):
+    def _get_loss(self, x, v):
         naive_term = (v**2).sum(dim=[-1, -2]).mean()
 
         x.requires_grad_()  # required for phi=0 trajectories
@@ -345,5 +346,5 @@ class LANDMFM(MFM):
     def get_metric(self, y1, y2, x):
         raise NotImplementedError
 
-    def get_loss(self, x, v):
+    def _get_loss(self, x, v):
         raise NotImplementedError

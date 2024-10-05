@@ -29,8 +29,8 @@ cfm:
  coordinates_network: Fourmomenta
  transforms_float64: true
  mfm:
-  alpha_W: 2.
   alpha_top: 2.
+  alpha_W: ${cfm.mfm.alpha_top}
   seed_base: 42
   use_logmass: true
   warmstart_path: null
