@@ -20,7 +20,7 @@ class DisplacementNet(nn.Module):
             nn.Linear(embed_t_dim, embed_t_dim),
         )
 
-    def embed_everything(self, x_base, x_target, t):
+    def embed(self, x_base, x_target, t):
         t_emb = self.t_embedding(t[..., 0])
         x_base_emb = x_base.flatten(start_dim=-2)
         x_target_emb = x_target.flatten(start_dim=-2)
@@ -40,6 +40,8 @@ class DisplacementMLP(DisplacementNet):
         embed_t_scale,
     ):
         super().__init__(embed_t_dim, embed_t_scale)
+        # inputs: x_base (n_features), x_target (n_features), t (embed_t_dim)
+        # outputs: phi (n_features)
         self.net = MLP(
             in_shape=2 * n_features + embed_t_dim,
             out_shape=n_features,
@@ -48,7 +50,7 @@ class DisplacementMLP(DisplacementNet):
         )
 
     def forward(self, x_base, x_target, t):
-        x_base_emb, x_target_emb, t_emb = self.embed_everything(x_base, x_target, t)
+        x_base_emb, x_target_emb, t_emb = self.embed(x_base, x_target, t)
         embedding = torch.cat(
             (x_base_emb, x_target_emb, t_emb),
             dim=-1,
@@ -68,6 +70,8 @@ class DisplacementTransformer(DisplacementNet):
         embed_t_scale,
     ):
         super().__init__(embed_t_dim, embed_t_scale)
+        # inputs per channel: x_base (1), x_target (1), t (embed_t_dim), idx (n_features)
+        # outputs per channel: phi (1)
         self.net = Transformer(
             in_channels=2 + embed_t_dim + n_features,
             out_channels=1,
@@ -77,7 +81,7 @@ class DisplacementTransformer(DisplacementNet):
         )
 
     def forward(self, x_base, x_target, t):
-        x_base_emb, x_target_emb, t_emb = self.embed_everything(x_base, x_target, t)
+        x_base_emb, x_target_emb, t_emb = self.embed(x_base, x_target, t)
         x_base_emb, x_target_emb = x_base_emb.unsqueeze(-1), x_target_emb.unsqueeze(-1)
         t_emb = torch.repeat_interleave(
             t_emb.unsqueeze(-2), x_base_emb.shape[-2], dim=-2
@@ -89,6 +93,5 @@ class DisplacementTransformer(DisplacementNet):
         idx_emb = idx_emb.repeat(list(x_base_emb.shape[:-2]) + [1, 1])
         embedding = torch.cat((x_base_emb, x_target_emb, t_emb, idx_emb), dim=-1)
 
-        phi = self.net(embedding)
-        phi = phi.reshape_as(x_base)
+        phi = self.net(embedding).reshape_as(x_base)
         return phi
