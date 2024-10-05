@@ -32,19 +32,19 @@ class MFM(StandardLogPtPhiEtaLogM2):
         raise NotImplementedError
 
     @torch.enable_grad()
-    def _get_trajectory(self, x_base, x_target, t):
+    def _get_trajectory(self, x_target, x_base, t):
         t.requires_grad_()
         # TODO: understand this line better
         # (how are gradients constructed, why not torch.func.jvp etc)
         phi, dphi_dt = torch.autograd.functional.jvp(
-            lambda t: self.dnet(x_base, x_target, t),
+            lambda t: self.dnet(x_target, x_base, t),
             t,
             torch.ones_like(t),
             create_graph=True,
             strict=True,
         )
-        xt = x_base + t * (x_target - x_base) + t * (1 - t) * phi
-        vt = x_target - x_base + t * (1 - t) * dphi_dt + (1 - 2 * t) * phi
+        xt = x_target + t * (x_base - x_target) + t * (1 - t) * phi
+        vt = x_base - x_target + t * (1 - t) * dphi_dt + (1 - 2 * t) * phi
         return xt, vt
 
     def initialize(
@@ -132,7 +132,7 @@ class MFM(StandardLogPtPhiEtaLogM2):
 
     def _step(self, x_base, x_target, metrics, optimizer):
         t = torch.rand(x_base.shape[0], 1, 1, device=x_base.device, dtype=x_base.dtype)
-        xt, vt = self.get_trajectory(x_base, x_target, t)
+        xt, vt = self.get_trajectory(x_target, x_base, t)
         loss, metrics_phi = self.get_loss(xt, vt)
         optimizer.zero_grad()
         loss.backward()
@@ -152,7 +152,7 @@ class MFM(StandardLogPtPhiEtaLogM2):
             self, *args
         )
         xt, vt = self.get_trajectory(
-            x_base, x_target, t, inner_trajectory_func=inner_trajectory_func
+            x_target, x_base, t, inner_trajectory_func=inner_trajectory_func
         )
         loss_phi0, metrics_phi0 = self.get_loss(xt, vt)
 
@@ -204,13 +204,13 @@ class MFM(StandardLogPtPhiEtaLogM2):
         )
         x_base = base[None, :nsamples].repeat(nt, 1, 1, 1).to(device, dtype)
         x_target = target[None, :nsamples].repeat(nt, 1, 1, 1).to(device, dtype)
-        xt = self.get_trajectory(x_base, x_target, t)[0].detach().cpu()
+        xt = self.get_trajectory(x_target, x_base, t)[0].detach().cpu()
         inner_trajectory_func = lambda *args: StandardLogPtPhiEtaLogM2._get_trajectory(
             self, *args
         )
         xt_straight = (
             self.get_trajectory(
-                x_base, x_target, t, inner_trajectory_func=inner_trajectory_func
+                x_target, x_base, t, inner_trajectory_func=inner_trajectory_func
             )[0]
             .detach()
             .cpu()
