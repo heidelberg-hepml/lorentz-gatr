@@ -224,8 +224,8 @@ class MFM(StandardLogPtPhiEtaLogM2):
                     xt[:, :, i, j],
                     xt_straight[:, :, i, j],
                     t[:, :, 0, 0],
-                    xlabel=r"$t$",
-                    ylabel=r"$x(t)$",
+                    xlabel=r"$t$ ($t=0$: target, $t=1$: base)",
+                    ylabel=r"$x_{%s}(t)$" % str(4 * i + j),
                 )
 
         xt_fourmomenta = self.x_to_fourmomenta(xt)
@@ -240,8 +240,8 @@ class MFM(StandardLogPtPhiEtaLogM2):
                 mass,
                 mass_straight,
                 t[:, :, 0, 0],
-                xlabel=r"$t$",
-                ylabel=r"$m(t)$",
+                xlabel=r"$t$ ($t=0$: target, $t=1$: base)",
+                ylabel=r"$m_{\mathrm{{%s}}}(t)$" % particles,
                 nmax=nsamples,
             )
 
