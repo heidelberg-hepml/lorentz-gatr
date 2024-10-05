@@ -80,3 +80,4 @@ defaults:
 - model: gatr_eventgen
 - classifier: classifier
 - default
+- dnet: mlp

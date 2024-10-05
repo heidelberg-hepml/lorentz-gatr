@@ -4,6 +4,7 @@ import os
 import time
 import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
+from hydra.utils import instantiate
 
 from experiments.eventgen.coordinates import StandardLogPtPhiEtaLogM2
 from experiments.eventgen.cfm import GaussianFourierProjection
@@ -11,6 +12,7 @@ from experiments.baselines.mlp import MLP
 from experiments.base_plots import plot_loss, plot_metric
 from experiments.eventgen.plots import plot_trajectories_2d, plot_trajectories_over_time
 from experiments.logger import LOGGER
+from experiments.eventgen.dnet import DisplacementMLP
 
 
 class MFM(StandardLogPtPhiEtaLogM2):
@@ -29,24 +31,13 @@ class MFM(StandardLogPtPhiEtaLogM2):
     def get_metric(self, x1, x2):
         raise NotImplementedError
 
-    def _get_displacement(self, x_base, x_target, t):
-        t_emb = self.t_embedding(t[..., 0])
-        x_base_emb = x_base.flatten(start_dim=-2)
-        x_target_emb = x_target.flatten(start_dim=-2)
-        embedding = torch.cat(
-            (x_base_emb, x_target_emb, t_emb),
-            dim=-1,
-        )
-        phi = self.dnet(embedding).reshape_as(x_base)
-        return phi
-
     @torch.enable_grad()
     def _get_trajectory(self, x_base, x_target, t):
         t.requires_grad_()
         # TODO: understand this line better
         # (how are gradients constructed, why not torch.func.jvp etc)
         phi, dphi_dt = torch.autograd.functional.jvp(
-            lambda t: self._get_displacement(x_base, x_target, t),
+            lambda t: self.dnet(x_base, x_target, t),
             t,
             torch.ones_like(t),
             create_graph=True,
@@ -56,31 +47,24 @@ class MFM(StandardLogPtPhiEtaLogM2):
         vt = x_target - x_base + t * (1 - t) * dphi_dt + (1 - 2 * t) * phi
         return xt, vt
 
-    def _init_dnet(self, n_features, device, dtype):
-        self.t_embedding = nn.Sequential(
-            GaussianFourierProjection(
-                embed_dim=self.cfm.embed_t_dim,
-                scale=self.cfm.embed_t_scale,
-            ),
-            nn.Linear(self.cfm.embed_t_dim, self.cfm.embed_t_dim),
-        ).to(device, dtype)
-        self.dnet = MLP(
-            in_shape=2 * n_features + self.cfm.embed_t_dim,
-            out_shape=n_features,
-            hidden_channels=self.cfm.mfm.dnet.hidden_channels,
-            hidden_layers=self.cfm.mfm.dnet.hidden_layers,
-        ).to(device, dtype)
+    def initialize(
+        self, base, target, dnet_cfg, plot_path=None, device=None, dtype=None
+    ):
+        # initialize dnet
+        n_features = base.flatten(start_dim=-2).shape[-1]
+        self.dnet = instantiate(
+            dnet_cfg,
+            n_features=n_features,
+            embed_t_dim=self.cfm.embed_t_dim,
+            embed_t_scale=self.cfm.embed_t_scale,
+        )
+        self.dnet = self.dnet.to(device, dtype)
         num_parameters = sum(
             p.numel() for p in self.dnet.parameters() if p.requires_grad
         )
         LOGGER.info(
-            f"Instantiated dnet net with {num_parameters} learnable parameters."
+            f"Instantiated dnet {type(self.dnet).__name__} with {num_parameters} learnable parameters."
         )
-
-    def initialize(self, base, target, plot_path=None, device=None, dtype=None):
-        # initialize dnet
-        n_features = base.flatten(start_dim=-2).shape[-1]
-        self._init_dnet(n_features, device, dtype)
 
         # train dnet
         LOGGER.info(

@@ -1,0 +1,3 @@
+_target_: experiments.eventgen.dnet.DisplacementMLP
+hidden_channels: 128
+hidden_layers: 4

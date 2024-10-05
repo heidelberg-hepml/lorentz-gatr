@@ -148,7 +148,11 @@ class EventGenerationExperiment(BaseExperiment):
             else None
         )
         self.model.init_anything(
-            fit_data, plot_path=plot_path, device=self.device, dtype=self.dtype
+            fit_data,
+            plot_path=plot_path,
+            dnet_cfg=self.cfg.dnet,
+            device=self.device,
+            dtype=self.dtype,
         )
 
     def _init_dataloader(self):
