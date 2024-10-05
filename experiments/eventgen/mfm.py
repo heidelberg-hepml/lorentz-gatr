@@ -41,7 +41,7 @@ class MFM(StandardLogPtPhiEtaLogM2):
         return phi
 
     @torch.enable_grad()
-    def get_trajectory(self, x_base, x_target, t):
+    def _get_trajectory(self, x_base, x_target, t):
         t.requires_grad_()
         # TODO: understand this line better
         # (how are gradients constructed, why not torch.func.jvp etc)
@@ -164,7 +164,12 @@ class MFM(StandardLogPtPhiEtaLogM2):
         optimizer.step()
 
         # evaluate loss also for straight trajectories (phi=0)
-        xt, vt = StandardLogPtPhiEtaLogM2.get_trajectory(self, x_base, x_target, t)
+        inner_trajectory_func = lambda *args: StandardLogPtPhiEtaLogM2._get_trajectory(
+            self, *args
+        )
+        xt, vt = self.get_trajectory(
+            x_base, x_target, t, inner_trajectory_func=inner_trajectory_func
+        )
         loss_phi0, metrics_phi0 = self.get_loss(xt, vt)
 
         metrics["full"].append(loss.item())
@@ -216,8 +221,13 @@ class MFM(StandardLogPtPhiEtaLogM2):
         x_base = base[None, :nsamples].repeat(nt, 1, 1, 1).to(device, dtype)
         x_target = target[None, :nsamples].repeat(nt, 1, 1, 1).to(device, dtype)
         xt = self.get_trajectory(x_base, x_target, t)[0].detach().cpu()
+        inner_trajectory_func = lambda *args: StandardLogPtPhiEtaLogM2._get_trajectory(
+            self, *args
+        )
         xt_straight = (
-            StandardLogPtPhiEtaLogM2.get_trajectory(self, x_base, x_target, t)[0]
+            self.get_trajectory(
+                x_base, x_target, t, inner_trajectory_func=inner_trajectory_func
+            )[0]
             .detach()
             .cpu()
         )
@@ -295,6 +305,8 @@ class MassMFM(MFM):
 
     def get_loss(self, x, v):
         naive_term = (v**2).sum(dim=[-1, -2]).mean()
+
+        x.requires_grad_()  # required for phi=0 trajectories
 
         mass_term = []
         x_fourmomenta = self.x_to_fourmomenta(x)
