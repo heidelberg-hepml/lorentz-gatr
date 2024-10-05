@@ -6,13 +6,10 @@ import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 from hydra.utils import instantiate
 
-from experiments.eventgen.coordinates import StandardLogPtPhiEtaLogM2
-from experiments.eventgen.cfm import GaussianFourierProjection
-from experiments.baselines.mlp import MLP
+from experiments.eventgen.coordinates import StandardLogPtPhiEtaLogM2, BaseCoordinates
 from experiments.base_plots import plot_loss, plot_metric
-from experiments.eventgen.plots import plot_trajectories_2d, plot_trajectories_over_time
+from experiments.eventgen.plots import plot_trajectories_over_time
 from experiments.logger import LOGGER
-from experiments.eventgen.dnet import DisplacementMLP
 
 
 class MFM(StandardLogPtPhiEtaLogM2):
@@ -30,6 +27,9 @@ class MFM(StandardLogPtPhiEtaLogM2):
 
     def get_metric(self, x1, x2):
         raise NotImplementedError
+
+    def get_trajectory(self, *args, **kwargs):
+        return BaseCoordinates.get_trajectory(self, *args, **kwargs)
 
     @torch.enable_grad()
     def _get_trajectory(self, x_target, x_base, t):
