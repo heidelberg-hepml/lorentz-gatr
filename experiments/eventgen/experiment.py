@@ -147,8 +147,10 @@ class EventGenerationExperiment(BaseExperiment):
             if self.cfg.save and self.cfg.plot
             else None
         )
+        model_path = os.path.join(self.cfg.run_dir, "models") if self.cfg.save else None
         self.model.init_anything(
             fit_data,
+            model_path=model_path,
             plot_path=plot_path,
             dnet_cfg=self.cfg.dnet,
             device=self.device,

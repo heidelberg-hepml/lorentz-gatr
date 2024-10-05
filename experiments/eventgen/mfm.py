@@ -47,11 +47,8 @@ class MFM(StandardLogPtPhiEtaLogM2):
         vt = x_base - x_target + t * (1 - t) * dphi_dt + (1 - 2 * t) * phi
         return xt, vt
 
-    def initialize(
-        self, base, target, dnet_cfg, plot_path=None, device=None, dtype=None
-    ):
+    def _initialize_model(self, dnet_cfg, n_features, device, dtype):
         # initialize dnet
-        n_features = base.flatten(start_dim=-2).shape[-1]
         self.dnet = instantiate(
             dnet_cfg,
             n_features=n_features,
@@ -66,10 +63,19 @@ class MFM(StandardLogPtPhiEtaLogM2):
             f"Instantiated dnet {type(self.dnet).__name__} with {num_parameters} learnable parameters."
         )
 
-        # train dnet
+        # load network
+        if self.cfm.mfm.warmstart_path is not None:
+            model_path = os.path.join(self.cfm.mfm.warmstart_path, "dnet.pt")
+            state_dict = torch.load(model_path, map_location=device)
+            self.dnet.load_state_dict(state_dict)
+            LOGGER.info(f"Loaded dnet from {self.cfm.mfm.warmstart_path}")
+
+    def _initialize_train(self, base, target, plot_path, model_path, device, dtype):
         LOGGER.info(
             f"Using base/target datasets of shape {tuple(base.shape)}/{tuple(target.shape)}."
         )
+
+        # dataset and loader
         dataset = torch.utils.data.TensorDataset
         loader = lambda dataset: torch.utils.data.DataLoader(
             dataset, batch_size=self.cfm.mfm.startup.batchsize, shuffle=True
@@ -82,6 +88,8 @@ class MFM(StandardLogPtPhiEtaLogM2):
 
         constructor = lambda tensor: iter(cycle(loader(dataset(tensor))))
         iter_base, iter_target = constructor(base), constructor(target)
+
+        # training preparations
         optimizer = torch.optim.Adam(self.dnet.parameters(), lr=self.cfm.mfm.startup.lr)
         metrics = {
             "full": [],
@@ -92,9 +100,11 @@ class MFM(StandardLogPtPhiEtaLogM2):
         self._extend_metrics(metrics)
         kwargs = {"optimizer": optimizer, "metrics": metrics}
         loss_min, patience = float("inf"), 0
+
+        # train loop
         t0 = time.time()
         LOGGER.info(
-            f"Starting to train dnet net for {self.cfm.mfm.startup.iterations} iterations "
+            f"Starting to train dnet for {self.cfm.mfm.startup.iterations} iterations "
             f"(batchsize={self.cfm.mfm.startup.batchsize}, lr={self.cfm.mfm.startup.lr}, "
             f"patience={self.cfm.mfm.startup.patience})"
         )
@@ -117,7 +127,14 @@ class MFM(StandardLogPtPhiEtaLogM2):
         mean_loss = np.mean(metrics["full"][-patience:])
         LOGGER.info(f"Mean dnet loss: {mean_loss:.2f}")
 
-        # create plots
+        # save network
+        if model_path is not None:
+            os.makedirs(model_path, exist_ok=True)
+            model_path = os.path.join(model_path, "dnet.pt")
+            torch.save(self.dnet.state_dict(), model_path)
+            LOGGER.info(f"Saved dnet to {model_path}")
+
+        # training plots
         if plot_path is not None:
             os.makedirs(plot_path, exist_ok=True)
             LOGGER.info(f"Starting to create dnet plots in {plot_path}.")
@@ -125,6 +142,24 @@ class MFM(StandardLogPtPhiEtaLogM2):
                 filename = os.path.join(plot_path, "dnet_training.pdf")
                 with PdfPages(filename) as file:
                     self._plot_training(file, metrics)
+
+    def initialize(
+        self,
+        base,
+        target,
+        dnet_cfg,
+        model_path=None,
+        plot_path=None,
+        device=None,
+        dtype=None,
+    ):
+        n_features = base.flatten(start_dim=-2).shape[-1]
+        self._initialize_model(dnet_cfg, n_features, device, dtype)
+        if self.cfm.mfm.warmstart_path is None:
+            self._initialize_train(base, target, plot_path, model_path, device, dtype)
+
+        # trajectories plots
+        if plot_path is not None:
             if self.cfm.mfm.startup.plot_trajectories:
                 filename = os.path.join(plot_path, "dnet_trajectories.pdf")
                 with PdfPages(filename) as file:
