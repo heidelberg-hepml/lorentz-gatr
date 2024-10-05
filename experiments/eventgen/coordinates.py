@@ -49,9 +49,10 @@ class BaseCoordinates:
     def init_unit(self, particles_list):
         self.transforms[-1].init_unit(particles_list)
 
-    def get_metric(self, x1, x2):
+    def get_metric(self, y1, y2, x):
+        # y1 and y2 are vectors (not necessarily positions), and x is the position
         # default: euclidean metric
-        se = (x1 - x2) ** 2 / 2
+        se = (y1 - y2) ** 2 / 2
         return se.sum(dim=[-1, -2])
 
     def get_trajectory(self, x_target, x_base, t, inner_trajectory_func=None):

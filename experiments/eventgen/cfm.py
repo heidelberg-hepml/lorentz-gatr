@@ -163,7 +163,9 @@ class CFM(nn.Module):
         vp_straight = self.get_velocity_straight(xt_network, t, ijet=ijet)[0]
 
         # evaluate conditional flow matching objective
-        distance = self.coordinates_straight.get_metric(vp_straight, vt_straight).mean()
+        distance = self.coordinates_straight.get_metric(
+            vp_straight, vt_straight, xt_straight
+        ).mean()
         distance_particlewise = [
             ((vp_straight - vt_straight) ** 2)[:, i].mean() for i in range(4)
         ]

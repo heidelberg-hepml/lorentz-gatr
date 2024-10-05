@@ -25,9 +25,6 @@ class MFM(StandardLogPtPhiEtaLogM2):
     def get_loss(self, metrics):
         raise NotImplementedError
 
-    def get_metric(self, x1, x2):
-        raise NotImplementedError
-
     def get_trajectory(self, *args, **kwargs):
         return BaseCoordinates.get_trajectory(self, *args, **kwargs)
 
@@ -304,30 +301,6 @@ class MassMFM(MFM):
             np.array([1, 2, 3, 4])
         ]
 
-    def get_metric(self, x1, x2):
-        naive_term = 0.5 * ((x1 - x2) ** 2).sum(dim=[-1, -2])
-
-        x1_fourmomenta = self.x_to_fourmomenta(x1)
-        x2_fourmomenta = self.x_to_fourmomenta(x2)
-        mass_term = []
-        for particle in self.virtual_components_mfm:
-            x1_particle = x1_fourmomenta[..., particle, :].sum(dim=-2)
-            x2_particle = x2_fourmomenta[..., particle, :].sum(dim=-2)
-            m1 = self._get_mass(x1_particle)
-            m2 = self._get_mass(x2_particle)
-            mass_term0 = 0.5 * ((m1 - m2) ** 2)
-            mass_term.append(mass_term0)
-        mass = torch.stack(mass_term, dim=-1)
-        mass_top = mass[..., [0, 1]].sum(dim=-1)
-        mass_W = mass[..., [2, 3]].sum(dim=-1)
-
-        metric = (
-            naive_term
-            + self.cfm.mfm.alpha_top * mass_top
-            + self.cfm.mfm.alpha_W * mass_W
-        )
-        return metric
-
     def get_loss(self, x, v):
         naive_term = (v**2).sum(dim=[-1, -2]).mean()
 
@@ -369,7 +342,7 @@ class MassMFM(MFM):
 
 
 class LANDMFM(MFM):
-    def get_metric(self, x1, x2):
+    def get_metric(self, y1, y2, x):
         raise NotImplementedError
 
     def get_loss(self, x, v):
