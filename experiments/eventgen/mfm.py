@@ -357,6 +357,16 @@ class MassMFM(MFM):
             metrics[key] = []
             metrics[f"{key}_phi0"] = []
 
+    def _plot_training(self, file, metrics):
+        super()._plot_training(file, metrics)
+        for key in ["naive", "mass_top", "mass_W"]:
+            plot_loss(
+                file,
+                [metrics[key], metrics[f"{key}_phi0"]],
+                labels=[key, f"{key} with phi=0"],
+                logy=False,
+            )
+
 
 class LANDMFM(MFM):
     def get_metric(self, x1, x2):
