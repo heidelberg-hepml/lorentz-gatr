@@ -266,7 +266,7 @@ class MassMFM(MFM):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.virtual_components_mfm = np.array(self.virtual_components_plot)[
-            self.cfm.mfm.virtual_particles
+            np.array([1, 2, 3, 4])
         ]
 
     def get_metric(self, x1, x2):
@@ -282,9 +282,15 @@ class MassMFM(MFM):
             m2 = self._get_mass(x2_particle)
             mass_term0 = 0.5 * ((m1 - m2) ** 2)
             mass_term.append(mass_term0)
-        mass_term = torch.stack(mass_term, dim=-1).sum(dim=-1)
+        mass = torch.stack(mass_term, dim=-1)
+        mass_top = mass[..., [0, 1]].sum(dim=-1)
+        mass_W = mass[..., [2, 3]].sum(dim=-1)
 
-        metric = naive_term + self.cfm.mfm.alpha * mass_term
+        metric = (
+            naive_term
+            + self.cfm.mfm.alpha_top * mass_top
+            + self.cfm.mfm.alpha_W * mass_W
+        )
         return metric
 
     def get_loss(self, x, v):
@@ -303,15 +309,16 @@ class MassMFM(MFM):
             )[0]
             mass_term0 = (dmass_dx * v).sum(dim=[-1, -2]) ** 2
             mass_term.append(mass_term0)
-        mass_term = torch.stack(mass_term, dim=-1).sum(dim=-1).mean()
-        mass_term *= self.cfm.mfm.alpha
+        mass = torch.stack(mass_term, dim=-1)
+        mass_top = self.cfm.mfm.alpha_top * mass[..., [0, 1]].sum(dim=-1).mean()
+        mass_W = self.cfm.mfm.alpha_W * mass[..., [2, 3]].sum(dim=-1).mean()
 
-        loss = naive_term + mass_term
-        metrics = {"naive": naive_term, "mass": mass_term}
+        loss = naive_term + mass_top + mass_W
+        metrics = {"naive": naive_term, "mass_W": mass_W, "mass_top": mass_top}
         return loss, metrics
 
     def _extend_metrics(self, metrics):
-        for key in ["naive", "mass"]:
+        for key in ["naive", "mass_top", "mass_W"]:
             metrics[key] = []
             metrics[f"{key}_phi0"] = []
 

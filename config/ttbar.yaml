@@ -29,15 +29,15 @@ cfm:
  coordinates_network: Fourmomenta
  transforms_float64: true
  mfm:
-  alpha: 2.
+  alpha_W: 2.
+  alpha_top: 2.
   seed_base: 42
   use_logmass: true
-  virtual_particles: [1,2,3,4]
   startup:
    iterations: 10000
    batchsize: 1024
    lr: 1e-3
-   clip_grad_norm: 1000
+   clip_grad_norm: 5
    plot_training: true
    plot_trajectories: true
    patience: 100
