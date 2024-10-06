@@ -8,7 +8,7 @@ from hydra.utils import instantiate
 
 from experiments.eventgen.coordinates import StandardLogPtPhiEtaLogM2, BaseCoordinates
 from experiments.base_plots import plot_loss, plot_metric
-from experiments.eventgen.plots import plot_trajectories_over_time
+from experiments.eventgen.plots import plot_trajectories_over_time, plot_trajectories_2d
 from experiments.logger import LOGGER
 
 
@@ -276,6 +276,33 @@ class MFM(StandardLogPtPhiEtaLogM2):
                 xlabel=r"$t$ ($t=0$: target, $t=1$: base)",
                 ylabel=r"$m_{\mathrm{{%s}}}(t)$" % particles,
                 nmax=nsamples,
+            )
+
+        for p1, p2 in [[1, 2], [3, 4], [1, 3], [2, 4]]:
+            particles1, particles2 = (
+                self.virtual_components_plot[p1],
+                self.virtual_components_plot[p2],
+            )
+            x_particle1 = xt_fourmomenta[..., particles1, :].sum(dim=-2)
+            x_particle2 = xt_fourmomenta[..., particles2, :].sum(dim=-2)
+            x_straight_particle1 = xt_straight_fourmomenta[..., particles1, :].sum(
+                dim=-2
+            )
+            x_straight_particle2 = xt_straight_fourmomenta[..., particles2, :].sum(
+                dim=-2
+            )
+            mass1 = self._get_mass(x_particle1)
+            mass2 = self._get_mass(x_particle2)
+            mass1_straight = self._get_mass(x_straight_particle1)
+            mass2_straight = self._get_mass(x_straight_particle2)
+            plot_trajectories_2d(
+                file,
+                mass1_straight,
+                mass2_straight,
+                mass1,
+                mass2,
+                xlabel=r"$m_{\mathrm{{%s}}}$" % particles1,
+                ylabel=r"$m_{\mathrm{{%s}}}$" % particles2,
             )
 
     def _get_mass(self, particle):
