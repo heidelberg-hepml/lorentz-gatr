@@ -294,6 +294,9 @@ class MFM(StandardLogPtPhiEtaLogM2):
         ).all(), f"{torch.isnan(prepd).sum()} {torch.isinf(prepd).sum()}"
         return prepd
 
+    def _extend_metrics(self, metrics):
+        pass
+
 
 class MassMFM(MFM):
     def __init__(self, *args, **kwargs):
@@ -343,8 +346,30 @@ class MassMFM(MFM):
 
 
 class LANDMFM(MFM):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.sigma = self.cfm.mfm.land.sigma
+        self.eps = self.cfm.mfm.land.eps
+
+    def _get_diag_entries(self, x):
+        # see (9) in arXiv:2405.14780
+        x_emb = x.flatten(start_dim=-2)
+        x1, x2 = x_emb.unsqueeze(-2), x_emb.unsqueeze(-3)
+        diff2 = (x1 - x2) ** 2
+        exponent = -diff2.sum(dim=-1) / (2 * self.sigma**2)
+        h = diff2 * torch.exp(exponent.unsqueeze(-1))
+        h = h.mean(dim=-3)
+        h = h.reshape_as(x)
+        return h
+
     def get_metric(self, y1, y2, x):
-        raise NotImplementedError
+        diag_entries = self._get_diag_entries(x)
+        metric = (y1 - y2) ** 2 / (diag_entries + self.eps)
+        metric = metric.sum(dim=[-1, -2])
+        return metric
 
     def _get_loss(self, x, v):
-        raise NotImplementedError
+        diag_entries = self._get_diag_entries(x)
+        loss = v**2 / (diag_entries + self.eps)
+        loss = loss.sum(dim=[-1, -2]).mean()
+        return loss, {}
