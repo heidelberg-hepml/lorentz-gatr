@@ -116,11 +116,11 @@ class GPT(nn.Module):
         x0_gaussian = x0_condition[:, 1:]
         x0_gaussian = x0_gaussian[:, reverse_idx]
         x0_gaussian = x0_gaussian.reshape(shape[0], shape[1] // 4, 4)
-        x0_fourmomenta = self.coordinates_sampling.x_to_fourmomenta(x0_gaussian)
+        x0_fourmomenta = self.coordinates_x.x_to_fourmomenta(x0_gaussian)
         return x0_fourmomenta
 
     def _log_prob_gaussian(self, x0_fourmomenta, ijet):
-        x0_gaussian = self.coordinates_sampling.fourmomenta_to_x(x0_fourmomenta)
+        x0_gaussian = self.coordinates_x.fourmomenta_to_x(x0_fourmomenta)
         x0_gaussian = x0_gaussian.reshape(
             x0_gaussian.shape[0], -1
         )  # shape (batchsize, num_components)
@@ -145,7 +145,7 @@ class GPT(nn.Module):
     def log_prob(self, x0_fourmomenta, ijet):
         log_prob_gaussian, x0_gaussian = self._log_prob_gaussian(x0_fourmomenta, ijet)
         log_prob_gaussian = log_prob_gaussian.sum(dim=-1, keepdims=True)
-        logdetjac, _ = self.coordinates_sampling.logdetjac_x_to_fourmomenta(x0_gaussian)
+        logdetjac, _ = self.coordinates_x.logdetjac_x_to_fourmomenta(x0_gaussian)
         log_prob_fourmomenta = log_prob_gaussian + logdetjac
         return log_prob_fourmomenta[:, 0]
 
@@ -180,10 +180,10 @@ class EventGPT(GPT):
         self.distributions = []
 
     def init_coordinates(self):
-        self.coordinates_sampling = StandardLogPtPhiEtaLogM2(
+        self.coordinates_x = StandardLogPtPhiEtaLogM2(
             self.pt_min, self.units, self.onshell_list
         )
-        self.coordinates = [self.coordinates_sampling]
+        self.coordinates = [self.coordinates_x]
 
     def preprocess(self, fourmomenta):
         fourmomenta = fourmomenta / self.units
@@ -192,6 +192,9 @@ class EventGPT(GPT):
     def undo_preprocess(self, fourmomenta):
         fourmomenta = fourmomenta * self.units
         return fourmomenta
+
+    def init_anything(self, *args, **kwargs):
+        pass
 
 
 class JetGPT(EventGPT):

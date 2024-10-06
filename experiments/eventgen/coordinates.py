@@ -49,9 +49,25 @@ class BaseCoordinates:
     def init_unit(self, particles_list):
         self.transforms[-1].init_unit(particles_list)
 
-    def get_trajectory(self, x1, x2, t):
-        v_t = x2 - x1
-        x_t = x1 + t * v_t
+    def get_metric(self, y1, y2, x):
+        # y1 and y2 are vectors (not necessarily positions), and x is the position
+        # default: euclidean metric
+        se = (y1 - y2) ** 2 / 2
+        return se.sum(dim=[-1, -2])
+
+    def get_trajectory(self, x_target, x_base, t, inner_trajectory_func=None):
+        # inner_trajectory_func is an ugly construction
+        # to give control over which inner trajectory function to use
+        # (happy about any suggestions for how to do this better)
+        # (only used in MFM right now)
+        if inner_trajectory_func is None:
+            inner_trajectory_func = self._get_trajectory
+        return inner_trajectory_func(x_target, x_base, t)
+
+    def _get_trajectory(self, x_target, x_base, t):
+        # default: straight trajectories
+        v_t = x_base - x_target
+        x_t = x_target + t * v_t
         return x_t, v_t
 
     def fourmomenta_to_x(self, a_in):
@@ -128,11 +144,10 @@ class PPPM2(BaseCoordinates):
 
 class PhiCoordinates(BaseCoordinates):
     # abstract class for coordinates with phi in component 1
-    def get_trajectory(self, x1, x2, t):
-        v_t = x2 - x1
-        v_t[..., 1] = ensure_angle(v_t[..., 1])
-        x_t = x1 + t * v_t
+    def get_trajectory(self, x_target, x_base, t, inner_trajectory_func=None):
+        x_t, v_t = super().get_trajectory(x_target, x_base, t, inner_trajectory_func)
         x_t[..., 1] = ensure_angle(x_t[..., 1])
+        v_t[..., 1] = ensure_angle(v_t[..., 1])
         return x_t, v_t
 
 

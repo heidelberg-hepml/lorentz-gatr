@@ -1,0 +1,4 @@
+_target_: experiments.eventgen.dnet.DisplacementTransformer
+hidden_channels: 32
+num_blocks: 1
+num_heads: 2
