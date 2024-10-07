@@ -55,17 +55,7 @@ class BaseCoordinates:
         se = (y1 - y2) ** 2 / 2
         return se.sum(dim=[-1, -2])
 
-    def get_trajectory(self, x_target, x_base, t, inner_trajectory_func=None):
-        # inner_trajectory_func is an ugly construction
-        # to give control over which inner trajectory function to use
-        # (happy about any suggestions for how to do this better)
-        # (only used in MFM right now)
-        if inner_trajectory_func is None:
-            inner_trajectory_func = self._get_trajectory
-        return inner_trajectory_func(x_target, x_base, t)
-
-    def _get_trajectory(self, x_target, x_base, t):
-        # default: straight trajectories
+    def get_trajectory(self, x_target, x_base, t):
         v_t = x_base - x_target
         x_t = x_target + t * v_t
         return x_t, v_t
@@ -129,60 +119,77 @@ class BaseCoordinates:
         return logdetjac.to(dtype=a_in.dtype), a.to(dtype=a_in.dtype)
 
 
-class Fourmomenta(BaseCoordinates):
+class PossiblyPeriodicCoordinates(BaseCoordinates):
+    def __init__(self):
+        super().__init__()
+        self.periodic_components = []
+
+    def _possibly_periodic(self, x):
+        x[..., self.periodic_components] = ensure_angle(
+            x[..., self.periodic_components]
+        )
+        return x
+
+    def get_trajectory(self, x_target, x_base, t):
+        v_t = x_base - x_target
+        v_t = self._possibly_periodic(v_t)
+        x_t = x_target + t * v_t
+        x_t = self._possibly_periodic(x_t)
+        return x_t, v_t
+
+
+class Fourmomenta(PossiblyPeriodicCoordinates):
     # (E, px, py, pz)
     # this class effectively does nothing,
     # because fourmomenta are already the baseline representation
     def __init__(self):
+        self.periodic_components = []
         self.transforms = [tr.EmptyTransform()]
 
 
-class PPPM2(BaseCoordinates):
+class PPPM2(PossiblyPeriodicCoordinates):
     def __init__(self):
+        self.periodic_components = []
         self.transforms = [tr.EPPP_to_PPPM2()]
 
 
-class PhiCoordinates(BaseCoordinates):
-    # abstract class for coordinates with phi in component 1
-    def get_trajectory(self, x_target, x_base, t, inner_trajectory_func=None):
-        x_t, v_t = super().get_trajectory(x_target, x_base, t, inner_trajectory_func)
-        x_t[..., 1] = ensure_angle(x_t[..., 1])
-        v_t[..., 1] = ensure_angle(v_t[..., 1])
-        return x_t, v_t
-
-
-class EPhiPtPz(PhiCoordinates):
+class EPhiPtPz(PossiblyPeriodicCoordinates):
     # (E, phi, pt, pz)
     def __init__(self):
+        self.periodic_components = [1]
         self.transforms = [tr.EPPP_to_EPhiPtPz()]
 
 
-class PtPhiEtaE(PhiCoordinates):
+class PtPhiEtaE(PossiblyPeriodicCoordinates):
     # (pt, phi, eta, E)
     def __init__(self):
+        self.periodic_components = [1]
         self.transforms = [tr.EPPP_to_PtPhiEtaE()]
 
 
-class PtPhiEtaM2(PhiCoordinates):
+class PtPhiEtaM2(PossiblyPeriodicCoordinates):
     def __init__(self):
+        self.periodic_components = [1]
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
         ]
 
 
-class PPPLogM2(BaseCoordinates):
+class PPPLogM2(PossiblyPeriodicCoordinates):
     # (px, py, pz, log(m^2))
     def __init__(self):
+        self.periodic_components = []
         self.transforms = [
             tr.EPPP_to_PPPM2(),
             tr.M2_to_LogM2(),
         ]
 
 
-class StandardPPPLogM2(BaseCoordinates):
+class StandardPPPLogM2(PossiblyPeriodicCoordinates):
     # fitted (px, py, pz, log(m^2))
     def __init__(self, onshell_list=[]):
+        self.periodic_components = []
         self.transforms = [
             tr.EPPP_to_PPPM2(),
             tr.M2_to_LogM2(),
@@ -190,15 +197,17 @@ class StandardPPPLogM2(BaseCoordinates):
         ]
 
 
-class LogPtPhiEtaE(PhiCoordinates):
+class LogPtPhiEtaE(PossiblyPeriodicCoordinates):
     # (log(pt), phi, eta, E)
     def __init__(self, pt_min, units):
+        self.periodic_components = [1]
         self.transforms = [tr.EPPP_to_PtPhiEtaE(), tr.Pt_to_LogPt(pt_min, units)]
 
 
-class PtPhiEtaLogM2(PhiCoordinates):
+class PtPhiEtaLogM2(PossiblyPeriodicCoordinates):
     # (pt, phi, eta, log(m^2))
     def __init__(self):
+        self.periodic_components = [1]
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
@@ -206,9 +215,10 @@ class PtPhiEtaLogM2(PhiCoordinates):
         ]
 
 
-class LogPtPhiEtaM2(PhiCoordinates):
+class LogPtPhiEtaM2(PossiblyPeriodicCoordinates):
     # (log(pt), phi, eta, m^2)
     def __init__(self, pt_min, units):
+        self.periodic_components = [1]
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
@@ -216,9 +226,10 @@ class LogPtPhiEtaM2(PhiCoordinates):
         ]
 
 
-class LogPtPhiEtaLogM2(PhiCoordinates):
+class LogPtPhiEtaLogM2(PossiblyPeriodicCoordinates):
     # (log(pt), phi, eta, log(m^2)
     def __init__(self, pt_min, units):
+        self.periodic_components = [1]
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
@@ -227,9 +238,10 @@ class LogPtPhiEtaLogM2(PhiCoordinates):
         ]
 
 
-class StandardLogPtPhiEtaLogM2(PhiCoordinates):
+class StandardLogPtPhiEtaLogM2(PossiblyPeriodicCoordinates):
     # Fitted (log(pt), phi, eta, log(m^2)
     def __init__(self, pt_min, units, onshell_list=[]):
+        self.periodic_components = [1]
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),

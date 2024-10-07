@@ -31,7 +31,7 @@ class MFM(StandardLogPtPhiEtaLogM2):
         return BaseCoordinates.get_trajectory(self, *args, **kwargs)
 
     @torch.enable_grad()
-    def _get_trajectory(self, x_target, x_base, t):
+    def get_trajectory(self, x_target, x_base, t):
         t.requires_grad_()
         # TODO: understand torch.autograd.functional.jvp better
         # (how are gradients constructed, why not torch.func.jvp etc)
@@ -42,9 +42,17 @@ class MFM(StandardLogPtPhiEtaLogM2):
             create_graph=True,
             strict=True,
         )
-        xt = x_target + t * (x_base - x_target) + t * (1 - t) * phi
-        vt = x_base - x_target + t * (1 - t) * dphi_dt + (1 - 2 * t) * phi
-        return xt, vt
+
+        v_t_naive = x_base - x_target
+        v_t_naive = self._possibly_periodic(v_t_naive)
+        phi = self._possibly_periodic(phi)
+        dphi_dt = self._possibly_periodic(dphi_dt)
+
+        x_t = x_target + t * v_t_naive + t * (1 - t) * phi
+        v_t = v_t_naive + t * (1 - t) * dphi_dt + (1 - 2 * t) * phi
+        x_t = self._possibly_periodic(x_t)
+        v_t = self._possibly_periodic(v_t)
+        return x_t, v_t
 
     def initialize(
         self,
@@ -181,11 +189,10 @@ class MFM(StandardLogPtPhiEtaLogM2):
         optimizer.step()
 
         # evaluate loss also for straight trajectories (phi=0)
-        inner_trajectory_func = lambda *args: StandardLogPtPhiEtaLogM2._get_trajectory(
-            self, *args
-        )
         xt, vt = self.get_trajectory(
-            x_target, x_base, t, inner_trajectory_func=inner_trajectory_func
+            x_target,
+            x_base,
+            t,
         )
         loss_phi0, metrics_phi0 = self._get_loss(xt, vt)
 
@@ -238,16 +245,7 @@ class MFM(StandardLogPtPhiEtaLogM2):
         x_base = base[None, :nsamples].repeat(nt, 1, 1, 1).to(device, dtype)
         x_target = target[None, :nsamples].repeat(nt, 1, 1, 1).to(device, dtype)
         xt = self.get_trajectory(x_target, x_base, t)[0].detach().cpu()
-        inner_trajectory_func = lambda *args: StandardLogPtPhiEtaLogM2._get_trajectory(
-            self, *args
-        )
-        xt_straight = (
-            self.get_trajectory(
-                x_target, x_base, t, inner_trajectory_func=inner_trajectory_func
-            )[0]
-            .detach()
-            .cpu()
-        )
+        xt_straight = self.get_trajectory(x_target, x_base, t)[0].detach().cpu()
         t = t.detach().cpu()
 
         for i in range(base.shape[-2]):
@@ -382,7 +380,9 @@ class LANDMFM(MFM):
         # see (9) in arXiv:2405.14780
         x_emb = x.flatten(start_dim=-2)
         x1, x2 = x_emb.unsqueeze(-2), x_emb.unsqueeze(-3)
-        diff2 = (x1 - x2) ** 2
+        diff = x1 - x2
+        diff = self._possibly_periodic(diff)
+        diff2 = diff**2
         exponent = -diff2.sum(dim=-1) / (2 * self.sigma**2)
         h = diff2 * torch.exp(exponent.unsqueeze(-1))
         h = h.mean(dim=-3)
@@ -391,7 +391,9 @@ class LANDMFM(MFM):
 
     def get_metric(self, y1, y2, x):
         diag_entries = self._get_diag_entries(x)
-        metric = (y1 - y2) ** 2 / (diag_entries + self.eps)
+        diff = y1 - y2
+        diff = self._possibly_periodic(diff)
+        metric = diff**2 / (diag_entries + self.eps)
         metric = metric.sum(dim=[-1, -2])
         return metric
 
