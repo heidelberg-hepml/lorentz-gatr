@@ -6,7 +6,7 @@ import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 from hydra.utils import instantiate
 
-from experiments.eventgen.coordinates import StandardLogPtPhiEtaLogM2, BaseCoordinates
+from experiments.eventgen.coordinates import StandardLogPtPhiEtaLogM2
 from experiments.base_plots import plot_loss, plot_metric
 from experiments.eventgen.plots import plot_trajectories_over_time, plot_trajectories_2d
 from experiments.logger import LOGGER
@@ -25,33 +25,36 @@ class MFM(StandardLogPtPhiEtaLogM2):
     def get_loss(self, metrics):
         raise NotImplementedError
 
-    def get_trajectory(self, *args, **kwargs):
-        # phi-periodic trajectories not implemented yet
-        # (they lead to unstable trainings for some reason)
-        return BaseCoordinates.get_trajectory(self, *args, **kwargs)
-
     @torch.enable_grad()
     def get_trajectory(self, x_target, x_base, t):
         t.requires_grad_()
+
+        def get_phi(t):
+            phi = self.dnet(x_target, x_base, t)
+            # phi[..., self.periodic_components] = (
+            #    torch.tanh(phi[..., self.periodic_components]) * torch.pi
+            # )
+            return phi
+
         # TODO: understand torch.autograd.functional.jvp better
         # (how are gradients constructed, why not torch.func.jvp etc)
         phi, dphi_dt = torch.autograd.functional.jvp(
-            lambda t: self.dnet(x_target, x_base, t),
+            get_phi,
             t,
             torch.ones_like(t),
             create_graph=True,
             strict=True,
         )
 
+        # TODO: Understand why I can not enforce periodicity here
         v_t_naive = x_base - x_target
         v_t_naive = self._possibly_periodic(v_t_naive)
-        phi = self._possibly_periodic(phi)
-        dphi_dt = self._possibly_periodic(dphi_dt)
+        # dphi_dt = self._possibly_periodic(dphi_dt)
 
         x_t = x_target + t * v_t_naive + t * (1 - t) * phi
         v_t = v_t_naive + t * (1 - t) * dphi_dt + (1 - 2 * t) * phi
-        x_t = self._possibly_periodic(x_t)
-        v_t = self._possibly_periodic(v_t)
+        # x_t = self._possibly_periodic(x_t)
+        # v_t = self._possibly_periodic(v_t)
         return x_t, v_t
 
     def initialize(
@@ -189,12 +192,13 @@ class MFM(StandardLogPtPhiEtaLogM2):
         optimizer.step()
 
         # evaluate loss also for straight trajectories (phi=0)
-        xt, vt = self.get_trajectory(
+        xt_straight, vt_straight = StandardLogPtPhiEtaLogM2.get_trajectory(
+            self,
             x_target,
             x_base,
             t,
         )
-        loss_phi0, metrics_phi0 = self._get_loss(xt, vt)
+        loss_phi0, metrics_phi0 = self._get_loss(xt_straight, vt_straight)
 
         metrics["full"].append(loss.item())
         metrics["full_phi0"].append(loss_phi0.item())
@@ -245,7 +249,11 @@ class MFM(StandardLogPtPhiEtaLogM2):
         x_base = base[None, :nsamples].repeat(nt, 1, 1, 1).to(device, dtype)
         x_target = target[None, :nsamples].repeat(nt, 1, 1, 1).to(device, dtype)
         xt = self.get_trajectory(x_target, x_base, t)[0].detach().cpu()
-        xt_straight = self.get_trajectory(x_target, x_base, t)[0].detach().cpu()
+        xt_straight = (
+            StandardLogPtPhiEtaLogM2.get_trajectory(self, x_target, x_base, t)[0]
+            .detach()
+            .cpu()
+        )
         t = t.detach().cpu()
 
         for i in range(base.shape[-2]):
@@ -381,7 +389,6 @@ class LANDMFM(MFM):
         x_emb = x.flatten(start_dim=-2)
         x1, x2 = x_emb.unsqueeze(-2), x_emb.unsqueeze(-3)
         diff = x1 - x2
-        diff = self._possibly_periodic(diff)
         diff2 = diff**2
         exponent = -diff2.sum(dim=-1) / (2 * self.sigma**2)
         h = diff2 * torch.exp(exponent.unsqueeze(-1))
@@ -392,7 +399,6 @@ class LANDMFM(MFM):
     def get_metric(self, y1, y2, x):
         diag_entries = self._get_diag_entries(x)
         diff = y1 - y2
-        diff = self._possibly_periodic(diff)
         metric = diff**2 / (diag_entries + self.eps)
         metric = metric.sum(dim=[-1, -2])
         return metric
