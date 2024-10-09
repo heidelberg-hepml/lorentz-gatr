@@ -34,6 +34,7 @@ class TopTaggingFineTuneExperiment(TopTaggingExperiment):
 
             # overwrite model-specific data entries
             # (this is ugly, please improve it)
+            self.cfg.model.mean_aggregation = warmstart_cfg.model.mean_aggregation
             self.cfg.data.beam_reference = warmstart_cfg.data.beam_reference
             self.cfg.data.two_beams = warmstart_cfg.data.two_beams
             self.cfg.data.beam_token = warmstart_cfg.data.beam_token

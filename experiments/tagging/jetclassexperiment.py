@@ -41,9 +41,6 @@ class JetClassTaggingExperiment(TaggingExperiment):
             "ZToQQ",
         ]
         with open_dict(self.cfg):
-            # no need to manually add features
-            self.cfg.data.add_scalar_features = False
-
             if self.cfg.data.score_token:
                 self.cfg.data.num_global_tokens = len(self.class_names)
                 self.cfg.model.net.out_mv_channels = 1
