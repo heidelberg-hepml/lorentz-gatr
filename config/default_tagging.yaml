@@ -5,8 +5,7 @@ data:
  add_time_reference: true
  add_xzplane: false
  add_yzplane: false
- add_pt: false
- add_energy: false
+ add_scalar_features: false
  reinsert_channels: false
  rescale_data: true
 

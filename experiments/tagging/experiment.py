@@ -41,10 +41,8 @@ class TaggingExperiment(BaseExperiment):
             self.cfg.model.net.in_mv_channels = 1
 
             # extra scalar channels
-            if self.cfg.data.add_pt:
-                self.cfg.model.net.in_s_channels += 1
-            if self.cfg.data.add_energy:
-                self.cfg.model.net.in_s_channels += 1
+            if self.cfg.data.add_scalar_features:
+                self.cfg.model.net.in_s_channels += 7
             if self.cfg.data.include_global_token:
                 self.cfg.model.net.in_s_channels += self.cfg.data.num_global_tokens
 

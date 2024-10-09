@@ -1,8 +1,15 @@
 import torch
 from torch.nn.functional import one_hot
+from torch_geometric.utils import scatter
 
 from experiments.tagging.dataset import EPS
 from gatr.interface import embed_vector
+
+
+def get_batch_from_ptr(ptr):
+    return torch.arange(len(ptr) - 1, device=ptr.device).repeat_interleave(
+        ptr[1:] - ptr[:-1],
+    )
 
 
 def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
@@ -32,12 +39,25 @@ def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
     arange = torch.arange(batchsize, device=fourmomenta.device)
 
     # add extra scalar channels
-    if cfg_data.add_pt:
+    if cfg_data.add_scalar_features:
         log_pt = get_pt(fourmomenta).unsqueeze(-1).log()
-        scalars = torch.cat((scalars, log_pt), dim=-1)
-    if cfg_data.add_energy:
         log_energy = fourmomenta[..., 0].unsqueeze(-1).log()
-        scalars = torch.cat((scalars, log_energy), dim=-1)
+
+        batch = get_batch_from_ptr(ptr)
+        jet = scatter(fourmomenta, index=batch, dim=0, reduce="sum").index_select(
+            0, batch
+        )
+        log_pt_rel = (get_pt(fourmomenta).log() - get_pt(jet).log()).unsqueeze(-1)
+        log_energy_rel = (fourmomenta[..., 0].log() - jet[..., 0].log()).unsqueeze(-1)
+        phi_4, phi_jet = get_phi(fourmomenta), get_phi(jet)
+        dphi = ((phi_4 - phi_jet + torch.pi) % (2 * torch.pi) - torch.pi).unsqueeze(-1)
+        eta_4, eta_jet = get_eta(fourmomenta), get_eta(jet)
+        deta = (eta_4 - eta_jet).unsqueeze(-1)
+        dr = torch.sqrt(dphi**2 + deta**2)
+        scalars = torch.cat(
+            (scalars, log_pt, log_energy, log_pt_rel, log_energy_rel, dphi, deta, dr),
+            dim=-1,
+        )
 
     # embed fourmomenta into multivectors
     multivectors = embed_vector(fourmomenta)
@@ -159,11 +179,6 @@ def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
         is_global = None
 
     # return dict
-    get_batch_from_ptr = lambda ptr: torch.arange(
-        len(ptr) - 1, device=multivectors.device
-    ).repeat_interleave(
-        ptr[1:] - ptr[:-1],
-    )
     batch = get_batch_from_ptr(ptr)
     embedding = {
         "mv": multivectors,
@@ -300,3 +315,14 @@ def get_spurion(
 def get_pt(p):
     # transverse momentum
     return torch.sqrt(p[..., 1] ** 2 + p[..., 2] ** 2)
+
+
+def get_phi(p):
+    # azimuthal angle
+    return torch.arctan2(p[..., 2], p[..., 1])
+
+
+def get_eta(p):
+    # rapidity
+    p_abs = torch.sqrt(torch.sum(p[..., 1:] ** 2, dim=-1))
+    return torch.arctanh(p[..., 3] / p_abs)

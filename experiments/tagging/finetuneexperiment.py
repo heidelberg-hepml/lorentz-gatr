@@ -38,8 +38,7 @@ class TopTaggingFineTuneExperiment(TopTaggingExperiment):
             self.cfg.data.two_beams = warmstart_cfg.data.two_beams
             self.cfg.data.beam_token = warmstart_cfg.data.beam_token
             self.cfg.data.add_time_reference = warmstart_cfg.data.add_time_reference
-            self.cfg.data.add_pt = warmstart_cfg.data.add_pt
-            self.cfg.data.add_energy = warmstart_cfg.data.add_energy
+            self.cfg.data.add_scalar_features = warmstart_cfg.data.add_scalar_features
             self.cfg.data.reinsert_channels = warmstart_cfg.data.reinsert_channels
             self.cfg.data.rescale_data = warmstart_cfg.data.rescale_data
 
