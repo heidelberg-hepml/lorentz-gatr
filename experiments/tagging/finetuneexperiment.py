@@ -17,7 +17,10 @@ class TopTaggingFineTuneExperiment(TopTaggingExperiment):
         assert warmstart_cfg.exp_type == "jctagging"
         assert warmstart_cfg.data.features == "fourmomenta"
         assert (
-            warmstart_cfg.ema and self.cfg.ema or not warmstart_cfg.ema and not self.ema
+            warmstart_cfg.ema
+            and self.cfg.ema
+            or not warmstart_cfg.ema
+            and not self.cfg.ema
         ), "Current implementation only works if pretrained and finetune model use the same EMA setting"
         if warmstart_cfg.data.score_token:
             raise NotImplementedError(
@@ -35,7 +38,7 @@ class TopTaggingFineTuneExperiment(TopTaggingExperiment):
             self.cfg.data.two_beams = warmstart_cfg.data.two_beams
             self.cfg.data.beam_token = warmstart_cfg.data.beam_token
             self.cfg.data.add_time_reference = warmstart_cfg.data.add_time_reference
-            self.cfg.data.add_pt = warmstart_cfg.data.add_pt
+            self.cfg.data.add_scalar_features = warmstart_cfg.data.add_scalar_features
             self.cfg.data.reinsert_channels = warmstart_cfg.data.reinsert_channels
             self.cfg.data.rescale_data = warmstart_cfg.data.rescale_data
 
