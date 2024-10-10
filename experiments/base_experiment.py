@@ -444,7 +444,12 @@ class BaseExperiment:
 
     def train(self):
         # performance metrics
-        self.train_lr, self.train_loss, self.val_loss = [], [], []
+        self.train_lr, self.train_loss, self.val_loss, self.train_grad_norm = (
+            [],
+            [],
+            [],
+            [],
+        )
         self.train_metrics = self._init_metrics()
         self.val_metrics = self._init_metrics()
 
@@ -568,6 +573,7 @@ class BaseExperiment:
         # collect metrics
         self.train_loss.append(loss.item())
         self.train_lr.append(self.optimizer.param_groups[0]["lr"])
+        self.train_grad_norm.append(grad_norm)
         for key, value in metrics.items():
             self.train_metrics[key].append(value)
 

@@ -407,7 +407,7 @@ class EventGenerationExperiment(BaseExperiment):
         }
 
         if self.cfg.train:
-            filename = os.path.join(path, "loss.pdf")
+            filename = os.path.join(path, "training.pdf")
             plotter.plot_losses(filename=filename, **kwargs)
 
         if not self.cfg.evaluate:
