@@ -14,11 +14,11 @@ from experiments.eventgen.coordinates import (
 
 def get_type_token(x_ref, type_token_channels):
     # embed type_token
-    type_token_raw = torch.arange(x_ref.shape[1], device=x_ref.device, dtype=torch.long)
-    type_token = nn.functional.one_hot(type_token_raw, num_classes=type_token_channels)
-    type_token = type_token.unsqueeze(0).expand(
-        x_ref.shape[0], x_ref.shape[1], type_token_channels
+    type_token_raw = torch.arange(
+        x_ref.shape[-2], device=x_ref.device, dtype=torch.long
     )
+    type_token = nn.functional.one_hot(type_token_raw, num_classes=type_token_channels)
+    type_token = type_token.expand(*x_ref.shape[:-1], type_token_channels)
     return type_token
 
 
