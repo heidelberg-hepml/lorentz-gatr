@@ -1,8 +1,7 @@
 import torch
 from torch import nn
-from experiments.baselines.mlp import MLP
-from experiments.baselines.transformer import Transformer
 from experiments.eventgen.cfm import GaussianFourierProjection
+from experiments.eventgen.wrappers import get_type_token
 
 
 class DisplacementNet(nn.Module):
@@ -20,11 +19,8 @@ class DisplacementNet(nn.Module):
             nn.Linear(embed_t_dim, embed_t_dim),
         )
 
-    def embed(self, x_base, x_target, t):
-        t_emb = self.t_embedding(t[..., 0])
-        x_base_emb = x_base.flatten(start_dim=-2)
-        x_target_emb = x_target.flatten(start_dim=-2)
-        return x_base_emb, x_target_emb, t_emb
+    def embed_t(self, t):
+        return self.t_embedding(t[..., 0])
 
     def forward(self, x_base, x_target, t):
         raise NotImplementedError
@@ -33,8 +29,7 @@ class DisplacementNet(nn.Module):
 class DisplacementMLP(DisplacementNet):
     def __init__(
         self,
-        hidden_channels,
-        hidden_layers,
+        net,
         n_features,
         embed_t_dim,
         embed_t_scale,
@@ -42,19 +37,20 @@ class DisplacementMLP(DisplacementNet):
         super().__init__(embed_t_dim, embed_t_scale)
         # inputs: x_base (n_features), x_target (n_features), t (embed_t_dim)
         # outputs: phi (n_features)
-        self.net = MLP(
+        self.net = net(
             in_shape=2 * n_features + embed_t_dim,
             out_shape=n_features,
-            hidden_channels=hidden_channels,
-            hidden_layers=hidden_layers,
         )
 
+    def embed(self, x_base, x_target, t):
+        t_emb = self.embed_t(t)
+        x_base_emb = x_base.flatten(start_dim=-2)
+        x_target_emb = x_target.flatten(start_dim=-2)
+        embedding = torch.cat((x_base_emb, x_target_emb, t_emb), dim=-1)
+        return embedding
+
     def forward(self, x_base, x_target, t):
-        x_base_emb, x_target_emb, t_emb = self.embed(x_base, x_target, t)
-        embedding = torch.cat(
-            (x_base_emb, x_target_emb, t_emb),
-            dim=-1,
-        )
+        embedding = self.embed(x_base, x_target, t)
         phi = self.net(embedding).reshape_as(x_base)
         return phi
 
@@ -62,36 +58,29 @@ class DisplacementMLP(DisplacementNet):
 class DisplacementTransformer(DisplacementNet):
     def __init__(
         self,
-        hidden_channels,
-        num_blocks,
-        num_heads,
+        net,
         n_features,
         embed_t_dim,
         embed_t_scale,
     ):
         super().__init__(embed_t_dim, embed_t_scale)
-        # inputs per channel: x_base (1), x_target (1), t (embed_t_dim), idx (n_features)
-        # outputs per channel: phi (1)
-        self.net = Transformer(
-            in_channels=2 + embed_t_dim + n_features,
-            out_channels=1,
-            hidden_channels=hidden_channels,
-            num_blocks=num_blocks,
-            num_heads=num_heads,
+        # we use one channel for each particle, instead of one channel for each component
+        # inputs per token: x_base (4), x_target (4), t (embed_t_dim), idx (n_particles)
+        # outputs per token: phi (4)
+        self.n_particles = n_features // 4
+        self.net = net(
+            in_channels=2 * 4 + embed_t_dim + self.n_particles,
         )
+
+    def embed(self, x_base, x_target, t):
+        t_emb = self.embed_t(t)
+        t_emb = t_emb.unsqueeze(-2).expand(*x_base.shape[:-1], t_emb.shape[-1])
+        type_token = get_type_token(x_base, self.n_particles)
+        type_token = type_token.expand(*x_base.shape[:-1], type_token.shape[-1])
+        embedding = torch.cat((x_base, x_target, t_emb, type_token), dim=-1)
+        return embedding
 
     def forward(self, x_base, x_target, t):
-        x_base_emb, x_target_emb, t_emb = self.embed(x_base, x_target, t)
-        x_base_emb, x_target_emb = x_base_emb.unsqueeze(-1), x_target_emb.unsqueeze(-1)
-        t_emb = torch.repeat_interleave(
-            t_emb.unsqueeze(-2), x_base_emb.shape[-2], dim=-2
-        )
-        idx = torch.arange(x_base_emb.shape[-2], device=x_base_emb.device)
-        idx_emb = torch.nn.functional.one_hot(idx).repeat(
-            [1 for _ in range(len(x_base_emb.shape))]
-        )
-        idx_emb = idx_emb.repeat(list(x_base_emb.shape[:-2]) + [1, 1])
-        embedding = torch.cat((x_base_emb, x_target_emb, t_emb, idx_emb), dim=-1)
-
-        phi = self.net(embedding).reshape_as(x_base)
+        embedding = self.embed(x_base, x_target, t)
+        phi = self.net(embedding)
         return phi
