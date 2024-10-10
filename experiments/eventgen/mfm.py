@@ -239,8 +239,8 @@ class MFM(StandardLogPtPhiEtaLogM2):
             logy=False,
         )
 
-    def _plot_trajectories(
-        self, file, base, target, device, dtype, nsamples=10, nt=1000
+    def _create_sample_trajectories(
+        self, base, target, device, dtype, nsamples=10, nt=1000
     ):
         t = (
             torch.linspace(0, 1, nt)
@@ -257,9 +257,11 @@ class MFM(StandardLogPtPhiEtaLogM2):
             .cpu()
         )
         t = t.detach().cpu()
+        return xt, xt_straight, t
 
-        for i in range(base.shape[-2]):
-            for j in range(base.shape[-1]):
+    def _plot_trajectories_simple(self, file, xt, xt_straight, t, nsamples):
+        for i in range(xt.shape[-2]):
+            for j in range(xt.shape[-1]):
                 plot_trajectories_over_time(
                     file,
                     xt[:, :, i, j],
@@ -312,6 +314,14 @@ class MFM(StandardLogPtPhiEtaLogM2):
                 xlabel=r"$m_{\mathrm{{%s}}}$" % particles1,
                 ylabel=r"$m_{\mathrm{{%s}}}$" % particles2,
             )
+
+    def _plot_trajectories(
+        self, file, base, target, device, dtype, nsamples=10, nt=1000
+    ):
+        xt, xt_straight, t = self._create_sample_trajectories(
+            base, target, device, dtype, nsamples, nt
+        )
+        self._plot_trajectories_simple(file, xt, xt_straight, t, nsamples)
 
     def _get_mass(self, particle):
         # particle has to be in 'Fourmomenta' format
@@ -378,6 +388,60 @@ class MassMFM(MFM):
                 labels=[key, f"{key} with phi=0"],
                 logy=False,
             )
+
+    def _get_distance(self, x1, x2):
+        diff = x1 - x2
+        diff = self._possibly_periodic(diff)
+        naive_term = (diff**2).sum(dim=[-1, -2])
+
+        mass_term = []
+        x1_fourmomenta = self.x_to_fourmomenta(x1)
+        x2_fourmomenta = self.x_to_fourmomenta(x2)
+        for particles in self.virtual_components_mfm:
+            x1_particle = x1_fourmomenta[..., particles, :].sum(dim=-2)
+            x2_particle = x2_fourmomenta[..., particles, :].sum(dim=-2)
+            mass1 = self._get_mass(x1_particle)
+            mass2 = self._get_mass(x2_particle)
+            mass_term0 = (mass1 - mass2) ** 2
+            mass_term.append(mass_term0)
+        mass = torch.stack(mass_term, dim=-1)
+        mass_top = self.cfm.mfm.alpha_top * mass[..., [0, 1]].sum(dim=-1)
+        mass_W = self.cfm.mfm.alpha_W * mass[..., [2, 3]].sum(dim=-1)
+
+        distance = torch.sqrt(naive_term + mass_top + mass_W)
+        return distance
+
+    def _plot_trajectories(
+        self, file, base, target, device, dtype, nsamples=10, nt=1000
+    ):
+        xt, xt_straight, t = self._create_sample_trajectories(
+            base, target, device, dtype, nsamples, nt
+        )
+
+        self._plot_trajectories_simple(file, xt, xt_straight, t, nsamples)
+        self._plot_trajectories_distance(
+            file, base[:nsamples], target[:nsamples], xt, xt_straight, t, nsamples
+        )
+
+    def _plot_trajectories_distance(
+        self, file, base, target, xt, xt_straight, t, nsamples
+    ):
+        xt_base = base.unsqueeze(-4).repeat(xt.shape[-4], 1, 1, 1)
+        distance = self._get_distance(xt_base, xt)
+        distance_straight = self._get_distance(xt_base, xt_straight)
+        distance_max = distance[[0]].clone()
+        distance /= distance_max
+        distance_straight /= distance_max
+
+        plot_trajectories_over_time(
+            file,
+            distance,
+            distance_straight,
+            t[:, :, 0, 0],
+            xlabel=r"$t$ ($t=0$: target, $t=1$: base)",
+            ylabel=r"rescaled remaining distance to base",
+            nmax=nsamples,
+        )
 
 
 class LANDMFM(MFM):
