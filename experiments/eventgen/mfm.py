@@ -75,6 +75,8 @@ class MFM(StandardLogPtPhiEtaLogM2):
         # trajectories plots
         if plot_path is not None:
             if self.cfm.mfm.startup.plot_trajectories:
+                os.makedirs(plot_path, exist_ok=True)
+                LOGGER.info(f"Starting to create dnet trajectory plots in {plot_path}.")
                 filename = os.path.join(plot_path, "dnet_trajectories.pdf")
                 with PdfPages(filename) as file:
                     self._plot_trajectories(file, base, target, device, dtype)
@@ -168,7 +170,7 @@ class MFM(StandardLogPtPhiEtaLogM2):
         # training plots
         if plot_path is not None:
             os.makedirs(plot_path, exist_ok=True)
-            LOGGER.info(f"Starting to create dnet plots in {plot_path}.")
+            LOGGER.info(f"Starting to create dnet training plots in {plot_path}.")
             if self.cfm.mfm.startup.plot_training:
                 filename = os.path.join(plot_path, "dnet_training.pdf")
                 with PdfPages(filename) as file:
