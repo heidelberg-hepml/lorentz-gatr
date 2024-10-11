@@ -7,10 +7,6 @@ from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity
 from experiments.tagging.embedding import get_spurion
 from experiments.eventgen.cfm import EventCFM
 
-from experiments.eventgen.coordinates import (
-    convert_velocity,
-)
-
 
 def get_type_token(x_ref, type_token_channels):
     # embed type_token
@@ -65,7 +61,31 @@ class MLPCFM(EventCFM):
         return v
 
 
-class GAPCFM(EventCFM):
+class EventCFMForGA(EventCFM):
+    def __init__(self, scalar_dims, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.scalar_dims = scalar_dims
+        assert (np.array(scalar_dims) < 4).all() and (np.array(scalar_dims) >= 0).all()
+
+    def get_velocity(self, x_straight, t, ijet):
+        assert self.coordinates is not None
+        x_fourmomenta = self.coordinates.x_to_fourmomenta(x_straight)
+
+        mv, s = self.embed_into_ga(x_fourmomenta, t, ijet)
+        mv_outputs, s_outputs = self.net(mv, s)
+        v_fourmomenta, v_s = self.extract_from_ga(mv_outputs, s_outputs)
+
+        v_straight = self.coordinates.velocity_fourmomenta_to_x(
+            v_fourmomenta, x_straight
+        )[0]
+
+        # Overwrite transformed velocities with scalar outputs
+        # (this is specific to GATr to avoid large jacobians from from log-transforms)
+        v_straight[..., self.scalar_dims] = v_s[..., self.scalar_dims]
+        return v_straight
+
+
+class GAPCFM(EventCFMForGA):
     """
     Baseline GAP velocity network
     """
@@ -89,28 +109,6 @@ class GAPCFM(EventCFM):
         self.beam_reference = beam_reference
         self.two_beams = two_beams
         self.add_time_reference = add_time_reference
-        self.scalar_dims = scalar_dims
-        assert (
-            self.cfm.coordinates_network == "Fourmomenta"
-        ), f"GA-networks require coordinates_network=Fourmomenta"
-
-    def get_velocity(self, fourmomenta, t, ijet):
-        mv, s = self.embed_into_ga(fourmomenta, t, ijet)
-        mv_outputs, s_outputs = self.net(mv, s)
-        v_fourmomenta, v_s = self.extract_from_ga(mv_outputs, s_outputs)
-        return v_fourmomenta, v_s
-
-    def get_velocity_straight(self, xt_network, t, ijet):
-        # Predict velocities as usual
-        vp_network, vp_scalar = self.get_velocity(xt_network, t, ijet=ijet)
-        vp_straight, xt_straight = convert_velocity(
-            vp_network, xt_network, self.coordinates_network, self.coordinates_straight
-        )
-
-        # Overwrite transformed velocities with scalar outputs of GATr
-        # (this is specific to GATr to avoid large jacobians from from log-transforms)
-        vp_straight[..., self.scalar_dims] = vp_scalar[..., self.scalar_dims]
-        return vp_straight, xt_straight
 
     def embed_into_ga(self, x, t, ijet):
         # note: ijet is not used
@@ -173,7 +171,7 @@ class TransformerCFM(EventCFM):
         return v
 
 
-class GATrCFM(EventCFM):
+class GATrCFM(EventCFMForGA):
     """
     GATr velocity network
     """
@@ -224,6 +222,7 @@ class GATrCFM(EventCFM):
             ODE solver settings to be passed to torchdiffeq.odeint
         """
         super().__init__(
+            scalar_dims,
             cfm,
             odeint,
         )
@@ -233,29 +232,6 @@ class GATrCFM(EventCFM):
         self.beam_reference = beam_reference
         self.two_beams = two_beams
         self.add_time_reference = add_time_reference
-        self.scalar_dims = scalar_dims
-        assert (np.array(scalar_dims) < 4).all() and (np.array(scalar_dims) >= 0).all()
-        assert (
-            self.cfm.coordinates_network == "Fourmomenta"
-        ), f"GA-networks require coordinates_network=Fourmomenta"
-
-    def get_velocity(self, fourmomenta, t, ijet):
-        mv, s = self.embed_into_ga(fourmomenta, t, ijet)
-        mv_outputs, s_outputs = self.net(mv, s)
-        v_fourmomenta, v_s = self.extract_from_ga(mv_outputs, s_outputs)
-        return v_fourmomenta, v_s
-
-    def get_velocity_straight(self, xt_network, t, ijet):
-        # Predict velocities as usual
-        vp_network, vp_scalar = self.get_velocity(xt_network, t, ijet=ijet)
-        vp_straight, xt_straight = convert_velocity(
-            vp_network, xt_network, self.coordinates_network, self.coordinates_straight
-        )
-
-        # Overwrite transformed velocities with scalar outputs of GATr
-        # (this is specific to GATr to avoid large jacobians from from log-transforms)
-        vp_straight[..., self.scalar_dims] = vp_scalar[..., self.scalar_dims]
-        return vp_straight, xt_straight
 
     def embed_into_ga(self, x, t, ijet):
         # scalar embedding

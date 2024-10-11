@@ -14,10 +14,7 @@ from experiments.eventgen.distributions import (
 )
 from experiments.eventgen.utils import GaussianFourierProjection
 import experiments.eventgen.coordinates as c
-from experiments.eventgen.coordinates import (
-    convert_coordinates,
-    convert_velocity,
-)
+from experiments.eventgen.geometry import BaseGeometry, SimplePossiblyPeriodicGeometry
 from experiments.eventgen.mfm import MassMFM, LANDMFM
 
 
@@ -68,12 +65,8 @@ class CFM(nn.Module):
 
         # initialize to base objects, this will be overwritten later
         self.distribution = BaseDistribution()
-        self.coordinates_straight = c.BaseCoordinates()
-        self.coordinates_network = c.BaseCoordinates()
-        self.coordinates_list = [
-            self.coordinates_straight,
-            self.coordinates_network,
-        ]
+        self.coordinates = c.BaseCoordinates()
+        self.geometry = BaseGeometry()
 
         if cfm.transforms_float64:
             c.DTYPE = torch.float64
@@ -84,6 +77,9 @@ class CFM(nn.Module):
         raise NotImplementedError
 
     def init_coordinates(self):
+        raise NotImplementedError
+
+    def init_geometry(self):
         raise NotImplementedError
 
     def sample_base(self, shape, device, dtype, generator=None):
@@ -102,21 +98,6 @@ class CFM(nn.Module):
         """
         # implemented by architecture-specific subclasses
         raise NotImplementedError
-
-    def get_velocity_straight(self, xt_network, t, ijet):
-        """
-        Parameters
-        ----------
-        xt_network : torch.tensor with shape (batchsize, n_particles, 4)
-        t : torch.tensor with shape (batchsize, 1, 1)
-        ijet: int
-        """
-        # This method is only overwritten by GATrCFM and GAPCFM
-        vp_network = self.get_velocity(xt_network, t, ijet=ijet)
-        vp_straight, xt_straight = convert_velocity(
-            vp_network, xt_network, self.coordinates_network, self.coordinates_straight
-        )
-        return vp_straight, xt_straight
 
     def handle_velocity(self, v):
         # default: do nothing
@@ -150,20 +131,15 @@ class CFM(nn.Module):
         )
 
         # construct target trajectories
-        x0_straight = self.coordinates_straight.fourmomenta_to_x(x0_fourmomenta)
-        x1_straight = self.coordinates_straight.fourmomenta_to_x(x1_fourmomenta)
-        xt_straight, vt_straight = self.coordinates_straight.get_trajectory(
+        x0_straight = self.coordinates.fourmomenta_to_x(x0_fourmomenta)
+        x1_straight = self.coordinates.fourmomenta_to_x(x1_fourmomenta)
+        xt_straight, vt_straight = self.geometry.get_trajectory(
             x0_straight, x1_straight, t
         )
-
-        # predict velocity
-        xt_network = convert_coordinates(
-            xt_straight, self.coordinates_straight, self.coordinates_network
-        )
-        vp_straight = self.get_velocity_straight(xt_network, t, ijet=ijet)[0]
+        vp_straight = self.get_velocity(xt_straight, t, ijet=ijet)[0]
 
         # evaluate conditional flow matching objective
-        distance = self.coordinates_straight.get_metric(
+        distance = self.geometry.get_metric(
             vp_straight, vt_straight, xt_straight
         ).mean()
         distance_particlewise = [
@@ -196,18 +172,13 @@ class CFM(nn.Module):
             t = t * torch.ones(
                 shape[0], 1, 1, dtype=xt_straight.dtype, device=xt_straight.device
             )
-            xt_network = convert_coordinates(
-                xt_straight, self.coordinates_straight, self.coordinates_network
-            )
-            vt_straight, xt_straight = self.get_velocity_straight(
-                xt_network, t, ijet=ijet
-            )
+            vt_straight = self.get_velocity(xt_straight, t, ijet=ijet)
             vt_straight = self.handle_velocity(vt_straight)
             return vt_straight
 
         # sample fourmomenta from base distribution
         x1_fourmomenta = self.sample_base(shape, device, dtype)
-        x1_straight = self.coordinates_straight.fourmomenta_to_x(x1_fourmomenta)
+        x1_straight = self.coordinates.fourmomenta_to_x(x1_fourmomenta)
 
         # solve ODE in straight space
         x0_straight = odeint(
@@ -226,7 +197,7 @@ class CFM(nn.Module):
         x1_fourmomenta = x1_fourmomenta[mask, ...]
 
         # transform generated event back to fourmomenta
-        x0_fourmomenta = self.coordinates_straight.x_to_fourmomenta(x0_straight)
+        x0_fourmomenta = self.coordinates.x_to_fourmomenta(x0_straight)
         return x0_fourmomenta
 
     def log_prob(self, x0_fourmomenta, ijet):
@@ -262,10 +233,7 @@ class CFM(nn.Module):
                     dtype=xt_straight.dtype,
                     device=xt_straight.device,
                 )
-                xt_network = convert_coordinates(
-                    xt_straight, self.coordinates_straight, self.coordinates_network
-                )
-                vt_straight = self.get_velocity_straight(xt_network, t, ijet=ijet)[0]
+                vt_straight = self.get_velocity(xt_straight, t, ijet=ijet)
                 vt_straight = self.handle_velocity(vt_straight)
                 dlogp_dt_straight = (
                     -self.trace_fn(vt_straight, xt_straight).unsqueeze(-1).detach()
@@ -273,7 +241,7 @@ class CFM(nn.Module):
             return vt_straight, dlogp_dt_straight
 
         # solve ODE in coordinates_straight
-        x0_straight = self.coordinates_straight.fourmomenta_to_x(x0_fourmomenta)
+        x0_straight = self.coordinates.fourmomenta_to_x(x0_fourmomenta)
         logdetjac0_cfm_straight = torch.zeros(
             (x0_straight.shape[0], 1),
             dtype=x0_straight.dtype,
@@ -299,11 +267,11 @@ class CFM(nn.Module):
         x1_straight = x1_straight[mask, ...]
         x0_fourmomenta = x0_fourmomenta[mask, ...]
 
-        x1_fourmomenta = self.coordinates_straight.x_to_fourmomenta(x1_straight)
-        logdetjac_forward = self.coordinates_straight.logdetjac_fourmomenta_to_x(
-            x0_fourmomenta
-        )[0]
-        logdetjac_inverse = -self.coordinates_straight.logdetjac_fourmomenta_to_x(
+        x1_fourmomenta = self.coordinates.x_to_fourmomenta(x1_straight)
+        logdetjac_forward = self.coordinates.logdetjac_fourmomenta_to_x(x0_fourmomenta)[
+            0
+        ]
+        logdetjac_inverse = -self.coordinates.logdetjac_fourmomenta_to_x(
             x1_fourmomenta
         )[0]
 
@@ -411,20 +379,7 @@ class EventCFM(CFM):
             raise ValueError(f"base_type={self.base_type} not implemented")
 
     def init_coordinates(self):
-        self.coordinates_straight = self._init_coordinates(
-            self.cfm.coordinates_straight
-        )
-        if self.cfm.coordinates_straight == self.cfm.coordinates_network:
-            self.coordinates_network = self.coordinates_straight
-        else:
-            self.coordinates_network = self._init_coordinates(
-                self.cfm.coordinates_network
-            )
-
-        self.coordinates = [
-            self.coordinates_straight,
-            self.coordinates_network,
-        ]
+        self.coordinates = self._init_coordinates(self.cfm.coordinates_straight)
 
     def _init_coordinates(self, coordinates_label):
         if coordinates_label == "Fourmomenta":
@@ -472,9 +427,15 @@ class EventCFM(CFM):
             raise ValueError(f"coordinates={coordinates_label} not implemented")
         return coordinates
 
-    def init_anything(self, fourmomenta, **kwargs):
+    def init_geometry(self, fourmomenta, **kwargs):
         # placeholder for any initialization that needs to be done
-        if self.cfm.coordinates_straight in ["LANDMFM", "MassMFM"]:
+        if self.cfm.geometry.type == "simple":
+            self.geometry = SimplePossiblyPeriodicGeometry(
+                contains_phi=self.coordinates.contains_phi,
+                periodic=self.cfm.geometry.periodic,
+            )
+        elif self.cfm.geometry in ["LANDMFM", "MassMFM"]:
+            raise NotImplementedError
             assert (
                 len(fourmomenta) == 1
             ), "MassMFM only implemented for single-multiplicity training for now"
@@ -502,16 +463,7 @@ class EventCFM(CFM):
         return fourmomenta
 
     def handle_velocity(self, v):
-        if self.cfm.coordinates_straight in [
-            "PPPM2",
-            "PPPLogM2",
-            "StandardPPPLogM2",
-            "PtPhiEtaM2",
-            "LogPtPhiEtaM2",
-            "PtPhiEtaLogM2",
-            "LogPtPhiEtaLogM2",
-            "StandardLogPtPhiEtaLogM2",
-        ]:
+        if self.coordinates.contains_mass:
             # manually set mass velocity of onshell events to zero
             v[..., self.onshell_list, 3] = 0.0
         return v

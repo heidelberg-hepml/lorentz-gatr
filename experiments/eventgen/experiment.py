@@ -137,8 +137,7 @@ class EventGenerationExperiment(BaseExperiment):
         self.model.init_distribution()
         self.model.init_coordinates()
         fit_data = [x / self.units for x in self.events_raw]
-        for coordinates in self.model.coordinates:
-            coordinates.init_fit(fit_data)
+        self.model.coordinates.init_fit(fit_data)
         if hasattr(self.model, "distribution"):
             self.model.distribution.coordinates.init_fit(fit_data)
 
@@ -148,7 +147,7 @@ class EventGenerationExperiment(BaseExperiment):
             else None
         )
         model_path = os.path.join(self.cfg.run_dir, "models") if self.cfg.save else None
-        self.model.init_anything(
+        self.model.init_geometry(
             fit_data,
             model_path=model_path,
             plot_path=plot_path,
