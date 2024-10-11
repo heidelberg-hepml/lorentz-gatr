@@ -257,10 +257,11 @@ class MFM(SimplePossiblyPeriodicGeometry):
             for j in range(xt.shape[-1]):
                 plot_trajectories_over_time(
                     file,
-                    xt[:, :, i, j],
-                    xt_straight[:, :, i, j],
+                    xt[:, :, i, j].clone(),
+                    xt_straight[:, :, i, j].clone(),
                     t[:, :, 0, 0],
                     xlabel=r"$t$ ($t=0$: target, $t=1$: base)",
+                    is_phi=j == 1,
                     ylabel=r"$x_{%s}(t)$" % str(4 * i + j),
                 )
 
@@ -384,7 +385,7 @@ class MassMFM(MFM):
 
     def _get_distance(self, x1, x2):
         diff = x1 - x2
-        diff = self._possibly_periodic(diff)
+        diff = self._handle_periodic(diff)
         naive_term = (diff**2).sum(dim=[-1, -2])
 
         mass_term = []

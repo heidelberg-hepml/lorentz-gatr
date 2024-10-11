@@ -239,7 +239,7 @@ def plot_preprocessed(exp, filename, model_label, weights, mask_dict):
         for ijet in range(len(exp.cfg.data.n_jets)):
 
             def extract(x, channel):
-                x = exp.model.coordinates_straight.fourmomenta_to_x(x)
+                x = exp.model.coordinates.fourmomenta_to_x(x)
                 x = x.reshape(x.shape[0], -1)
                 return x[:, channel]
 

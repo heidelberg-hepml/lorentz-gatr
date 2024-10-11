@@ -27,7 +27,7 @@ cfm:
  hutchinson: true
  coordinates_straight: StandardLogPtPhiEtaLogM2
  geometry:
-  type: simple
+  type: MassMFM
   periodic: true
  transforms_float64: true
  mfm:

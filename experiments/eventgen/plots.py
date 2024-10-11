@@ -390,12 +390,20 @@ def simple_histogram(
     plt.close()
 
 
-def plot_trajectories_over_time(file, xt1, xt2, t, xlabel, ylabel, nmax=10):
+def plot_trajectories_over_time(
+    file, xt1, xt2, t, xlabel, ylabel, is_phi=False, nmax=10
+):
     assert xt1.shape == xt2.shape
     assert t.shape[0] == xt1.shape[0]
     assert xt1.shape[1] <= nmax
     col = mpl.cm.Set1(range(nmax))
     fig, ax = plt.subplots(figsize=(5, 4))
+    if is_phi:
+        for x in [xt1, xt2]:
+            # set entries to nan
+            abs_diff = np.abs(np.diff(x, axis=0))
+            mask = abs_diff > np.pi
+            x[1:][mask] = np.nan
     for i in range(xt1.shape[1]):
         ax.plot(t[:, i], xt1[:, i], color=col[i], linestyle="-")
         ax.plot(t[:, i], xt2[:, i], color=col[i], linestyle="--")
