@@ -31,9 +31,16 @@ class MFM(SimplePossiblyPeriodicGeometry):
     def get_trajectory(self, x_target, x_base, t):
         # notation: varphi is the trajectory displacement,
         # phi is one of the coordinates
+        def get_varphi(t):
+            varphi = self.dnet(x_target, x_base, t)
+            varphi[..., self.periodic_components] = torch.pi * torch.tanh(
+                varphi[..., self.periodic_components]
+            )
+            return varphi
+
         t.requires_grad_()
         varphi, dvarphi_dt = torch.autograd.functional.jvp(
-            lambda t: self.dnet(x_target, x_base, t),
+            get_varphi,
             t,
             torch.ones_like(t),
             create_graph=True,
