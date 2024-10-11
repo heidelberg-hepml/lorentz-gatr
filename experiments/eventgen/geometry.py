@@ -42,6 +42,6 @@ class SimplePossiblyPeriodicGeometry(SimpleGeometry):
 
     def get_metric(self, y1, y2, x):
         diff = y1 - y2
-        diff = self._handle_periodic(diff)
+        # diff = self._handle_periodic(diff)
         se = diff**2 / 2
         return se.sum(dim=[-1, -2])

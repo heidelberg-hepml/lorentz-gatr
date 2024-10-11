@@ -96,6 +96,7 @@ class Fourmomenta(BaseCoordinates):
 
 class PPPM2(BaseCoordinates):
     def __init__(self):
+        self.contains_mass = True
         self.transforms = [tr.EPPP_to_PPPM2()]
 
 
@@ -115,6 +116,7 @@ class PtPhiEtaE(BaseCoordinates):
 
 class PtPhiEtaM2(BaseCoordinates):
     def __init__(self):
+        self.contains_phi = True
         self.contains_mass = True
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
