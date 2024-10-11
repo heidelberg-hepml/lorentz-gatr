@@ -29,11 +29,10 @@ class MFM(SimplePossiblyPeriodicGeometry):
 
     @torch.enable_grad()
     def get_trajectory(self, x_target, x_base, t):
+        # notation: varphi is the trajectory displacement,
+        # phi is one of the coordinates
         t.requires_grad_()
-
-        # TODO: understand torch.autograd.functional.jvp better
-        # (how are gradients constructed, why not torch.func.jvp etc)
-        phi, dphi_dt = torch.autograd.functional.jvp(
+        varphi, dvarphi_dt = torch.autograd.functional.jvp(
             lambda t: self.dnet(x_target, x_base, t),
             t,
             torch.ones_like(t),
@@ -45,8 +44,8 @@ class MFM(SimplePossiblyPeriodicGeometry):
             self, x_target, x_base, t
         )
 
-        xt = xt_naive + t * (1 - t) * phi
-        vt = vt_naive + t * (1 - t) * dphi_dt + (1 - 2 * t) * phi
+        xt = xt_naive + t * (1 - t) * varphi
+        vt = vt_naive + t * (1 - t) * dvarphi_dt + (1 - 2 * t) * varphi
         xt = self._handle_periodic(xt)
         vt = self._handle_periodic(vt)
         return xt, vt
