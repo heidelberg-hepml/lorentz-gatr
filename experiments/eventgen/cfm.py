@@ -409,20 +409,6 @@ class EventCFM(CFM):
                 self.pt_min,
                 self.units,
             )
-        elif coordinates_label == "MassMFM":
-            coordinates = MassMFM(
-                self.virtual_components,
-                self.cfm,
-                self.pt_min,
-                self.units,
-            )
-        elif coordinates_label == "LANDMFM":
-            coordinates = LANDMFM(
-                self.virtual_components,
-                self.cfm,
-                self.pt_min,
-                self.units,
-            )
         else:
             raise ValueError(f"coordinates={coordinates_label} not implemented")
         return coordinates
@@ -434,21 +420,38 @@ class EventCFM(CFM):
                 contains_phi=self.coordinates.contains_phi,
                 periodic=self.cfm.geometry.periodic,
             )
-        elif self.cfm.geometry in ["LANDMFM", "MassMFM"]:
-            raise NotImplementedError
+        elif self.cfm.geometry.type == "MassMFM":
+            self.geometry = MassMFM(
+                virtual_components=self.virtual_components,
+                cfm=self.cfm,
+                coordinates=self.coordinates,
+                contains_phi=self.coordinates.contains_phi,
+                periodic=self.cfm.geometry.periodic,
+            )
+        elif self.cfm.geometry.type == "LANDMFM":
+            self.geometry = LANDMFM(
+                virtual_components=self.virtual_components,
+                cfm=self.cfm,
+                coordinates=self.coordinates,
+                contains_phi=self.coordinates.contains_phi,
+                periodic=self.cfm.geometry.periodic,
+            )
+        else:
+            raise ValueError(f"geometry={self.cfm.geometry} not implemented")
+
+        if self.cfm.geometry.type in ["MassMFM", "LANDMFM"]:
             assert (
                 len(fourmomenta) == 1
-            ), "MassMFM only implemented for single-multiplicity training for now"
+            ), "MFM only implemented for single-multiplicity training for now"
             fourmomenta = fourmomenta[0]
-            generator = torch.Generator()
-            generator.manual_seed(self.cfm.mfm.seed_base)
+            generator = torch.Generator().manual_seed(self.cfm.mfm.seed_base)
             base = self.sample_base(
                 fourmomenta.shape,
                 fourmomenta.device,
                 fourmomenta.dtype,
                 generator=generator,
             )
-            self.coordinates_straight.initialize(base, fourmomenta, **kwargs)
+            self.geometry.initialize(base, fourmomenta, **kwargs)
 
     def preprocess(self, fourmomenta):
         fourmomenta = fourmomenta / self.units

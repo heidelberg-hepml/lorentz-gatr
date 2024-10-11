@@ -6,56 +6,50 @@ import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 from hydra.utils import instantiate
 
-from experiments.eventgen.coordinates import StandardLogPtPhiEtaLogM2
+from experiments.eventgen.geometry import SimplePossiblyPeriodicGeometry
 from experiments.base_plots import plot_loss, plot_metric
 from experiments.eventgen.plots import plot_trajectories_over_time, plot_trajectories_2d
 from experiments.logger import LOGGER
 
 
-class MFM(StandardLogPtPhiEtaLogM2):
-    def __init__(self, virtual_components, cfm, *args, **kwargs):
+class MFM(SimplePossiblyPeriodicGeometry):
+    def __init__(self, virtual_components, cfm, coordinates, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.virtual_components_plot = virtual_components
         self.cfm = cfm
+        self.coordinates = coordinates
         self.dnet = None
-
-    def _init_metrics(self, metrics):
-        pass
 
     def get_loss(self, metrics):
         raise NotImplementedError
+
+    def get_metric(self, y1, y2, x):
+        # default: MSE metric
+        return super().get_metric(y1, y2, x)
 
     @torch.enable_grad()
     def get_trajectory(self, x_target, x_base, t):
         t.requires_grad_()
 
-        def get_phi(t):
-            phi = self.dnet(x_target, x_base, t)
-            # phi[..., self.periodic_components] = (
-            #    torch.tanh(phi[..., self.periodic_components]) * torch.pi
-            # )
-            return phi
-
         # TODO: understand torch.autograd.functional.jvp better
         # (how are gradients constructed, why not torch.func.jvp etc)
         phi, dphi_dt = torch.autograd.functional.jvp(
-            get_phi,
+            lambda t: self.dnet(x_target, x_base, t),
             t,
             torch.ones_like(t),
             create_graph=True,
             strict=True,
         )
 
-        # TODO: Understand why I can not enforce periodicity here
-        v_t_naive = x_base - x_target
-        v_t_naive = self._possibly_periodic(v_t_naive)
-        # dphi_dt = self._possibly_periodic(dphi_dt)
+        xt_naive, vt_naive = SimplePossiblyPeriodicGeometry.get_trajectory(
+            self, x_target, x_base, t
+        )
 
-        x_t = x_target + t * v_t_naive + t * (1 - t) * phi
-        v_t = v_t_naive + t * (1 - t) * dphi_dt + (1 - 2 * t) * phi
-        # x_t = self._possibly_periodic(x_t)
-        # v_t = self._possibly_periodic(v_t)
-        return x_t, v_t
+        xt = xt_naive + t * (1 - t) * phi
+        vt = vt_naive + t * (1 - t) * dphi_dt + (1 - 2 * t) * phi
+        xt = self._handle_periodic(xt)
+        vt = self._handle_periodic(vt)
+        return xt, vt
 
     def initialize(
         self,
@@ -194,7 +188,7 @@ class MFM(StandardLogPtPhiEtaLogM2):
         optimizer.step()
 
         # evaluate loss also for straight trajectories (phi=0)
-        xt_straight, vt_straight = StandardLogPtPhiEtaLogM2.get_trajectory(
+        xt_straight, vt_straight = SimplePossiblyPeriodicGeometry.get_trajectory(
             self,
             x_target,
             x_base,
@@ -252,7 +246,7 @@ class MFM(StandardLogPtPhiEtaLogM2):
         x_target = target[None, :nsamples].repeat(nt, 1, 1, 1).to(device, dtype)
         xt = self.get_trajectory(x_target, x_base, t)[0].detach().cpu()
         xt_straight = (
-            StandardLogPtPhiEtaLogM2.get_trajectory(self, x_target, x_base, t)[0]
+            SimplePossiblyPeriodicGeometry.get_trajectory(self, x_target, x_base, t)[0]
             .detach()
             .cpu()
         )
@@ -271,8 +265,8 @@ class MFM(StandardLogPtPhiEtaLogM2):
                     ylabel=r"$x_{%s}(t)$" % str(4 * i + j),
                 )
 
-        xt_fourmomenta = self.x_to_fourmomenta(xt)
-        xt_straight_fourmomenta = self.x_to_fourmomenta(xt_straight)
+        xt_fourmomenta = self.coordinates.x_to_fourmomenta(xt)
+        xt_straight_fourmomenta = self.coordinates.x_to_fourmomenta(xt_straight)
         for particles in self.virtual_components_plot:
             x_particle = xt_fourmomenta[..., particles, :].sum(dim=-2)
             x_straight_particle = xt_straight_fourmomenta[..., particles, :].sum(dim=-2)
@@ -356,7 +350,7 @@ class MassMFM(MFM):
         x.requires_grad_()  # required for phi=0 trajectories
 
         mass_term = []
-        x_fourmomenta = self.x_to_fourmomenta(x)
+        x_fourmomenta = self.coordinates.x_to_fourmomenta(x)
         for particles in self.virtual_components_mfm:
             x_particle = x_fourmomenta[..., particles, :].sum(dim=-2)
             mass = self._get_mass(x_particle)[:, None, None]
@@ -395,8 +389,8 @@ class MassMFM(MFM):
         naive_term = (diff**2).sum(dim=[-1, -2])
 
         mass_term = []
-        x1_fourmomenta = self.x_to_fourmomenta(x1)
-        x2_fourmomenta = self.x_to_fourmomenta(x2)
+        x1_fourmomenta = self.coordinates.x_to_fourmomenta(x1)
+        x2_fourmomenta = self.coordinates.x_to_fourmomenta(x2)
         for particles in self.virtual_components_mfm:
             x1_particle = x1_fourmomenta[..., particles, :].sum(dim=-2)
             x2_particle = x2_fourmomenta[..., particles, :].sum(dim=-2)
