@@ -3,6 +3,7 @@ exp_type: ???
 run_name: null
 base_dir: .
 
+jobid: null
 seed: null
 debug: false
 

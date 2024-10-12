@@ -6,35 +6,7 @@ from gatr.interface import embed_vector, extract_vector
 from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity
 from experiments.tagging.embedding import get_spurion
 from experiments.eventgen.cfm import EventCFM
-
-from experiments.eventgen.coordinates import (
-    convert_velocity,
-)
-
-
-def get_type_token(x_ref, type_token_channels):
-    # embed type_token
-    type_token_raw = torch.arange(x_ref.shape[1], device=x_ref.device, dtype=torch.long)
-    type_token = nn.functional.one_hot(type_token_raw, num_classes=type_token_channels)
-    type_token = type_token.unsqueeze(0).expand(
-        x_ref.shape[0], x_ref.shape[1], type_token_channels
-    )
-    return type_token
-
-
-def get_process_token(x_ref, ijet, process_token_channels):
-    # embed process_token
-    process_token_raw = torch.tensor([ijet], device=x_ref.device, dtype=torch.long)
-    process_token = nn.functional.one_hot(
-        process_token_raw, num_classes=process_token_channels
-    ).squeeze()
-    process_token = process_token.unsqueeze(0).expand(
-        x_ref.shape[1], process_token_channels
-    )
-    process_token = process_token.unsqueeze(0).expand(
-        x_ref.shape[0], x_ref.shape[1], process_token_channels
-    )
-    return process_token
+from experiments.eventgen.utils import get_type_token, get_process_token
 
 
 class MLPCFM(EventCFM):
@@ -65,7 +37,32 @@ class MLPCFM(EventCFM):
         return v
 
 
-class GAPCFM(EventCFM):
+class EventCFMForGA(EventCFM):
+    def __init__(self, scalar_dims, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.scalar_dims = scalar_dims
+        assert (np.array(scalar_dims) < 4).all() and (np.array(scalar_dims) >= 0).all()
+
+    def get_velocity(self, x_straight, t, ijet):
+        assert self.coordinates is not None
+        x_fourmomenta = self.coordinates.x_to_fourmomenta(x_straight)
+
+        mv, s = self.embed_into_ga(x_fourmomenta, t, ijet)
+        mv_outputs, s_outputs = self.net(mv, s)
+        v_fourmomenta, v_s = self.extract_from_ga(mv_outputs, s_outputs)
+
+        v_straight = self.coordinates.velocity_fourmomenta_to_x(
+            v_fourmomenta,
+            x_fourmomenta,
+        )[0]
+
+        # Overwrite transformed velocities with scalar outputs
+        # (this is specific to GATr to avoid large jacobians from from log-transforms)
+        v_straight[..., self.scalar_dims] = v_s[..., self.scalar_dims]
+        return v_straight
+
+
+class GAPCFM(EventCFMForGA):
     """
     Baseline GAP velocity network
     """
@@ -89,28 +86,6 @@ class GAPCFM(EventCFM):
         self.beam_reference = beam_reference
         self.two_beams = two_beams
         self.add_time_reference = add_time_reference
-        self.scalar_dims = scalar_dims
-        assert (
-            self.cfm.coordinates_network == "Fourmomenta"
-        ), f"GA-networks require coordinates_network=Fourmomenta"
-
-    def get_velocity(self, fourmomenta, t, ijet):
-        mv, s = self.embed_into_ga(fourmomenta, t, ijet)
-        mv_outputs, s_outputs = self.net(mv, s)
-        v_fourmomenta, v_s = self.extract_from_ga(mv_outputs, s_outputs)
-        return v_fourmomenta, v_s
-
-    def get_velocity_sampling(self, xt_network, t, ijet):
-        # Predict velocities as usual
-        vp_network, vp_scalar = self.get_velocity(xt_network, t, ijet=ijet)
-        vp_sampling, xt_sampling = convert_velocity(
-            vp_network, xt_network, self.coordinates_network, self.coordinates_sampling
-        )
-
-        # Overwrite transformed velocities with scalar outputs of GATr
-        # (this is specific to GATr to avoid large jacobians from from log-transforms)
-        vp_sampling[..., self.scalar_dims] = vp_scalar[..., self.scalar_dims]
-        return vp_sampling, xt_sampling
 
     def embed_into_ga(self, x, t, ijet):
         # note: ijet is not used
@@ -173,7 +148,7 @@ class TransformerCFM(EventCFM):
         return v
 
 
-class GATrCFM(EventCFM):
+class GATrCFM(EventCFMForGA):
     """
     GATr velocity network
     """
@@ -197,7 +172,7 @@ class GATrCFM(EventCFM):
         cfm : Dict
             Information about how to set up CFM
             technical keys: embed_t_dim, embed_t_scale, hutchinson, transforms_float64, eps1_pt, eps1_m2
-            conceptional keys: coordinates_straight, coordinates_network, coordinates_sampling
+            conceptional keys: coordinates_straight, coordinates_network
         type_token_channels : int
             Number of different particle id's
             Used for one-hot encoding to break permutation symmetry
@@ -218,12 +193,13 @@ class GATrCFM(EventCFM):
             Components within the used parametrization
             for which the equivariantly predicted velocity (using multivector channels)
             is overwritten by a scalar network output (using scalar channels)
-            This is required whenever coordinates_network != coordinates_sampling,
+            This is required whenever coordinates_network != coordinates_straight,
             and the transformation between the two contains e.g. log transforms
         odeint : Dict
             ODE solver settings to be passed to torchdiffeq.odeint
         """
         super().__init__(
+            scalar_dims,
             cfm,
             odeint,
         )
@@ -233,29 +209,6 @@ class GATrCFM(EventCFM):
         self.beam_reference = beam_reference
         self.two_beams = two_beams
         self.add_time_reference = add_time_reference
-        self.scalar_dims = scalar_dims
-        assert (np.array(scalar_dims) < 4).all() and (np.array(scalar_dims) >= 0).all()
-        assert (
-            self.cfm.coordinates_network == "Fourmomenta"
-        ), f"GA-networks require coordinates_network=Fourmomenta"
-
-    def get_velocity(self, fourmomenta, t, ijet):
-        mv, s = self.embed_into_ga(fourmomenta, t, ijet)
-        mv_outputs, s_outputs = self.net(mv, s)
-        v_fourmomenta, v_s = self.extract_from_ga(mv_outputs, s_outputs)
-        return v_fourmomenta, v_s
-
-    def get_velocity_sampling(self, xt_network, t, ijet):
-        # Predict velocities as usual
-        vp_network, vp_scalar = self.get_velocity(xt_network, t, ijet=ijet)
-        vp_sampling, xt_sampling = convert_velocity(
-            vp_network, xt_network, self.coordinates_network, self.coordinates_sampling
-        )
-
-        # Overwrite transformed velocities with scalar outputs of GATr
-        # (this is specific to GATr to avoid large jacobians from from log-transforms)
-        vp_sampling[..., self.scalar_dims] = vp_scalar[..., self.scalar_dims]
-        return vp_sampling, xt_sampling
 
     def embed_into_ga(self, x, t, ijet):
         # scalar embedding

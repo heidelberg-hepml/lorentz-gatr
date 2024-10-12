@@ -94,7 +94,7 @@ class MLPClassifier:
 
     def init_data(self, data_true, data_fake):
         LOGGER.info(
-            f"Classifier training data has shape {data_true['trn'].shape}(true) / {data_fake['trn'].shape}(fake)"
+            f"Classifier training data true/fake has shape {tuple(data_true['trn'].shape)} / {tuple(data_fake['trn'].shape)}"
         )
 
         def create_dataloader(x, shuffle):
@@ -113,26 +113,6 @@ class MLPClassifier:
         self.loaders_tst = [
             create_dataloader(x["tst"], shuffle=False) for x in [data_true, data_fake]
         ]
-
-    def init_dataloaders(self, data_true, data_fake):
-        # data_true and data_fake have shape (nevents, ncomponents)
-        LOGGER.info(
-            f"Classifier true/fake data has shape {data_true.shape}/{data_fake.shape}"
-        )
-
-        # train/val split
-        n_true, n_fake = data_true.shape[0], data_fake.shape[0]
-        split_true = [int(n_true * ratio) for ratio in self.cfg_training.train_val]
-        split_fake = [int(n_fake * ratio) for ratio in self.cfg_training.train_val]
-        data_trn = data_true[: split_true[0]], data_fake[: split_fake[0]]
-        data_val = (
-            data_true[split_true[0] : sum(split_true)],
-            data_fake[split_fake[0] : sum(split_fake)],
-        )
-
-        # initialize loaders
-        self.loaders_trn = [self.create_dataloader(x) for x in data_trn]
-        self.loaders_val = [self.create_dataloader(x) for x in data_val]
 
     @torch.set_grad_enabled(True)
     def train(self):
