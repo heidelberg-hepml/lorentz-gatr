@@ -20,7 +20,7 @@ class SimpleGeometry:
         # y1 and y2 are vectors (not necessarily positions), and x is the position
         # default: euclidean metric
         se = (y1 - y2) ** 2 / 2
-        return se.sum(dim=[-1, -2])
+        return se.mean(dim=[-1, -2])
 
 
 class SimplePossiblyPeriodicGeometry(SimpleGeometry):
@@ -44,4 +44,4 @@ class SimplePossiblyPeriodicGeometry(SimpleGeometry):
         diff = y1 - y2
         # diff = self._handle_periodic(diff)
         se = diff**2 / 2
-        return se.sum(dim=[-1, -2])
+        return se.mean(dim=[-1, -2])
