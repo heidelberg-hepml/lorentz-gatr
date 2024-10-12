@@ -407,9 +407,7 @@ class MFM(SimplePossiblyPeriodicGeometry):
         if self.cfm.mfm.use_logmass:
             prepd = prepd.log()
 
-        assert torch.isfinite(
-            prepd
-        ).all(), f"{torch.isnan(prepd).sum()} {torch.isinf(prepd).sum()}"
+        assert torch.isfinite(prepd).all()
         return prepd
 
     def _extend_metrics(self, metrics):
@@ -427,7 +425,8 @@ class MassMFM(MFM):
 
     @torch.enable_grad()
     def _get_loss(self, x, v):
-        naive_term = (v**2).sum(dim=[-1, -2]).mean()
+        scale = x.shape[-2] * x.shape[-1]
+        naive_term = (v**2).sum(dim=[-1, -2])
 
         x.requires_grad_()  # required for phi=0 trajectories
 
@@ -443,9 +442,14 @@ class MassMFM(MFM):
             mass_term0 = (dmass_dx * v).sum(dim=[-1, -2]) ** 2
             mass_term.append(mass_term0)
         mass = torch.stack(mass_term, dim=-1)
-        mass_top = self.alpha_top * mass[..., [0, 1]].sum(dim=-1).mean()
-        mass_W = self.alpha_W * mass[..., [2, 3]].sum(dim=-1).mean()
+        mass_top = self.alpha_top * mass[..., [0, 1]].sum(dim=-1)
+        mass_W = self.alpha_W * mass[..., [2, 3]].sum(dim=-1)
 
+        naive_term, mass_top, mass_W = (
+            naive_term.mean() / scale,
+            mass_top.mean() / scale,
+            mass_W.mean() / scale,
+        )
         loss = naive_term + mass_top + mass_W
         metrics = {"naive": naive_term, "mass_W": mass_W, "mass_top": mass_top}
         return loss, metrics
