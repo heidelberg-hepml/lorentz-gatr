@@ -37,9 +37,6 @@ class MFM(SimplePossiblyPeriodicGeometry):
         # phi is one of the coordinates
         def get_varphi(t):
             varphi = self.dnet(x_target, x_base, t)
-            varphi[..., self.periodic_components] = torch.pi * torch.tanh(
-                varphi[..., self.periodic_components]
-            )
             return varphi
 
         t.requires_grad_()
