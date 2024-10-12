@@ -60,7 +60,7 @@ class MFM(SimplePossiblyPeriodicGeometry):
 
     def initialize(
         self,
-        base,
+        basesampler,
         target,
         dnet_cfg,
         model_path=None,
@@ -68,10 +68,12 @@ class MFM(SimplePossiblyPeriodicGeometry):
         device=None,
         dtype=None,
     ):
-        n_features = base.flatten(start_dim=-2).shape[-1]
+        n_features = target.flatten(start_dim=-2).shape[-1]
         self._initialize_model(dnet_cfg, n_features, device, dtype)
         if self.cfm.mfm.warmstart_path is None:
-            self._initialize_train(base, target, plot_path, model_path, device, dtype)
+            self._initialize_train(
+                basesampler, target, plot_path, model_path, device, dtype
+            )
 
         # trajectories plots
         if plot_path is not None:
@@ -80,7 +82,7 @@ class MFM(SimplePossiblyPeriodicGeometry):
                 LOGGER.info(f"Starting to create dnet trajectory plots in {plot_path}.")
                 filename = os.path.join(plot_path, "dnet_trajectories.pdf")
                 with PdfPages(filename) as file:
-                    self._plot_trajectories(file, base, target, device, dtype)
+                    self._plot_trajectories(file, basesampler, target, device, dtype)
 
     def _initialize_model(self, dnet_cfg, n_features, device, dtype):
         self.dnet = instantiate(
@@ -104,10 +106,10 @@ class MFM(SimplePossiblyPeriodicGeometry):
             self.dnet.load_state_dict(state_dict)
             LOGGER.info(f"Loaded dnet from {self.cfm.mfm.warmstart_path}")
 
-    def _initialize_train(self, base, target, plot_path, model_path, device, dtype):
-        LOGGER.info(
-            f"Using base/target datasets of shape {tuple(base.shape)}/{tuple(target.shape)}."
-        )
+    def _initialize_train(
+        self, basesampler, target, plot_path, model_path, device, dtype
+    ):
+        LOGGER.info(f"Using target dataset of shape {tuple(target.shape)}.")
 
         # dataset and loader
         dataset = torch.utils.data.TensorDataset
@@ -121,7 +123,7 @@ class MFM(SimplePossiblyPeriodicGeometry):
                     yield x
 
         constructor = lambda tensor: iter(cycle(loader(dataset(tensor))))
-        iter_base, iter_target = constructor(base), constructor(target)
+        iter_target = constructor(target)
 
         # training preparations
         optimizer = torch.optim.Adam(
@@ -163,8 +165,8 @@ class MFM(SimplePossiblyPeriodicGeometry):
             f"patience={self.cfm.mfm.training.patience})"
         )
         for iteration in range(self.cfm.mfm.training.iterations):
-            x_base = next(iter_base)[0].to(device, dtype)
             x_target = next(iter_target)[0].to(device, dtype)
+            x_base = basesampler(x_target.shape, device, dtype)
             loss = self._step(x_base, x_target, **kwargs)
 
             if loss < loss_min:
@@ -339,12 +341,14 @@ class MFM(SimplePossiblyPeriodicGeometry):
             )
 
     def _plot_trajectories(
-        self, file, base, target, device, dtype, nsamples=10, nt=1000
+        self, file, basesampler, target, device, dtype, nsamples=10, nt=1000
     ):
+        base = basesampler(target.shape, device, dtype, use_seed=True)
         xt, xt_straight, t = self._create_sample_trajectories(
             base, target, device, dtype, nsamples, nt
         )
         self._plot_trajectories_simple(file, xt, xt_straight, t, nsamples)
+        return base, xt, xt_straight, t
 
     def _get_mass(self, particle):
         # particle has to be in 'Fourmomenta' format
@@ -439,11 +443,9 @@ class MassMFM(MFM):
     def _plot_trajectories(
         self, file, base, target, device, dtype, nsamples=100, nt=1000
     ):
-        xt, xt_straight, t = self._create_sample_trajectories(
-            base, target, device, dtype, nsamples, nt
+        base, xt, xt_straight, t = super()._plot_trajectories(
+            file, base, target, device, dtype, nsamples=100, nt=1000
         )
-
-        self._plot_trajectories_simple(file, xt, xt_straight, t, nsamples)
         self._plot_trajectories_distance(
             file, base[:nsamples], target[:nsamples], xt, xt_straight, t, nsamples
         )

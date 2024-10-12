@@ -445,13 +445,13 @@ class EventCFM(CFM):
             ), "MFM only implemented for single-multiplicity training for now"
             fourmomenta = fourmomenta[0]
             generator = torch.Generator().manual_seed(self.cfm.mfm.seed_base)
-            base = self.sample_base(
-                fourmomenta.shape,
-                fourmomenta.device,
-                fourmomenta.dtype,
-                generator=generator,
-            )
-            self.geometry.initialize(base, fourmomenta, **kwargs)
+
+            def basesampler(shape, device, dtype, use_seed=False):
+                return self.sample_base(
+                    shape, device, dtype, generator=generator if use_seed else None
+                )
+
+            self.geometry.initialize(basesampler, fourmomenta, **kwargs)
 
     def preprocess(self, fourmomenta):
         fourmomenta = fourmomenta / self.units
