@@ -31,19 +31,24 @@ cfm:
   periodic: true
  transforms_float64: true
  mfm:
-  alpha_top: 2.
-  alpha_W: ${cfm.mfm.alpha_top}
+  mass:
+   alpha_top: 2.
+   alpha_W: ${cfm.mfm.mass.alpha_top}
   seed_base: 42
   use_logmass: true
   warmstart_path: null
-  startup:
+  training:
    iterations: 10000
    batchsize: 1024
    lr: 1e-3
    clip_grad_norm: 5
-   plot_training: true
-   plot_trajectories: true
    patience: 100
+   scheduler: CosineAnnealingLR
+   reduceplateau_factor: ${training.reduceplateau_factor}
+   reduceplateau_patience: ${training.reduceplateau_patience}
+   cosanneal_eta_min: ${training.cosanneal_eta_min}
+  plot_training: true
+  plot_trajectories: true
   land:
    sigma: 1
    eps: 1e-3

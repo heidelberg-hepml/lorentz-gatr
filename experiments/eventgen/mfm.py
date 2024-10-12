@@ -75,7 +75,7 @@ class MFM(SimplePossiblyPeriodicGeometry):
 
         # trajectories plots
         if plot_path is not None:
-            if self.cfm.mfm.startup.plot_trajectories:
+            if self.cfm.mfm.plot_trajectories:
                 os.makedirs(plot_path, exist_ok=True)
                 LOGGER.info(f"Starting to create dnet trajectory plots in {plot_path}.")
                 filename = os.path.join(plot_path, "dnet_trajectories.pdf")
@@ -112,7 +112,7 @@ class MFM(SimplePossiblyPeriodicGeometry):
         # dataset and loader
         dataset = torch.utils.data.TensorDataset
         loader = lambda dataset: torch.utils.data.DataLoader(
-            dataset, batch_size=self.cfm.mfm.startup.batchsize, shuffle=True
+            dataset, batch_size=self.cfm.mfm.training.batchsize, shuffle=True
         )
 
         def cycle(iterable):
@@ -124,7 +124,27 @@ class MFM(SimplePossiblyPeriodicGeometry):
         iter_base, iter_target = constructor(base), constructor(target)
 
         # training preparations
-        optimizer = torch.optim.Adam(self.dnet.parameters(), lr=self.cfm.mfm.startup.lr)
+        optimizer = torch.optim.Adam(
+            self.dnet.parameters(), lr=self.cfm.mfm.training.lr
+        )
+        if self.cfm.mfm.training.scheduler is None:
+            scheduler = None
+        elif self.cfm.mfm.training.scheduler == "ReduceLROnPlateau":
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer,
+                factor=self.cfm.mfm.training.reduceplateau_factor,
+                patience=self.cfm.mfm.training.reduceplateau_patience,
+            )
+        elif self.cfm.mfm.training.scheduler == "CosineAnnealingLR":
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer,
+                T_max=self.cfm.mfm.training.iterations,
+                eta_min=self.cfm.mfm.training.cosanneal_eta_min,
+            )
+        else:
+            raise ValueError(
+                f"Scheduler {self.cfm.mfm.training.scheduler} not implemented"
+            )
         metrics = {
             "full": [],
             "full_phi0": [],
@@ -132,17 +152,17 @@ class MFM(SimplePossiblyPeriodicGeometry):
             "grad_norm": [],
         }
         self._extend_metrics(metrics)
-        kwargs = {"optimizer": optimizer, "metrics": metrics}
+        kwargs = {"optimizer": optimizer, "scheduler": scheduler, "metrics": metrics}
         loss_min, patience = float("inf"), 0
 
         # train loop
         t0 = time.time()
         LOGGER.info(
-            f"Starting to train dnet for {self.cfm.mfm.startup.iterations} iterations "
-            f"(batchsize={self.cfm.mfm.startup.batchsize}, lr={self.cfm.mfm.startup.lr}, "
-            f"patience={self.cfm.mfm.startup.patience})"
+            f"Starting to train dnet for {self.cfm.mfm.training.iterations} iterations "
+            f"(batchsize={self.cfm.mfm.training.batchsize}, lr={self.cfm.mfm.training.lr}, "
+            f"patience={self.cfm.mfm.training.patience})"
         )
-        for iteration in range(self.cfm.mfm.startup.iterations):
+        for iteration in range(self.cfm.mfm.training.iterations):
             x_base = next(iter_base)[0].to(device, dtype)
             x_target = next(iter_target)[0].to(device, dtype)
             loss = self._step(x_base, x_target, **kwargs)
@@ -152,7 +172,7 @@ class MFM(SimplePossiblyPeriodicGeometry):
                 patience = 0
             else:
                 patience += 1
-                if patience > self.cfm.mfm.startup.patience:
+                if patience > self.cfm.mfm.training.patience:
                     break
         dt = time.time() - t0
         LOGGER.info(
@@ -172,12 +192,12 @@ class MFM(SimplePossiblyPeriodicGeometry):
         if plot_path is not None:
             os.makedirs(plot_path, exist_ok=True)
             LOGGER.info(f"Starting to create dnet training plots in {plot_path}.")
-            if self.cfm.mfm.startup.plot_training:
+            if self.cfm.mfm.plot_training:
                 filename = os.path.join(plot_path, "dnet_training.pdf")
                 with PdfPages(filename) as file:
                     self._plot_training(file, metrics)
 
-    def _step(self, x_base, x_target, metrics, optimizer):
+    def _step(self, x_base, x_target, metrics, optimizer, scheduler):
         t = torch.rand(x_base.shape[0], 1, 1, device=x_base.device, dtype=x_base.dtype)
         xt, vt = self.get_trajectory(x_target, x_base, t)
         loss, metrics_phi = self._get_loss(xt, vt)
@@ -186,13 +206,15 @@ class MFM(SimplePossiblyPeriodicGeometry):
         grad_norm = (
             torch.nn.utils.clip_grad_norm_(
                 self.dnet.parameters(),
-                self.cfm.mfm.startup.clip_grad_norm,
+                self.cfm.mfm.training.clip_grad_norm,
                 error_if_nonfinite=True,
             )
             .cpu()
             .item()
         )
         optimizer.step()
+        if self.cfm.mfm.training.scheduler in ["CosineAnnealingLR"]:
+            scheduler.step()
 
         # evaluate loss also for straight trajectories (phi=0)
         xt_straight, vt_straight = SimplePossiblyPeriodicGeometry.get_trajectory(
@@ -350,6 +372,8 @@ class MassMFM(MFM):
         self.virtual_components_mfm = np.array(self.virtual_components_plot)[
             np.array([1, 2, 3, 4])
         ]
+        self.alpha_top = self.cfm.mfm.mass.alpha_top
+        self.alpha_W = self.cfm.mfm.mass.alpha_W
 
     def _get_loss(self, x, v):
         naive_term = (v**2).sum(dim=[-1, -2]).mean()
@@ -368,8 +392,8 @@ class MassMFM(MFM):
             mass_term0 = (dmass_dx * v).sum(dim=[-1, -2]) ** 2
             mass_term.append(mass_term0)
         mass = torch.stack(mass_term, dim=-1)
-        mass_top = self.cfm.mfm.alpha_top * mass[..., [0, 1]].sum(dim=-1).mean()
-        mass_W = self.cfm.mfm.alpha_W * mass[..., [2, 3]].sum(dim=-1).mean()
+        mass_top = self.alpha_top * mass[..., [0, 1]].sum(dim=-1).mean()
+        mass_W = self.alpha_W * mass[..., [2, 3]].sum(dim=-1).mean()
 
         loss = naive_term + mass_top + mass_W
         metrics = {"naive": naive_term, "mass_W": mass_W, "mass_top": mass_top}
@@ -406,8 +430,8 @@ class MassMFM(MFM):
             mass_term0 = (mass1 - mass2) ** 2
             mass_term.append(mass_term0)
         mass = torch.stack(mass_term, dim=-1)
-        mass_top = self.cfm.mfm.alpha_top * mass[..., [0, 1]].sum(dim=-1)
-        mass_W = self.cfm.mfm.alpha_W * mass[..., [2, 3]].sum(dim=-1)
+        mass_top = self.alpha_top * mass[..., [0, 1]].sum(dim=-1)
+        mass_W = self.alpha_W * mass[..., [2, 3]].sum(dim=-1)
 
         distance = torch.sqrt(naive_term + mass_top + mass_W)
         return distance
