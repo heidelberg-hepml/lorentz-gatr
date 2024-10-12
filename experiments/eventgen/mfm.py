@@ -286,8 +286,14 @@ class MFM(SimplePossiblyPeriodicGeometry):
     def _plot_training(self, file, metrics):
         plot_loss(
             file,
-            [metrics["full"], metrics["full_phi0"]],
+            [metrics["full"], metrics["val_loss"]],
             metrics["lr"],
+            labels=["train", r"validation"],
+            logy=False,
+        )
+        plot_loss(
+            file,
+            [metrics["full"], metrics["full_phi0"]],
             labels=["full loss", r"full loss with $\varphi=0$"],
             logy=False,
         )
