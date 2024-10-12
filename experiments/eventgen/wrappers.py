@@ -52,7 +52,8 @@ class EventCFMForGA(EventCFM):
         v_fourmomenta, v_s = self.extract_from_ga(mv_outputs, s_outputs)
 
         v_straight = self.coordinates.velocity_fourmomenta_to_x(
-            v_fourmomenta, x_straight
+            v_fourmomenta,
+            x_fourmomenta,
         )[0]
 
         # Overwrite transformed velocities with scalar outputs
