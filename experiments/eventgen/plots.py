@@ -395,7 +395,7 @@ def plot_trajectories_over_time(
 ):
     assert xt1.shape == xt2.shape
     assert t.shape[0] == xt1.shape[0]
-    assert xt1.shape[1] <= nmax
+    xt1, xt2 = xt1[:, :nmax], xt2[:, :nmax]
     col = mpl.cm.Set1(range(nmax))
     fig, ax = plt.subplots(figsize=(5, 4))
     if is_phi:
@@ -411,6 +411,7 @@ def plot_trajectories_over_time(
         ax.plot(t[-1, i], xt1[-1, i], "x", color=col[i])
     ax.set_xlabel(xlabel, fontsize=FONTSIZE)
     ax.set_ylabel(ylabel, fontsize=FONTSIZE)
+    ax.set_xlim(0, 1)
     ax.tick_params(axis="both", labelsize=TICKLABELSIZE)
     plt.savefig(file, format="pdf", bbox_inches="tight")
     plt.close()
@@ -418,7 +419,12 @@ def plot_trajectories_over_time(
 
 def plot_trajectories_2d(file, xt1_x, xt1_y, xt2_x, xt2_y, xlabel, ylabel, nmax=10):
     assert xt1_x.shape == xt2_x.shape == xt1_y.shape == xt2_y.shape
-    assert xt1_x.shape[1] <= nmax
+    xt1_x, xt2_x, xt1_y, xt2_y = (
+        xt1_x[:, :nmax],
+        xt2_x[:, :nmax],
+        xt1_y[:, :nmax],
+        xt2_y[:, :nmax],
+    )
     col = mpl.cm.Set1(range(nmax))
     fig, ax = plt.subplots(figsize=(5, 4))
     for i in range(xt1_x.shape[1]):
@@ -428,6 +434,22 @@ def plot_trajectories_2d(file, xt1_x, xt1_y, xt2_x, xt2_y, xlabel, ylabel, nmax=
         ax.plot(xt1_x[-1, i], xt1_y[-1, i], "x", color=col[i])
     ax.set_xlabel(xlabel, fontsize=FONTSIZE)
     ax.set_ylabel(ylabel, fontsize=FONTSIZE)
+    ax.tick_params(axis="both", labelsize=TICKLABELSIZE)
+    plt.savefig(file, format="pdf", bbox_inches="tight")
+    plt.close()
+
+
+def plot_trajectories_straightness(file, xt, t, xlabel, ylabel):
+    assert t.shape[0] == xt.shape[0]
+    col = mpl.cm.Set1(range(10))
+    fig, ax = plt.subplots(figsize=(5, 4))
+    hopefully_one = xt / (1 - t)
+    for i in range(xt.shape[1]):
+        ax.plot(t[:, i], hopefully_one[:, i], color=col[i % 10], lw=0.5)
+    ax.plot(t[:, 0], 1.0 + 0 * t[:, 0], color="black", lw=1, linestyle="--")
+    ax.set_xlabel(xlabel, fontsize=FONTSIZE)
+    ax.set_ylabel(ylabel, fontsize=FONTSIZE)
+    ax.set_xlim(0, 1)
     ax.tick_params(axis="both", labelsize=TICKLABELSIZE)
     plt.savefig(file, format="pdf", bbox_inches="tight")
     plt.close()

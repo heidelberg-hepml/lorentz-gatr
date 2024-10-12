@@ -8,7 +8,11 @@ from hydra.utils import instantiate
 
 from experiments.eventgen.geometry import SimplePossiblyPeriodicGeometry
 from experiments.base_plots import plot_loss, plot_metric
-from experiments.eventgen.plots import plot_trajectories_over_time, plot_trajectories_2d
+from experiments.eventgen.plots import (
+    plot_trajectories_over_time,
+    plot_trajectories_2d,
+    plot_trajectories_straightness,
+)
 from experiments.logger import LOGGER
 
 
@@ -286,7 +290,6 @@ class MFM(SimplePossiblyPeriodicGeometry):
                 t[:, :, 0, 0],
                 xlabel=r"$t$ ($t=0$: target, $t=1$: base)",
                 ylabel=r"$m_{\mathrm{{%s}}}(t)$" % particles,
-                nmax=nsamples,
             )
 
         for p1, p2 in [[1, 2], [3, 4], [1, 3], [2, 4]]:
@@ -413,7 +416,7 @@ class MassMFM(MFM):
         return distance
 
     def _plot_trajectories(
-        self, file, base, target, device, dtype, nsamples=10, nt=1000
+        self, file, base, target, device, dtype, nsamples=100, nt=1000
     ):
         xt, xt_straight, t = self._create_sample_trajectories(
             base, target, device, dtype, nsamples, nt
@@ -441,7 +444,14 @@ class MassMFM(MFM):
             t[:, :, 0, 0],
             xlabel=r"$t$ ($t=0$: target, $t=1$: base)",
             ylabel=r"rescaled remaining distance to base",
-            nmax=nsamples,
+        )
+
+        plot_trajectories_straightness(
+            file,
+            distance,
+            t[:, :, 0, 0],
+            xlabel=r"$t$ ($t=0$: target, $t=1$: base)",
+            ylabel=r"$g/(1-t)$",
         )
 
 
