@@ -8,6 +8,14 @@ data:
  add_scalar_features: false
  reinsert_channels: false
  rescale_data: true
+ scalar_features_preprocessing: # following weaver defaults
+ - [-1.3, 0.7] # log_pt (include -log(20) from UNITS)
+ - [-1.0, 0.7] # log_energy (include -log(20) from UNITS)
+ - [-4.7, 0.7] # log_pt_rel
+ - [-4.7, 0.7] # log_energy_rel
+ - [0, 1] # dphi
+ - [0, 1] # deta
+ - [0.2, 4] # dr
 
 train: true
 training:

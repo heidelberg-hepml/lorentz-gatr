@@ -54,8 +54,20 @@ def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
         eta_4, eta_jet = get_eta(fourmomenta), get_eta(jet)
         deta = (eta_4 - eta_jet).unsqueeze(-1)
         dr = torch.sqrt(dphi**2 + deta**2)
+        scalar_features = [
+            log_pt,
+            log_energy,
+            log_pt_rel,
+            log_energy_rel,
+            dphi,
+            deta,
+            dr,
+        ]
+        for i, feature in enumerate(scalar_features):
+            mean, factor = cfg_data.scalar_features_preprocessing[i]
+            scalar_features[i] = (feature - mean) * factor
         scalars = torch.cat(
-            (scalars, log_pt, log_energy, log_pt_rel, log_energy_rel, dphi, deta, dr),
+            (scalars, *scalar_features),
             dim=-1,
         )
 
