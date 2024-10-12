@@ -552,7 +552,7 @@ class LANDMFM(MFM):
         x1, x2 = x_emb.unsqueeze(-2), x_emb.unsqueeze(-3)
         diff = x1 - x2
         diff2 = diff**2
-        exponent = -diff2.sum(dim=-1) / (2 * self.sigma**2)
+        exponent = -diff2.mean(dim=-1) / (2 * self.sigma**2)
         h = diff2 * torch.exp(exponent.unsqueeze(-1))
         h = h.mean(dim=-3)
         h = h.reshape_as(x)
@@ -562,11 +562,11 @@ class LANDMFM(MFM):
         diag_entries = self._get_diag_entries(x)
         diff = y1 - y2
         metric = diff**2 / (diag_entries + self.eps)
-        metric = metric.sum(dim=[-1, -2])
+        metric = metric.mean(dim=[-1, -2])
         return metric
 
     def _get_loss(self, x, v):
         diag_entries = self._get_diag_entries(x)
         loss = v**2 / (diag_entries + self.eps)
-        loss = loss.sum(dim=[-1, -2]).mean()
+        loss = loss.mean(dim=[-1, -2]).mean()
         return loss, {}
