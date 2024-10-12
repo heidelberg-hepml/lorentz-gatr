@@ -38,13 +38,13 @@ cfm:
   use_logmass: true
   warmstart_path: null
   training:
-   iterations: 10000
+   iterations: 100
    batchsize: 1024
    train_test_val: [0.8,0.1,0.1]
    validate_every_n_steps: 100
    lr: 1e-3
    clip_grad_norm: 5
-   patience: 100
+   es_patience: 100
    scheduler: CosineAnnealingLR
    reduceplateau_factor: ${training.reduceplateau_factor}
    reduceplateau_patience: ${training.reduceplateau_patience}

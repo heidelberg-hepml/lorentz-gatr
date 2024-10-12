@@ -189,7 +189,7 @@ class MFM(SimplePossiblyPeriodicGeometry):
         LOGGER.info(
             f"Starting to train dnet for {self.cfm.mfm.training.iterations} iterations "
             f"(batchsize={self.cfm.mfm.training.batchsize}, lr={self.cfm.mfm.training.lr}, "
-            f"patience={self.cfm.mfm.training.patience})"
+            f"patience={self.cfm.mfm.training.es_patience})"
         )
         for iteration in range(self.cfm.mfm.training.iterations):
             x_target = next(train_iter)[0].to(device, dtype)
@@ -205,7 +205,7 @@ class MFM(SimplePossiblyPeriodicGeometry):
                     patience = 0
                 else:
                     patience += 1
-                    if patience > self.cfm.mfm.training.patience:
+                    if patience > self.cfm.mfm.training.es_patience:
                         break
                 if self.cfm.mfm.training.scheduler in ["ReduceLROnPlateau"]:
                     scheduler.step(val_loss)
@@ -214,7 +214,7 @@ class MFM(SimplePossiblyPeriodicGeometry):
         LOGGER.info(
             f"Finished training dnet after {iteration} iterations / {dt/60**2:.2f}h (spent fraction {val_time/dt:.2f} validating)"
         )
-        mean_loss = np.mean(metrics["full"][-patience:])
+        mean_loss = np.mean(metrics["full"])
         LOGGER.info(f"Mean dnet loss: {mean_loss:.2f}")
 
         # save network
