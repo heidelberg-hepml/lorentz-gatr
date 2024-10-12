@@ -124,6 +124,7 @@ class MFM(SimplePossiblyPeriodicGeometry):
         splits = [
             int(x * target.shape[0]) for x in self.cfm.mfm.training.train_test_val
         ]
+        splits[-1] = target.shape[0] - sum(splits[:-1])
         train, test, val = torch.split(target, splits)
 
         # dataset and loader
@@ -238,6 +239,7 @@ class MFM(SimplePossiblyPeriodicGeometry):
         losses = []
         with torch.no_grad():
             for (x_target,) in val_loader:
+                x_target = x_target.to(device, dtype)
                 x_base = basesampler(x_target.shape, device, dtype)
                 t = torch.rand(x_base.shape[0], 1, 1, device=device, dtype=dtype)
                 xt, vt = self.get_trajectory(x_target, x_base, t)
@@ -334,7 +336,7 @@ class MFM(SimplePossiblyPeriodicGeometry):
             .cpu()
         )
         t = t.detach().cpu()
-        return xt, xt_straight, t
+        return base.cpu(), xt, xt_straight, t
 
     def _plot_trajectories_simple(self, file, xt, xt_straight, t, nsamples):
         for i in range(xt.shape[-2]):
@@ -396,7 +398,7 @@ class MFM(SimplePossiblyPeriodicGeometry):
         self, file, basesampler, target, device, dtype, nsamples=10, nt=1000
     ):
         base = basesampler(target.shape, device, dtype, use_seed=True)
-        xt, xt_straight, t = self._create_sample_trajectories(
+        base, xt, xt_straight, t = self._create_sample_trajectories(
             base, target, device, dtype, nsamples, nt
         )
         self._plot_trajectories_simple(file, xt, xt_straight, t, nsamples)

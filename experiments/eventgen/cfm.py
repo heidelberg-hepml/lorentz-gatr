@@ -444,7 +444,9 @@ class EventCFM(CFM):
                 len(fourmomenta) == 1
             ), "MFM only implemented for single-multiplicity training for now"
             fourmomenta = fourmomenta[0]
-            generator = torch.Generator().manual_seed(self.cfm.mfm.seed_base)
+            generator = torch.Generator(device=kwargs["device"]).manual_seed(
+                self.cfm.mfm.seed_base
+            )
 
             def basesampler(shape, device, dtype, use_seed=False):
                 return self.sample_base(
