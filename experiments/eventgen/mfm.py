@@ -192,12 +192,12 @@ class MFM(SimplePossiblyPeriodicGeometry):
             f"(batchsize={self.cfm.mfm.training.batchsize}, lr={self.cfm.mfm.training.lr}, "
             f"patience={self.cfm.mfm.training.es_patience})"
         )
-        for iteration in range(self.cfm.mfm.training.iterations):
+        for step in range(self.cfm.mfm.training.iterations):
             x_target = next(train_iter)[0].to(device, dtype)
             x_base = basesampler(x_target.shape, device, dtype)
             self._step(x_base, x_target, **kwargs)
 
-            if (iteration + 1) % self.cfm.mfm.training.validate_every_n_steps == 0:
+            if (step + 1) % self.cfm.mfm.training.validate_every_n_steps == 0:
                 ta = time.time()
                 val_loss = self._validate(val_loader, basesampler, device, dtype)
                 metrics["val_loss"].append(val_loss)
@@ -211,9 +211,16 @@ class MFM(SimplePossiblyPeriodicGeometry):
                 if self.cfm.mfm.training.scheduler in ["ReduceLROnPlateau"]:
                     scheduler.step(val_loss)
                 val_time += time.time() - ta
+
+            if step == 1000:
+                dt = time.time() - t0
+                dtEst = dt * self.cfm.mfm.training.iterations / 1000
+                LOGGER.info(
+                    f"Finished iteration 1000 after {dt/60:.2f}min, training time estimate: {dtEst:.2f}h"
+                )
         dt = time.time() - t0
         LOGGER.info(
-            f"Finished training dnet after {iteration} iterations / {dt/60**2:.2f}h (spent fraction {val_time/dt:.2f} validating)"
+            f"Finished training dnet after {step} iterations / {dt/60**2:.2f}h (spent fraction {val_time/dt:.2f} validating)"
         )
         mean_loss = np.mean(metrics["full"])
         LOGGER.info(f"Mean dnet loss: {mean_loss:.2f}")
