@@ -493,13 +493,9 @@ class MassMFM(MFM):
         base, xt, xt_straight, t = super()._plot_trajectories(
             file, base, target, device, dtype, nsamples=100, nt=1000
         )
-        self._plot_trajectories_distance(
-            file, base[:nsamples], target[:nsamples], xt, xt_straight, t, nsamples
-        )
+        self._plot_trajectories_distance(file, base[:nsamples], xt, xt_straight, t)
 
-    def _plot_trajectories_distance(
-        self, file, base, target, xt, xt_straight, t, nsamples
-    ):
+    def _plot_trajectories_distance(self, file, base, xt, xt_straight, t):
         xt_base = base.unsqueeze(-4).repeat(xt.shape[-4], 1, 1, 1)
         distance = self._get_distance(xt_base, xt)
         distance_straight = self._get_distance(xt_base, xt_straight)
@@ -507,19 +503,28 @@ class MassMFM(MFM):
         distance /= distance_max
         distance_straight /= distance_max
 
+        t = t[:, :, 0, 0]
         plot_trajectories_over_time(
             file,
             distance,
             distance_straight,
-            t[:, :, 0, 0],
+            t,
             xlabel=r"$t$ ($t=0$: target, $t=1$: base)",
             ylabel=r"rescaled remaining distance to base",
         )
-
         plot_trajectories_straightness(
             file,
             distance,
-            t[:, :, 0, 0],
+            t,
+            1 - t,
+            xlabel=r"$t$ ($t=0$: target, $t=1$: base)",
+            ylabel=r"$g$",
+        )
+        plot_trajectories_straightness(
+            file,
+            distance / (1 - t),
+            t,
+            1 + 0.0 * t,
             xlabel=r"$t$ ($t=0$: target, $t=1$: base)",
             ylabel=r"$g/(1-t)$",
         )

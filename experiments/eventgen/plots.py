@@ -439,14 +439,13 @@ def plot_trajectories_2d(file, xt1_x, xt1_y, xt2_x, xt2_y, xlabel, ylabel, nmax=
     plt.close()
 
 
-def plot_trajectories_straightness(file, xt, t, xlabel, ylabel):
+def plot_trajectories_straightness(file, xt, t, ideal, xlabel, ylabel):
     assert t.shape[0] == xt.shape[0]
     col = mpl.cm.Set1(range(10))
     fig, ax = plt.subplots(figsize=(5, 4))
-    hopefully_one = xt / (1 - t)
     for i in range(xt.shape[1]):
-        ax.plot(t[:, i], hopefully_one[:, i], color=col[i % 10], lw=0.5)
-    ax.plot(t[:, 0], 1.0 + 0 * t[:, 0], color="black", lw=1, linestyle="--")
+        ax.plot(t[:, i], xt[:, i], color=col[i % 10], lw=0.5)
+    ax.plot(t[:, 0], ideal[:, 0], color="black", lw=1, linestyle="--")
     ax.set_xlabel(xlabel, fontsize=FONTSIZE)
     ax.set_ylabel(ylabel, fontsize=FONTSIZE)
     ax.set_xlim(0, 1)
