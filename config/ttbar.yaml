@@ -40,6 +40,8 @@ cfm:
   training:
    iterations: 10000
    batchsize: 1024
+   train_test_val: [0.8,0.1,0.1]
+   validate_every_n_steps: 100
    lr: 1e-3
    clip_grad_norm: 5
    patience: 100

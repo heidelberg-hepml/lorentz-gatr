@@ -70,9 +70,16 @@ class MFM(SimplePossiblyPeriodicGeometry):
     ):
         n_features = target.flatten(start_dim=-2).shape[-1]
         self._initialize_model(dnet_cfg, n_features, device, dtype)
+        train_iter, val_loader, test_target = self._initialize_data(target)
         if self.cfm.mfm.warmstart_path is None:
             self._initialize_train(
-                basesampler, target, plot_path, model_path, device, dtype
+                basesampler,
+                train_iter,
+                val_loader,
+                plot_path,
+                model_path,
+                device,
+                dtype,
             )
 
         # trajectories plots
@@ -82,7 +89,9 @@ class MFM(SimplePossiblyPeriodicGeometry):
                 LOGGER.info(f"Starting to create dnet trajectory plots in {plot_path}.")
                 filename = os.path.join(plot_path, "dnet_trajectories.pdf")
                 with PdfPages(filename) as file:
-                    self._plot_trajectories(file, basesampler, target, device, dtype)
+                    self._plot_trajectories(
+                        file, basesampler, test_target, device, dtype
+                    )
 
     def _initialize_model(self, dnet_cfg, n_features, device, dtype):
         self.dnet = instantiate(
@@ -106,15 +115,21 @@ class MFM(SimplePossiblyPeriodicGeometry):
             self.dnet.load_state_dict(state_dict)
             LOGGER.info(f"Loaded dnet from {self.cfm.mfm.warmstart_path}")
 
-    def _initialize_train(
-        self, basesampler, target, plot_path, model_path, device, dtype
+    def _initialize_data(
+        self,
+        target,
     ):
         LOGGER.info(f"Using target dataset of shape {tuple(target.shape)}.")
 
+        splits = [
+            int(x * target.shape[0]) for x in self.cfm.mfm.training.train_test_val
+        ]
+        train, test, val = torch.split(target, splits)
+
         # dataset and loader
         dataset = torch.utils.data.TensorDataset
-        loader = lambda dataset: torch.utils.data.DataLoader(
-            dataset, batch_size=self.cfm.mfm.training.batchsize, shuffle=True
+        loader = lambda dataset, shuffle: torch.utils.data.DataLoader(
+            dataset, batch_size=self.cfm.mfm.training.batchsize, shuffle=shuffle
         )
 
         def cycle(iterable):
@@ -122,9 +137,19 @@ class MFM(SimplePossiblyPeriodicGeometry):
                 for x in iterable:
                     yield x
 
-        constructor = lambda tensor: iter(cycle(loader(dataset(tensor))))
-        iter_target = constructor(target)
+        constructor = lambda tensor: iter(cycle(loader(dataset(tensor), shuffle=True)))
+        train_iter = constructor(train)
+        val_loader = loader(dataset(val), shuffle=False)
 
+        # return objects for further use
+        # train_iter: infinite iterator over training data
+        # val_loader: validation data loader
+        # test: raw test data
+        return train_iter, val_loader, test
+
+    def _initialize_train(
+        self, basesampler, train_iter, val_loader, plot_path, model_path, device, dtype
+    ):
         # training preparations
         optimizer = torch.optim.Adam(
             self.dnet.parameters(), lr=self.cfm.mfm.training.lr
@@ -152,33 +177,42 @@ class MFM(SimplePossiblyPeriodicGeometry):
             "full_phi0": [],
             "lr": [],
             "grad_norm": [],
+            "val_loss": [],
         }
         self._extend_metrics(metrics)
         kwargs = {"optimizer": optimizer, "scheduler": scheduler, "metrics": metrics}
-        loss_min, patience = float("inf"), 0
+        smallest_val_loss, patience = float("inf"), 0
 
         # train loop
         t0 = time.time()
+        val_time = 0.0
         LOGGER.info(
             f"Starting to train dnet for {self.cfm.mfm.training.iterations} iterations "
             f"(batchsize={self.cfm.mfm.training.batchsize}, lr={self.cfm.mfm.training.lr}, "
             f"patience={self.cfm.mfm.training.patience})"
         )
         for iteration in range(self.cfm.mfm.training.iterations):
-            x_target = next(iter_target)[0].to(device, dtype)
+            x_target = next(train_iter)[0].to(device, dtype)
             x_base = basesampler(x_target.shape, device, dtype)
-            loss = self._step(x_base, x_target, **kwargs)
+            self._step(x_base, x_target, **kwargs)
 
-            if loss < loss_min:
-                loss_min = loss
-                patience = 0
-            else:
-                patience += 1
-                if patience > self.cfm.mfm.training.patience:
-                    break
+            if (iteration + 1) % self.cfm.mfm.training.validate_every_n_steps == 0:
+                ta = time.time()
+                val_loss = self._validate(val_loader, basesampler, device, dtype)
+                metrics["val_loss"].append(val_loss)
+                if val_loss < smallest_val_loss:
+                    smallest_val_loss = val_loss
+                    patience = 0
+                else:
+                    patience += 1
+                    if patience > self.cfm.mfm.training.patience:
+                        break
+                if self.cfm.mfm.training.scheduler in ["ReduceLROnPlateau"]:
+                    scheduler.step(val_loss)
+                val_time += time.time() - ta
         dt = time.time() - t0
         LOGGER.info(
-            f"Finished training dnet after {iteration} iterations / {dt/60:.2f}min"
+            f"Finished training dnet after {iteration} iterations / {dt/60**2:.2f}h (spent fraction {val_time/dt:.2f} validating)"
         )
         mean_loss = np.mean(metrics["full"][-patience:])
         LOGGER.info(f"Mean dnet loss: {mean_loss:.2f}")
@@ -198,6 +232,18 @@ class MFM(SimplePossiblyPeriodicGeometry):
                 filename = os.path.join(plot_path, "dnet_training.pdf")
                 with PdfPages(filename) as file:
                     self._plot_training(file, metrics)
+
+    def _validate(self, val_loader, basesampler, device, dtype):
+        self.dnet.eval()
+        losses = []
+        with torch.no_grad():
+            for (x_target,) in val_loader:
+                x_base = basesampler(x_target.shape, device, dtype)
+                t = torch.rand(x_base.shape[0], 1, 1, device=device, dtype=dtype)
+                xt, vt = self.get_trajectory(x_target, x_base, t)
+                loss = self._get_loss(xt, vt)[0]
+                losses.append(loss.detach().cpu().item())
+        return np.mean(losses)
 
     def _step(self, x_base, x_target, metrics, optimizer, scheduler):
         t = torch.rand(x_base.shape[0], 1, 1, device=x_base.device, dtype=x_base.dtype)
@@ -379,6 +425,7 @@ class MassMFM(MFM):
         self.alpha_top = self.cfm.mfm.mass.alpha_top
         self.alpha_W = self.cfm.mfm.mass.alpha_W
 
+    @torch.enable_grad()
     def _get_loss(self, x, v):
         naive_term = (v**2).sum(dim=[-1, -2]).mean()
 
