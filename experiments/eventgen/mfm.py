@@ -65,13 +65,14 @@ class MFM(SimplePossiblyPeriodicGeometry):
         dnet_cfg,
         model_path=None,
         plot_path=None,
+        warmstart_path=None,
         device=None,
         dtype=None,
     ):
         n_features = target.flatten(start_dim=-2).shape[-1]
-        self._initialize_model(dnet_cfg, n_features, device, dtype)
+        self._initialize_model(dnet_cfg, warmstart_path, n_features, device, dtype)
         train_iter, val_loader, test_target = self._initialize_data(target)
-        if self.cfm.mfm.warmstart_path is None:
+        if warmstart_path is None:
             self._initialize_train(
                 basesampler,
                 train_iter,
@@ -93,7 +94,7 @@ class MFM(SimplePossiblyPeriodicGeometry):
                         file, basesampler, test_target, device, dtype
                     )
 
-    def _initialize_model(self, dnet_cfg, n_features, device, dtype):
+    def _initialize_model(self, dnet_cfg, warmstart_path, n_features, device, dtype):
         self.dnet = instantiate(
             dnet_cfg,
             n_features=n_features,
@@ -109,11 +110,14 @@ class MFM(SimplePossiblyPeriodicGeometry):
         )
 
         # load weights if warmstart is provided
-        if self.cfm.mfm.warmstart_path is not None:
-            model_path = os.path.join(self.cfm.mfm.warmstart_path, "dnet.pt")
-            state_dict = torch.load(model_path, map_location=device)
-            self.dnet.load_state_dict(state_dict)
-            LOGGER.info(f"Loaded dnet from {self.cfm.mfm.warmstart_path}")
+        if warmstart_path is not None:
+            model_path = os.path.join(warmstart_path, "dnet.pt")
+            try:
+                state_dict = torch.load(model_path, map_location=device)
+                self.dnet.load_state_dict(state_dict)
+                LOGGER.info(f"Loaded dnet from {model_path}")
+            except FileNotFoundError:
+                LOGGER.warning(f"No dnet found at {model_path}, starting from scratch.")
 
     def _initialize_data(
         self,

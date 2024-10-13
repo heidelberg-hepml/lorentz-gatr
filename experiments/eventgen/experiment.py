@@ -147,10 +147,18 @@ class EventGenerationExperiment(BaseExperiment):
             else None
         )
         model_path = os.path.join(self.cfg.run_dir, "models") if self.cfg.save else None
+        warmstart_path = (
+            self.cfg.cfm.mfm.warmstart_path
+            if self.cfg.cfm.mfm.warmstart_path is not None
+            else os.path.join(self.cfg.run_dir, "models")
+            if self.warm_start
+            else None
+        )
         self.model.init_geometry(
             fit_data,
             model_path=model_path,
             plot_path=plot_path,
+            warmstart_path=warmstart_path,
             dnet_cfg=self.cfg.dnet,
             device=self.device,
             dtype=self.dtype,
