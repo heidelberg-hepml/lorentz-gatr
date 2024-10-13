@@ -140,15 +140,16 @@ class BaseExperiment:
             )
             try:
                 state_dict = torch.load(model_path, map_location="cpu")["model"]
+                LOGGER.info(f"Loading model from {model_path}")
+                self.model.load_state_dict(state_dict)
+                if self.ema is not None:
+                    LOGGER.info(f"Loading EMA from {model_path}")
+                    state_dict = torch.load(model_path, map_location="cpu")["ema"]
+                    self.ema.load_state_dict(state_dict)
             except FileNotFoundError:
-                raise ValueError(f"Cannot load model from {model_path}")
-            LOGGER.info(f"Loading model from {model_path}")
-            self.model.load_state_dict(state_dict)
-
-            if self.ema is not None:
-                LOGGER.info(f"Loading EMA from {model_path}")
-                state_dict = torch.load(model_path, map_location="cpu")["ema"]
-                self.ema.load_state_dict(state_dict)
+                LOGGER.warning(
+                    f"Cannot load model from {model_path}, training model from scratch"
+                )
 
         self.model.to(self.device, dtype=self.dtype)
         if self.ema is not None:
@@ -392,10 +393,12 @@ class BaseExperiment:
             )
             try:
                 state_dict = torch.load(model_path, map_location="cpu")["optimizer"]
+                LOGGER.info(f"Loading optimizer from {model_path}")
+                self.optimizer.load_state_dict(state_dict)
             except FileNotFoundError:
-                raise ValueError(f"Cannot load optimizer from {model_path}")
-            LOGGER.info(f"Loading optimizer from {model_path}")
-            self.optimizer.load_state_dict(state_dict)
+                LOGGER.warning(
+                    f"Cannot load optimizer from {model_path}, starting from scratch"
+                )
 
     def _init_scheduler(self):
         if self.cfg.training.scheduler is None:
@@ -437,10 +440,12 @@ class BaseExperiment:
             )
             try:
                 state_dict = torch.load(model_path, map_location="cpu")["scheduler"]
+                LOGGER.info(f"Loading scheduler from {model_path}")
+                self.scheduler.load_state_dict(state_dict)
             except FileNotFoundError:
-                raise ValueError(f"Cannot load scheduler from {model_path}")
-            LOGGER.info(f"Loading scheduler from {model_path}")
-            self.scheduler.load_state_dict(state_dict)
+                LOGGER.warning(
+                    f"Cannot load scheduler from {model_path}, starting from scratch"
+                )
 
     def train(self):
         # performance metrics
