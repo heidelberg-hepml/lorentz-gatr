@@ -1,8 +1,10 @@
 import os
+import torch
 from omegaconf import OmegaConf, open_dict
 from torch_ema import ExponentialMovingAverage
 
 from experiments.tagging.experiment import TopTaggingExperiment
+from experiments.tagging.embedding import embed_tagging_data_into_ga
 from experiments.logger import LOGGER
 from gatr.layers.linear import EquiLinear
 
@@ -45,7 +47,7 @@ class TopTaggingFineTuneExperiment(TopTaggingExperiment):
             self.cfg.data.reinsert_channels = warmstart_cfg.data.reinsert_channels
             self.cfg.data.rescale_data = warmstart_cfg.data.rescale_data
 
-            self.cfg.model.net.out_mv_channels = 1
+            self.cfg.model.net.out_mv_channels = 2
 
     def init_model(self):
         super().init_model()
@@ -80,3 +82,33 @@ class TopTaggingFineTuneExperiment(TopTaggingExperiment):
         ]
 
         super()._init_optimizer(param_groups=param_groups)
+
+    def _init_loss(self):
+        self.loss = torch.nn.CrossEntropyLoss()
+
+    def _batch_loss(self, batch):
+        y_pred, label = self._get_ypred_and_label_train(batch)
+        label = label.to(dtype=torch.long)
+        print(y_pred.shape, label.shape, label)
+        loss = self.loss(y_pred, label)
+        assert torch.isfinite(loss).all()
+
+        metrics = {}
+        return loss, metrics
+
+    def _get_ypred_and_label_train(self, batch):
+        batch = batch.to(self.device)
+        embedding = embed_tagging_data_into_ga(
+            batch.x, batch.scalars, batch.ptr, self.cfg.data
+        )
+        y_pred = self.model(embedding)
+        return y_pred, batch.label.to(self.dtype)
+
+    def _get_ypred_and_label(self, batch):
+        batch = batch.to(self.device)
+        embedding = embed_tagging_data_into_ga(
+            batch.x, batch.scalars, batch.ptr, self.cfg.data
+        )
+        y_pred = self.model(embedding)
+        y_pred = y_pred[:, 0] - y_pred[:, 1]
+        return y_pred, batch.label.to(self.dtype)
