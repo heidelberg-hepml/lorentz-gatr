@@ -1,7 +1,9 @@
 import os
 from omegaconf import OmegaConf, open_dict
+from torch_ema import ExponentialMovingAverage
 
 from experiments.tagging.experiment import TopTaggingExperiment
+from experiments.logger import LOGGER
 from gatr.layers.linear import EquiLinear
 
 
@@ -42,6 +44,8 @@ class TopTaggingFineTuneExperiment(TopTaggingExperiment):
             self.cfg.data.add_scalar_features = warmstart_cfg.data.add_scalar_features
             self.cfg.data.reinsert_channels = warmstart_cfg.data.reinsert_channels
             self.cfg.data.rescale_data = warmstart_cfg.data.rescale_data
+
+            self.cfg.model.net.out_mv_channels = 1
 
     def init_model(self):
         super().init_model()
