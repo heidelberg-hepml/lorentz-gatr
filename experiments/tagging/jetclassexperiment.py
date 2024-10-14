@@ -20,6 +20,7 @@ from experiments.tagging.embedding import (
 from experiments.tagging.miniweaver.dataset import SimpleIterDataset
 from experiments.tagging.miniweaver.loader import to_filelist
 
+from scipy.special import softmax
 
 class JetClassTaggingExperiment(TaggingExperiment):
     def __init__(self, *args, **kwargs):
@@ -207,27 +208,29 @@ class JetClassTaggingExperiment(TaggingExperiment):
         )  # unweighted mean of AUCs across classes
         if mode == "eval":
             LOGGER.info(f"The ovo mean AUC is\t\t{metrics['auc_ovo']:.5f}")
-        fpr_list, tpr_list = [], []
-        for i in range(len(self.class_names)):
-            fpr, tpr, _ = roc_curve(labels_true == i, labels_predict[:, i])
-            fpr_list.append(fpr)
-            tpr_list.append(tpr)
-
+        
         # 1/epsB at fixed epsS
-        def get_rej(epsS, class_idx):
-            background_eff_fn = interp1d(tpr_list[class_idx], fpr_list[class_idx])
+        def get_rej(epsS, tpr, fpr):
+            background_eff_fn = interp1d(tpr, fpr)
             return 1 / background_eff_fn(epsS)
 
         class_rej_dict = [None, 0.5, 0.5, 0.5, 0.5, 0.99, 0.5, 0.995, 0.5, 0.5]
 
-        for i, rej in enumerate(class_rej_dict):
-            if rej is None:
-                continue
-            rej_string = str(rej).replace(".", "")
-            metrics[f"rej{rej_string}_{i}"] = get_rej(rej, i)
+        for i in range(len(self.class_names)-1):
+            labels_predict_class = labels_predict[(labels_true == 0) | (labels_true == i+1)]
+            labels_true_class = labels_true[(labels_true == 0) | (labels_true == i+1)]
+            labels_predict_class = labels_predict_class[:, [0, i+1]]
+            labels_predict_class = softmax(labels_predict_class, axis=1)
+
+            predict_score = labels_predict_class[:,1]/(labels_predict_class[:,0] + labels_predict_class[:,1])
+
+            fpr, tpr, _ = roc_curve(labels_true_class == i+1, predict_score)
+
+            rej_string = str(class_rej_dict[i+1]).replace(".", "")
+            metrics[f"rej{rej_string}_{i+1}"] = get_rej(class_rej_dict[i+1], tpr, fpr)
             if mode == "eval":
                 LOGGER.info(
-                    f"Rejection rate for class {self.class_names[i]:>10} on {title} dataset:{metrics[f'rej{rej_string}_{i}']:>5.0f} (epsS={rej})"
+                    f"Rejection rate for class {self.class_names[i+1]:>10} on {title} dataset:{metrics[f'rej{rej_string}_{i+1}']:>5.0f} (epsS={class_rej_dict[i+1]})"
                 )
 
         # create latex string

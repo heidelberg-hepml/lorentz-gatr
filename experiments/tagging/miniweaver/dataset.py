@@ -368,7 +368,7 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
         async_load=False,
         infinity_mode=False,
         in_memory=False,
-        events_per_file=100000,  # assumes files from JetClass dataset
+        events_per_file=100000,  # JetClass files contain 100k events each
         name="",
     ):
         self._iters = {} if infinity_mode or in_memory else None
@@ -469,4 +469,4 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
                 return self._iters[worker_id]
 
     def __len__(self):
-        return len(self._init_file_dict) * self._events_per_file
+        return len(self._init_file_dict["_"]) * self._events_per_file

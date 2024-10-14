@@ -17,7 +17,7 @@ from experiments.mlflow import log_mlflow
 
 MODEL_TITLE_DICT = {"GATr": "GATr"}
 
-UNITS = 40  # We use units of 40 GeV for all tagging experiments
+UNITS = 20  # We use units of 20 GeV for all tagging experiments
 
 
 class TaggingExperiment(BaseExperiment):
@@ -41,8 +41,8 @@ class TaggingExperiment(BaseExperiment):
             self.cfg.model.net.in_mv_channels = 1
 
             # extra scalar channels
-            if self.cfg.data.add_pt:
-                self.cfg.model.net.in_s_channels += 1
+            if self.cfg.data.add_scalar_features:
+                self.cfg.model.net.in_s_channels += 7
             if self.cfg.data.include_global_token:
                 self.cfg.model.net.in_s_channels += self.cfg.data.num_global_tokens
 
@@ -56,6 +56,10 @@ class TaggingExperiment(BaseExperiment):
                         else 1
                     )
                 if self.cfg.data.add_time_reference:
+                    self.cfg.model.net.in_mv_channels += 1
+                if self.cfg.data.add_xzplane:
+                    self.cfg.model.net.in_mv_channels += 1
+                if self.cfg.data.add_yzplane:
                     self.cfg.model.net.in_mv_channels += 1
 
             # reinsert channels
@@ -198,6 +202,11 @@ class TaggingExperiment(BaseExperiment):
                 f"{metrics['rej05']:.0f} (epsS=0.5), {metrics['rej08']:.0f}"
             )
 
+        # create latex string
+        if mode == "eval":
+            tex_string = f"{self.cfg.run_name} & {metrics['accuracy']:.4f} & {metrics['auc']:.4f} & {metrics['rej03']:.0f} & {metrics['rej05']:.0f} \\\\"
+            LOGGER.info(tex_string)
+
         if self.cfg.use_mlflow:
             for key, value in metrics.items():
                 if key in ["labels_true", "labels_predict", "fpr", "tpr"]:
@@ -234,6 +243,7 @@ class TaggingExperiment(BaseExperiment):
             plot_dict["train_lr"] = self.train_lr
             plot_dict["train_metrics"] = self.train_metrics
             plot_dict["val_metrics"] = self.val_metrics
+            plot_dict["grad_norm"] = self.train_grad_norm
         plot_mixer(self.cfg, plot_path, title, plot_dict)
 
     # overwrite _validate method to compute metrics over the full validation set
