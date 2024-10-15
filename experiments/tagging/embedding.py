@@ -70,9 +70,6 @@ def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
             (scalars, *scalar_features),
             dim=-1,
         )
-    print(scalars.shape)
-    print(scalars[:5])
-    exit()
 
     # embed fourmomenta into multivectors
     multivectors = embed_vector(fourmomenta)
