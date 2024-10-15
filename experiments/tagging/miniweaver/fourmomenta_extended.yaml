@@ -28,9 +28,9 @@ inputs:
          - [part_e_log, 2.0, 0.7]
          - [part_logptrel, -4.7, 0.7]
          - [part_logerel, -4.7, 0.7]
-         - [part_deltaR, 0.2, 4.0]
-         - [part_deta, null]
          - [part_dphi, null]
+         - [part_deta, null]
+         - [part_deltaR, 0.2, 4.0]
    pf_vectors:
       length: 128
       pad_mode: constant

@@ -52,7 +52,7 @@ def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
         phi_4, phi_jet = get_phi(fourmomenta), get_phi(jet)
         dphi = ((phi_4 - phi_jet + torch.pi) % (2 * torch.pi) - torch.pi).unsqueeze(-1)
         eta_4, eta_jet = get_eta(fourmomenta), get_eta(jet)
-        deta = (eta_4 - eta_jet).unsqueeze(-1)
+        deta = -(eta_4 - eta_jet).unsqueeze(-1)
         dr = torch.sqrt(dphi**2 + deta**2)
         scalar_features = [
             log_pt,
@@ -70,6 +70,9 @@ def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
             (scalars, *scalar_features),
             dim=-1,
         )
+    print(scalars.shape)
+    print(scalars[:5])
+    exit()
 
     # embed fourmomenta into multivectors
     multivectors = embed_vector(fourmomenta)
