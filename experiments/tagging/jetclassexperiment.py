@@ -108,7 +108,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
             datasets[label] = SimpleIterDataset(
                 file_dict,
                 self.cfg.data.data_config,
-                for_training=True,
+                for_training=for_training[label],
                 extra_selection=self.cfg.jc_params.extra_selection,
                 remake_weights=not self.cfg.jc_params.not_remake_weights,
                 load_range_and_fraction=((0, 1), 1),
