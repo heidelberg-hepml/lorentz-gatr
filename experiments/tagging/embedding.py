@@ -5,6 +5,8 @@ from torch_geometric.utils import scatter
 from experiments.tagging.dataset import EPS
 from gatr.interface import embed_vector
 
+UNITS = 20  # We use units of 20 GeV for all tagging experiments
+
 
 def get_batch_from_ptr(ptr):
     return torch.arange(len(ptr) - 1, device=ptr.device).repeat_interleave(
@@ -72,6 +74,8 @@ def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
         )
 
     # embed fourmomenta into multivectors
+    if cfg_data.rescale_data:
+        fourmomenta /= UNITS
     multivectors = embed_vector(fourmomenta)
     multivectors = multivectors.unsqueeze(-2)
 
