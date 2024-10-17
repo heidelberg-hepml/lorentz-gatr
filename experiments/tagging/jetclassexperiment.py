@@ -24,9 +24,6 @@ from experiments.tagging.miniweaver.loader import to_filelist
 class JetClassTaggingExperiment(TaggingExperiment):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        assert (
-            not self.cfg.model.mean_aggregation
-        ), "Mean-aggregation not implemented for multi-class classification"
         assert not self.cfg.plotting.roc and not self.cfg.plotting.score
         self.class_names = [
             "ZJetsToNuNu",
