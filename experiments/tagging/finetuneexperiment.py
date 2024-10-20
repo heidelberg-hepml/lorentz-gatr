@@ -18,12 +18,6 @@ class TopTaggingFineTuneExperiment(TopTaggingExperiment):
         warmstart_cfg = OmegaConf.load(warmstart_path)
         assert warmstart_cfg.exp_type == "jctagging"
         assert warmstart_cfg.data.features == "fourmomenta"
-        assert (
-            warmstart_cfg.ema
-            and self.cfg.ema
-            or not warmstart_cfg.ema
-            and not self.cfg.ema
-        ), "Current implementation only works if pretrained and finetune model use the same EMA setting"
         if warmstart_cfg.data.score_token:
             raise NotImplementedError(
                 "Score-token option not properly implemented yet to be transferred from jc to top"
@@ -33,17 +27,23 @@ class TopTaggingFineTuneExperiment(TopTaggingExperiment):
         with open_dict(self.cfg):
             # overwrite model
             self.cfg.model = warmstart_cfg.model
+            self.cfm.ema = warmstart_cfg.ema
+            self.cfg.ga_representations = warmstart_cfg.ga_representations
 
             # overwrite model-specific data entries
-            # (this is ugly, please improve it)
             self.cfg.model.mean_aggregation = warmstart_cfg.model.mean_aggregation
             self.cfg.data.beam_reference = warmstart_cfg.data.beam_reference
             self.cfg.data.two_beams = warmstart_cfg.data.two_beams
             self.cfg.data.beam_token = warmstart_cfg.data.beam_token
             self.cfg.data.add_time_reference = warmstart_cfg.data.add_time_reference
+            self.cfg.data.add_xzplane = warmstart_cfg.data.add_xzplane
+            self.cfg.data.add_yzplane = warmstart_cfg.data.add_yzplane
             self.cfg.data.add_scalar_features = warmstart_cfg.data.add_scalar_features
             self.cfg.data.reinsert_channels = warmstart_cfg.data.reinsert_channels
             self.cfg.data.rescale_data = warmstart_cfg.data.rescale_data
+            self.cfg.data.scalar_features_preprocessing = (
+                warmstart_cfg.data.scalar_features_preprocessing
+            )
 
             self.cfg.model.net.out_mv_channels = 1
 
