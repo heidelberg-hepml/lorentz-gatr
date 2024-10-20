@@ -23,10 +23,13 @@ class TopTransferTest(TopTaggingExperiment):
         warmstart_path = os.path.join(
             self.cfg.finetune.backbone_path, self.cfg.finetune.backbone_cfg
         )
-        warmstart_cfg = OmegaConf.load(warmstart_path)
-        assert warmstart_cfg.exp_type == "jctagging"
-        assert warmstart_cfg.data.features in ["fourmomenta", "fourmomenta_extended"]
-        if warmstart_cfg.data.score_token:
+        self.warmstart_cfg = OmegaConf.load(warmstart_path)
+        assert self.warmstart_cfg.exp_type == "jctagging"
+        assert self.warmstart_cfg.data.features in [
+            "fourmomenta",
+            "fourmomenta_extended",
+        ]
+        if self.warmstart_cfg.data.score_token:
             raise NotImplementedError(
                 "Score-token option not properly implemented yet to be transferred from jc to top"
             )
@@ -34,26 +37,47 @@ class TopTransferTest(TopTaggingExperiment):
         # merge config files
         with open_dict(self.cfg):
             # overwrite model
-            self.cfg.model = warmstart_cfg.model
-            self.cfg.ema = warmstart_cfg.ema
-            self.cfg.ga_representations = warmstart_cfg.ga_representations
+            self.cfg.model = self.warmstart_cfg.model
+            self.cfg.ema = self.warmstart_cfg.ema
+            self.cfg.ga_representations = self.warmstart_cfg.ga_representations
 
             # overwrite model-specific data entries
-            self.cfg.model.mean_aggregation = warmstart_cfg.model.mean_aggregation
-            self.cfg.data.beam_reference = warmstart_cfg.data.beam_reference
-            self.cfg.data.two_beams = warmstart_cfg.data.two_beams
-            self.cfg.data.beam_token = warmstart_cfg.data.beam_token
-            self.cfg.data.add_time_reference = warmstart_cfg.data.add_time_reference
-            self.cfg.data.add_xzplane = warmstart_cfg.data.add_xzplane
-            self.cfg.data.add_yzplane = warmstart_cfg.data.add_yzplane
-            self.cfg.data.add_scalar_features = warmstart_cfg.data.add_scalar_features
-            self.cfg.data.reinsert_channels = warmstart_cfg.data.reinsert_channels
-            self.cfg.data.rescale_data = warmstart_cfg.data.rescale_data
+            self.cfg.model.mean_aggregation = self.warmstart_cfg.model.mean_aggregation
+            self.cfg.data.beam_reference = self.warmstart_cfg.data.beam_reference
+            self.cfg.data.two_beams = self.warmstart_cfg.data.two_beams
+            self.cfg.data.beam_token = self.warmstart_cfg.data.beam_token
+            self.cfg.data.add_time_reference = (
+                self.warmstart_cfg.data.add_time_reference
+            )
+            self.cfg.data.add_xzplane = self.warmstart_cfg.data.add_xzplane
+            self.cfg.data.add_yzplane = self.warmstart_cfg.data.add_yzplane
+            self.cfg.data.add_scalar_features = (
+                self.warmstart_cfg.data.add_scalar_features
+            )
+            self.cfg.data.reinsert_channels = self.warmstart_cfg.data.reinsert_channels
+            self.cfg.data.rescale_data = self.warmstart_cfg.data.rescale_data
             self.cfg.data.scalar_features_preprocessing = (
-                warmstart_cfg.data.scalar_features_preprocessing
+                self.warmstart_cfg.data.scalar_features_preprocessing
             )
 
             self.cfg.train = False
+
+    def init_model(self):
+        super().init_model()
+
+        # load pretrained weights
+        model_path = os.path.join(
+            self.warmstart_cfg.run_dir,
+            "models",
+            f"model_run{self.warmstart_cfg.run_idx}.pt",
+        )
+        try:
+            state_dict = torch.load(model_path, map_location="cpu")["model"]
+        except FileNotFoundError:
+            raise ValueError(f"Cannot load model from {model_path}")
+        LOGGER.info(f"Loading pretrained model from {model_path}")
+        self.model.load_state_dict(state_dict)
+        self.model.to(self.device, dtype=self.dtype)
 
     def _get_ypred_and_label(self, batch):
         batch = batch.to(self.device)
@@ -78,47 +102,51 @@ class JetClassTransferTest(TopTaggingExperiment):
         warmstart_path = os.path.join(
             self.cfg.finetune.backbone_path, self.cfg.finetune.backbone_cfg
         )
-        warmstart_cfg = OmegaConf.load(warmstart_path)
-        assert warmstart_cfg.exp_type == "jctagging"
-        assert warmstart_cfg.data.features == "fourmomenta"
-        if warmstart_cfg.data.score_token:
+        self.warmstart_cfg = OmegaConf.load(warmstart_path)
+        assert self.warmstart_cfg.exp_type == "jctagging"
+        assert self.warmstart_cfg.data.features == "fourmomenta"
+        if self.warmstart_cfg.data.score_token:
             raise NotImplementedError(
                 "Score-token option not properly implemented yet to be transferred from jc to top"
             )
 
         with open_dict(self.cfg):
             # overwrite model
-            self.cfg.model = warmstart_cfg.model
-            self.cfg.ema = warmstart_cfg.ema
-            self.cfg.ga_representations = warmstart_cfg.ga_representations
+            self.cfg.model = self.warmstart_cfg.model
+            self.cfg.ema = self.warmstart_cfg.ema
+            self.cfg.ga_representations = self.warmstart_cfg.ga_representations
 
             # overwrite model-specific data entries
-            self.cfg.model.mean_aggregation = warmstart_cfg.model.mean_aggregation
-            self.cfg.data.beam_reference = warmstart_cfg.data.beam_reference
-            self.cfg.data.two_beams = warmstart_cfg.data.two_beams
-            self.cfg.data.beam_token = warmstart_cfg.data.beam_token
-            self.cfg.data.add_time_reference = warmstart_cfg.data.add_time_reference
-            self.cfg.data.add_xzplane = warmstart_cfg.data.add_xzplane
-            self.cfg.data.add_yzplane = warmstart_cfg.data.add_yzplane
-            self.cfg.data.add_scalar_features = warmstart_cfg.data.add_scalar_features
-            self.cfg.data.reinsert_channels = warmstart_cfg.data.reinsert_channels
-            self.cfg.data.rescale_data = warmstart_cfg.data.rescale_data
-            self.cfg.data.scalar_features_preprocessing = (
-                warmstart_cfg.data.scalar_features_preprocessing
+            self.cfg.model.mean_aggregation = self.warmstart_cfg.model.mean_aggregation
+            self.cfg.data.beam_reference = self.warmstart_cfg.data.beam_reference
+            self.cfg.data.two_beams = self.warmstart_cfg.data.two_beams
+            self.cfg.data.beam_token = self.warmstart_cfg.data.beam_token
+            self.cfg.data.add_time_reference = (
+                self.warmstart_cfg.data.add_time_reference
             )
-            self.cfg.data.features = warmstart_cfg.data.features
+            self.cfg.data.add_xzplane = self.warmstart_cfg.data.add_xzplane
+            self.cfg.data.add_yzplane = self.warmstart_cfg.data.add_yzplane
+            self.cfg.data.add_scalar_features = (
+                self.warmstart_cfg.data.add_scalar_features
+            )
+            self.cfg.data.reinsert_channels = self.warmstart_cfg.data.reinsert_channels
+            self.cfg.data.rescale_data = self.warmstart_cfg.data.rescale_data
+            self.cfg.data.scalar_features_preprocessing = (
+                self.warmstart_cfg.data.scalar_features_preprocessing
+            )
+            self.cfg.data.features = self.warmstart_cfg.data.features
 
-            self.cfg.jc_params = warmstart_cfg.jc_params
+            self.cfg.jc_params = self.warmstart_cfg.jc_params
             self.cfg.train = False
             self.cfg.evaluation.eval_set = ["test"]
 
-            if warmstart_cfg.data.features == "fourmomenta":
+            if self.warmstart_cfg.data.features == "fourmomenta":
                 self.cfg.data.data_config = (
                     "experiments/tagging/miniweaver/fourmomenta_jctt.yaml"
                 )
             else:
                 raise ValueError(
-                    f"warmstart with data.features={warmstart_cfg.data.features} not supported"
+                    f"warmstart with data.features={self.warmstart_cfg.data.features} not supported"
                 )
 
     def init_data(self):
@@ -182,6 +210,23 @@ class JetClassTransferTest(TopTaggingExperiment):
             **self.loader_kwargs,
         )
         self.train_loader, self.val_loader = None, None
+
+    def init_model(self):
+        super().init_model()
+
+        # load pretrained weights
+        model_path = os.path.join(
+            self.warmstart_cfg.run_dir,
+            "models",
+            f"model_run{self.warmstart_cfg.run_idx}.pt",
+        )
+        try:
+            state_dict = torch.load(model_path, map_location="cpu")["model"]
+        except FileNotFoundError:
+            raise ValueError(f"Cannot load model from {model_path}")
+        LOGGER.info(f"Loading pretrained model from {model_path}")
+        self.model.load_state_dict(state_dict)
+        self.model.to(self.device, dtype=self.dtype)
 
     def _get_ypred_and_label(self, batch):
         fourmomenta = batch[0]["pf_vectors"].to(self.device)
