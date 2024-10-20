@@ -157,15 +157,6 @@ class JetClassTaggingExperiment(TaggingExperiment):
 
     def _evaluate_single(self, loader, title, mode, step=None):
         assert mode in ["val", "eval"]
-        # re-initialize dataloader to make sure it is using the evaluation batchsize
-        # (makes a difference for trainloader)
-        loader = DataLoader(
-            dataset=loader.dataset,
-            batch_size=self.cfg.evaluation.batchsize,
-            shuffle=False,
-            drop_last=False,
-            **self.loader_kwargs,
-        )
 
         if mode == "eval":
             LOGGER.info(f"### Starting to evaluate model on {title} dataset ###")

@@ -35,7 +35,7 @@ class TopTransferTest(TopTaggingExperiment):
         with open_dict(self.cfg):
             # overwrite model
             self.cfg.model = warmstart_cfg.model
-            self.cfm.ema = warmstart_cfg.ema
+            self.cfg.ema = warmstart_cfg.ema
             self.cfg.ga_representations = warmstart_cfg.ga_representations
 
             # overwrite model-specific data entries
@@ -89,7 +89,7 @@ class JetClassTransferTest(TopTaggingExperiment):
         with open_dict(self.cfg):
             # overwrite model
             self.cfg.model = warmstart_cfg.model
-            self.cfm.ema = warmstart_cfg.ema
+            self.cfg.ema = warmstart_cfg.ema
             self.cfg.ga_representations = warmstart_cfg.ga_representations
 
             # overwrite model-specific data entries
