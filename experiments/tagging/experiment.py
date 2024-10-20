@@ -133,18 +133,11 @@ class TaggingExperiment(BaseExperiment):
 
     def _evaluate_single(self, loader, title, mode, step=None):
         assert mode in ["val", "eval"]
-        # re-initialize dataloader to make sure it is using the evaluation batchsize
-        # (makes a difference for trainloader)
-        loader = DataLoader(
-            dataset=loader.dataset,
-            batch_size=self.cfg.evaluation.batchsize,
-            shuffle=False,
-        )
 
         if mode == "eval":
             LOGGER.info(
                 f"### Starting to evaluate model on {title} dataset with "
-                f"{len(loader.dataset.data_list)} elements, batchsize {loader.batch_size} ###"
+                f"{len(loader.dataset)} elements, batchsize {loader.batch_size} ###"
             )
         metrics = {}
 
