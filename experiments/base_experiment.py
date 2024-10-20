@@ -569,7 +569,7 @@ class BaseExperiment:
             torch.nn.utils.clip_grad_norm_(
                 self.model.parameters(),
                 self.cfg.training.clip_grad_norm,
-                error_if_nonfinite=True,
+                error_if_nonfinite=False,
             )
             .cpu()
             .item()
