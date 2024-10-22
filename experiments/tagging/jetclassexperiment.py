@@ -50,11 +50,6 @@ class JetClassTaggingExperiment(TaggingExperiment):
                 self.cfg.data.data_config = (
                     "experiments/tagging/miniweaver/fourmomenta.yaml"
                 )
-            elif self.cfg.data.features == "fourmomenta_extended":
-                self.cfg.model.net.in_s_channels = 7
-                self.cfg.data.data_config = (
-                    "experiments/tagging/miniweaver/fourmomenta_extended.yaml"
-                )
             elif self.cfg.data.features == "pid":
                 self.cfg.model.net.in_s_channels = 6
                 self.cfg.data.data_config = "experiments/tagging/miniweaver/pid.yaml"
