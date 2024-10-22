@@ -197,9 +197,6 @@ class EventGPT(GPT):
         fourmomenta = fourmomenta * self.units
         return fourmomenta
 
-    def init_anything(self, *args, **kwargs):
-        pass
-
 
 class JetGPT(EventGPT):
     def __init__(self, net, n_gauss, gpt, type_token_channels, process_token_channels):

@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-from torch import nn
 
 from gatr.interface import embed_vector, extract_vector
 from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity

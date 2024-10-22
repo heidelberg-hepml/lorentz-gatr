@@ -1,4 +1,3 @@
-import torch
 from experiments.eventgen.helpers import ensure_angle
 
 
