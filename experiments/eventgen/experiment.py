@@ -140,29 +140,7 @@ class EventGenerationExperiment(BaseExperiment):
         self.model.coordinates.init_fit(fit_data)
         if hasattr(self.model, "distribution"):
             self.model.distribution.coordinates.init_fit(fit_data)
-
-        plot_path = (
-            os.path.join(self.cfg.run_dir, f"plots_{self.cfg.run_idx}")
-            if self.cfg.save and self.cfg.plot
-            else None
-        )
-        model_path = os.path.join(self.cfg.run_dir, "models") if self.cfg.save else None
-        warmstart_path = (
-            self.cfg.cfm.mfm.warmstart_path
-            if self.cfg.cfm.mfm.warmstart_path is not None
-            else os.path.join(self.cfg.run_dir, "models")
-            if self.warm_start
-            else None
-        )
-        self.model.init_geometry(
-            fit_data,
-            model_path=model_path,
-            plot_path=plot_path,
-            warmstart_path=warmstart_path,
-            dnet_cfg=self.cfg.dnet,
-            device=self.device,
-            dtype=self.dtype,
-        )
+        self.model.init_geometry()
 
     def _init_dataloader(self):
         assert sum(self.cfg.data.train_test_val) <= 1

@@ -1,6 +1,0 @@
-_target_: experiments.eventgen.dnet.DisplacementMLP
-net:
- _target_: experiments.baselines.mlp.MLP
- _partial_: true
- hidden_channels: 128
- hidden_layers: 4

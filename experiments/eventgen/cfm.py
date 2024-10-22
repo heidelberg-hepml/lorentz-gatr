@@ -15,7 +15,6 @@ from experiments.eventgen.distributions import (
 from experiments.eventgen.utils import GaussianFourierProjection
 import experiments.eventgen.coordinates as c
 from experiments.eventgen.geometry import BaseGeometry, SimplePossiblyPeriodicGeometry
-from experiments.eventgen.mfm import MassMFM, LANDMFM
 
 
 def hutchinson_trace(x_out, x_in):
@@ -413,47 +412,15 @@ class EventCFM(CFM):
             raise ValueError(f"coordinates={coordinates_label} not implemented")
         return coordinates
 
-    def init_geometry(self, fourmomenta, **kwargs):
+    def init_geometry(self):
         # placeholder for any initialization that needs to be done
         if self.cfm.geometry.type == "simple":
             self.geometry = SimplePossiblyPeriodicGeometry(
                 contains_phi=self.coordinates.contains_phi,
                 periodic=self.cfm.geometry.periodic,
             )
-        elif self.cfm.geometry.type == "MassMFM":
-            self.geometry = MassMFM(
-                virtual_components=self.virtual_components,
-                cfm=self.cfm,
-                coordinates=self.coordinates,
-                contains_phi=self.coordinates.contains_phi,
-                periodic=self.cfm.geometry.periodic,
-            )
-        elif self.cfm.geometry.type == "LANDMFM":
-            self.geometry = LANDMFM(
-                virtual_components=self.virtual_components,
-                cfm=self.cfm,
-                coordinates=self.coordinates,
-                contains_phi=self.coordinates.contains_phi,
-                periodic=self.cfm.geometry.periodic,
-            )
         else:
             raise ValueError(f"geometry={self.cfm.geometry} not implemented")
-
-        if self.cfm.geometry.type in ["MassMFM", "LANDMFM"]:
-            assert (
-                len(fourmomenta) == 1
-            ), "MFM only implemented for single-multiplicity training for now"
-            fourmomenta = fourmomenta[0]
-            generator = torch.Generator(device=kwargs["device"]).manual_seed(
-                self.cfm.mfm.seed_base
-            )
-
-            def basesampler(shape, device, dtype, use_seed=False):
-                return self.sample_base(
-                    shape, device, dtype, generator=generator if use_seed else None
-                )
-
-            self.geometry.initialize(basesampler, fourmomenta, **kwargs)
 
     def preprocess(self, fourmomenta):
         fourmomenta = fourmomenta / self.units
