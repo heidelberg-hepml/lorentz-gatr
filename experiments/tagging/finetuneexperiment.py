@@ -52,6 +52,10 @@ class TopTaggingFineTuneExperiment(TopTaggingExperiment):
     def init_model(self):
         super().init_model()
 
+        if self.warm_start:
+            # nothing to do
+            return
+
         # load pretrained weights
         model_path = os.path.join(
             self.warmstart_cfg.run_dir,
