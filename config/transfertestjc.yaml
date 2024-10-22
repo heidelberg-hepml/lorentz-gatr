@@ -1,7 +1,0 @@
-exp_type: transfertestjc
-
-data:
- test_files_range: [123,124]
-
-defaults:
- - toptaggingft
