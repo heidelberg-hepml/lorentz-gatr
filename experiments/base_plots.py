@@ -13,7 +13,7 @@ FONTSIZE_LEGEND = 13
 FONTSIZE_TICK = 12
 
 
-def plot_loss(file, losses, lr, labels=None, logy=True):
+def plot_loss(file, losses, lr=None, labels=None, logy=True):
     if len(losses[1]) == 0:  # catch no-validations case
         losses = [losses[0]]
         labels = [labels[0]]
@@ -30,11 +30,12 @@ def plot_loss(file, losses, lr, labels=None, logy=True):
 
     if logy:
         ax.set_yscale("log")
-    axright = ax.twinx()
-    axright.plot(iterations, lr, label="learning rate", color="crimson")
+    if lr is not None:
+        axright = ax.twinx()
+        axright.plot(iterations, lr, label="learning rate", color="crimson")
+        axright.set_ylabel("Learning rate", fontsize=FONTSIZE)
     ax.set_xlabel("Number of iterations", fontsize=FONTSIZE)
     ax.set_ylabel("Loss", fontsize=FONTSIZE)
-    axright.set_ylabel("Learning rate", fontsize=FONTSIZE)
     ax.legend(fontsize=FONTSIZE_LEGEND, frameon=False, loc="upper right")
     fig.savefig(file, format="pdf", bbox_inches="tight")
     plt.close()

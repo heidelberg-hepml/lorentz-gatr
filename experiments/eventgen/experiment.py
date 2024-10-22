@@ -115,6 +115,7 @@ class EventGenerationExperiment(BaseExperiment):
             self.delta_r_min,
             self.onshell_list,
             self.onshell_mass,
+            self.virtual_components,
             self.cfg.data.base_type,
             self.cfg.data.use_pt_min,
             self.cfg.data.use_delta_r_min,
@@ -136,10 +137,10 @@ class EventGenerationExperiment(BaseExperiment):
         self.model.init_distribution()
         self.model.init_coordinates()
         fit_data = [x / self.units for x in self.events_raw]
-        for coordinates in self.model.coordinates:
-            coordinates.init_fit(fit_data)
+        self.model.coordinates.init_fit(fit_data)
         if hasattr(self.model, "distribution"):
             self.model.distribution.coordinates.init_fit(fit_data)
+        self.model.init_geometry()
 
     def _init_dataloader(self):
         assert sum(self.cfg.data.train_test_val) <= 1
@@ -239,7 +240,7 @@ class EventGenerationExperiment(BaseExperiment):
         data_true = self.events_raw[ijet]
         data_fake = self.data_raw[ijet]["gen"]
         LOGGER.info(
-            f"Classifier data true/fake has shape {data_true.shape}/{data_fake.shape}"
+            f"Classifier generated data true/fake has shape {tuple(data_true.shape)}/{tuple(data_fake.shape)}"
         )
 
         # preprocessing
@@ -326,19 +327,6 @@ class EventGenerationExperiment(BaseExperiment):
         self.model.eval()
 
         for ijet, n_jets in enumerate(self.cfg.data.n_jets):
-            if self.cfg.save and self.cfg.plotting.save_trajectories:
-                os.makedirs(
-                    os.path.join(self.cfg.run_dir, "trajectories"), exist_ok=True
-                )
-                trajectory_path = os.path.join(
-                    self.cfg.run_dir,
-                    "trajectories",
-                    f"run{self.cfg.run_idx}_{n_jets}j.npz",
-                )
-                LOGGER.info(f"Will save {n_jets}j trajectories to {trajectory_path}")
-            else:
-                trajectory_path = None
-
             sample = []
             shape = (self.cfg.evaluation.batchsize, self.n_hard_particles + n_jets, 4)
             n_batches = (
@@ -354,7 +342,6 @@ class EventGenerationExperiment(BaseExperiment):
                     shape,
                     self.device,
                     self.dtype,
-                    trajectory_path=trajectory_path if i == 0 else None,
                 )
                 sample.append(x_t)
             t1 = time.time()
@@ -404,14 +391,22 @@ class EventGenerationExperiment(BaseExperiment):
             "model_label": self.modelname,
         }
 
+        if self.cfg.train:
+            filename = os.path.join(path, "training.pdf")
+            plotter.plot_losses(filename=filename, **kwargs)
+
+        if not self.cfg.evaluate:
+            return
+
         # set correct masses
-        for label in ["trn", "tst", "gen"]:
-            for ijet in range(len(self.cfg.data.n_jets)):
-                self.data_raw[ijet][label] = ensure_onshell(
-                    self.data_raw[ijet][label],
-                    self.onshell_list,
-                    self.onshell_mass,
-                )
+        if self.cfg.evaluation.sample:
+            for label in ["trn", "tst", "gen"]:
+                for ijet in range(len(self.cfg.data.n_jets)):
+                    self.data_raw[ijet][label] = ensure_onshell(
+                        self.data_raw[ijet][label],
+                        self.onshell_list,
+                        self.onshell_mass,
+                    )
 
         # If specified, collect weights from classifier
         if self.cfg.evaluation.classifier and self.cfg.plotting.reweighted:
@@ -433,55 +428,52 @@ class EventGenerationExperiment(BaseExperiment):
         else:
             mask_dict = {ijet: None for ijet, n_jets in enumerate(self.cfg.data.n_jets)}
 
-        if self.cfg.train:
-            filename = os.path.join(path, "loss.pdf")
-            plotter.plot_losses(filename=filename, **kwargs)
-
-        if self.cfg.plotting.log_prob and len(self.cfg.evaluation.eval_log_prob) > 0:
+        if (
+            self.cfg.plotting.log_prob
+            and len(self.cfg.evaluation.eval_log_prob) > 0
+            and self.cfg.evaluate
+        ):
             filename = os.path.join(path, "neg_log_prob.pdf")
             plotter.plot_log_prob(filename=filename, **kwargs)
 
-        if self.cfg.evaluation.classifier:
+        if self.cfg.evaluation.classifier and self.cfg.evaluate:
             filename = os.path.join(path, "classifier.pdf")
             plotter.plot_classifier(filename=filename, **kwargs)
 
-        if self.cfg.plotting.fourmomenta and self.cfg.evaluation.sample:
-            filename = os.path.join(path, "fourmomenta.pdf")
-            plotter.plot_fourmomenta(
-                filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
-            )
+        if self.cfg.evaluation.sample:
+            if self.cfg.plotting.fourmomenta:
+                filename = os.path.join(path, "fourmomenta.pdf")
+                plotter.plot_fourmomenta(
+                    filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
+                )
 
-        if self.cfg.plotting.jetmomenta and self.cfg.evaluation.sample:
-            filename = os.path.join(path, "jetmomenta.pdf")
-            plotter.plot_jetmomenta(
-                filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
-            )
+            if self.cfg.plotting.jetmomenta:
+                filename = os.path.join(path, "jetmomenta.pdf")
+                plotter.plot_jetmomenta(
+                    filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
+                )
 
-        if self.cfg.plotting.preprocessed and self.cfg.evaluation.sample:
-            filename = os.path.join(path, "preprocessed.pdf")
-            plotter.plot_preprocessed(
-                filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
-            )
+            if self.cfg.plotting.preprocessed:
+                filename = os.path.join(path, "preprocessed.pdf")
+                plotter.plot_preprocessed(
+                    filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
+                )
 
-        if (
-            self.cfg.plotting.virtual
-            and len(self.virtual_components) > 0
-            and self.cfg.evaluation.sample
-        ):
-            filename = os.path.join(path, "virtual.pdf")
-            plotter.plot_virtual(
-                filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
-            )
+            if self.cfg.plotting.virtual and len(self.virtual_components) > 0:
+                filename = os.path.join(path, "virtual.pdf")
+                plotter.plot_virtual(
+                    filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
+                )
 
-        if self.cfg.plotting.delta and self.cfg.evaluation.sample:
-            filename = os.path.join(path, "delta.pdf")
-            plotter.plot_delta(
-                filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
-            )
+            if self.cfg.plotting.delta:
+                filename = os.path.join(path, "delta.pdf")
+                plotter.plot_delta(
+                    filename=filename, **kwargs, weights=weights, mask_dict=mask_dict
+                )
 
-        if self.cfg.plotting.deta_dphi and self.cfg.evaluation.sample:
-            filename = os.path.join(path, "deta_dphi.pdf")
-            plotter.plot_deta_dphi(filename=filename, **kwargs)
+            if self.cfg.plotting.deta_dphi:
+                filename = os.path.join(path, "deta_dphi.pdf")
+                plotter.plot_deta_dphi(filename=filename, **kwargs)
 
     def _init_loss(self):
         # loss defined manually within the model
