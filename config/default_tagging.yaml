@@ -3,9 +3,19 @@ data:
  two_beams: true
  beam_token: true
  add_time_reference: true
- add_pt: false
+ add_xzplane: false
+ add_yzplane: false
+ add_scalar_features: false
  reinsert_channels: false
  rescale_data: true
+ scalar_features_preprocessing: # following weaver defaults
+ - [1.7, 0.7] # log_pt
+ - [2.0, 0.7] # log_energy
+ - [-4.7, 0.7] # log_pt_rel
+ - [-4.7, 0.7] # log_energy_rel
+ - [0, 1] # dphi
+ - [0, 1] # deta
+ - [0.2, 4] # dr
 
 train: true
 training:
