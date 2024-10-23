@@ -53,6 +53,11 @@ class JetClassTaggingExperiment(TaggingExperiment):
             elif self.cfg.data.features == "pid":
                 self.cfg.model.net.in_s_channels = 6
                 self.cfg.data.data_config = "experiments/tagging/miniweaver/pid.yaml"
+            elif self.cfg.data.features == "displacements":
+                self.cfg.model.net.in_s_channels = 4
+                self.cfg.data.data_config = (
+                    "experiments/tagging/miniweaver/displacements.yaml"
+                )
             elif self.cfg.data.features == "default":
                 self.cfg.model.net.in_s_channels = 10
                 self.cfg.data.data_config = (
