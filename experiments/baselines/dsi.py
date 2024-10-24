@@ -66,11 +66,15 @@ class DSI(nn.Module):
         dropout_prob : float
         """
         super().__init__()
+        assert use_deepset or use_invariants
         self.use_deepset = use_deepset
         self.use_invariants = use_invariants
         n = len(type_token_list)
         if self.use_deepset:
-            assert len(np.unique(type_token_list)) == max(type_token_list) + 1
+            assert (
+                len(np.unique(type_token_list)) == max(type_token_list) + 1
+            ), f"Invalid type_token_list={type_token_list}"
+            self.type_token_list = type_token_list
 
             self.prenets = nn.ModuleList(
                 [
@@ -100,10 +104,14 @@ class DSI(nn.Module):
         )
 
     def forward(self, particles, type_token):
+        assert len(type_token) == 1
+        type_token = type_token[0]
+        assert type_token.numpy().tolist() == self.type_token_list
+
         # deep set preprocessing
         if self.use_deepset:
             deep_set = []
-            for i, type_token_i in enumerate(type_token[0]):
+            for i, type_token_i in enumerate(type_token):
                 element = self.prenets[type_token_i](particles[..., i, :])
                 deep_set.append(element)
             deep_set = torch.cat(deep_set, dim=-1)
