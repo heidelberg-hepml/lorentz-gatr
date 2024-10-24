@@ -4,6 +4,8 @@ net:
   _target_: experiments.baselines.dsi.DSI
 
   use_deepset: true
+  use_invariants: true
+
   hidden_channels_prenet: 384
   hidden_layers_prenet: 2
   out_dim_prenet_sep: 32

@@ -44,6 +44,7 @@ class DSI(nn.Module):
         hidden_channels_net,
         hidden_layers_net,
         use_deepset=True,
+        use_invariants=True,
         dropout_prob=None,
     ):
         """
@@ -59,11 +60,14 @@ class DSI(nn.Module):
         hidden_channels_net : int
         hidden_layers_net : int
         use_deepset : bool
-            whether to use the deep set part (prenet)
+            whether to use the deep set part (affects prenet)
+        use_invariants : bool
+            whether to use the invariants part (affects net)
         dropout_prob : float
         """
         super().__init__()
         self.use_deepset = use_deepset
+        self.use_invariants = use_invariants
         n = len(type_token_list)
         if self.use_deepset:
             assert len(np.unique(type_token_list)) == max(type_token_list) + 1
@@ -80,12 +84,15 @@ class DSI(nn.Module):
                     for _ in range(max(type_token_list) + 1)
                 ]
             )
-            deepset_outputs = out_dim_prenet_sep * n
+            mlp_inputs = out_dim_prenet_sep * n
         else:
-            deepset_outputs = 0
+            mlp_inputs = 0
+
+        if self.use_invariants:
+            mlp_inputs += n * (n + 1) // 2
 
         self.net = MLP(
-            in_shape=deepset_outputs + n * (n + 1) // 2,
+            in_shape=mlp_inputs,
             out_shape=1,
             hidden_channels=hidden_channels_net,
             hidden_layers=hidden_layers_net,
@@ -93,8 +100,8 @@ class DSI(nn.Module):
         )
 
     def forward(self, particles, type_token):
+        # deep set preprocessing
         if self.use_deepset:
-            # deep set preprocessing
             deep_set = []
             for i, type_token_i in enumerate(type_token[0]):
                 element = self.prenets[type_token_i](particles[:, i])
@@ -106,7 +113,15 @@ class DSI(nn.Module):
             )
 
         # invariants
-        invariants = compute_invariants(particles)
+        if self.use_invariants:
+            invariants = compute_invariants(particles)
+        else:
+            invariants = torch.empty(
+                particles.shape[0],
+                0,
+                device=particles.device,
+                dtype=particles.dtype,
+            )
 
         # combine everything
         latent_full = torch.cat((deep_set, invariants), dim=-1)
