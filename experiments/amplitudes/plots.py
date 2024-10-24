@@ -270,7 +270,7 @@ def plot_delta_histogram(
             dup_last(hist) * scale,
             color,
             where="post",
-            label=label + r" ($\overline{\Delta^2} = \num{%.2g})$" % (mse * 1e-4),
+            label=label + r" ($\overline{\Delta^2} = {%.2g})$" % (mse * 1e-4),
         )  # need 1e-4 to compensate for initial *100
         axs.fill_between(
             bins,
