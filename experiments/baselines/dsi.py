@@ -104,12 +104,12 @@ class DSI(nn.Module):
         if self.use_deepset:
             deep_set = []
             for i, type_token_i in enumerate(type_token[0]):
-                element = self.prenets[type_token_i](particles[:, i])
+                element = self.prenets[type_token_i](particles[..., i, :])
                 deep_set.append(element)
             deep_set = torch.cat(deep_set, dim=-1)
         else:
             deep_set = torch.empty(
-                particles.shape[0], 0, device=particles.device, dtype=particles.dtype
+                *particles.shape[:-2], 0, device=particles.device, dtype=particles.dtype
             )
 
         # invariants
@@ -117,7 +117,7 @@ class DSI(nn.Module):
             invariants = compute_invariants(particles)
         else:
             invariants = torch.empty(
-                particles.shape[0],
+                *particles.shape[:-2],
                 0,
                 device=particles.device,
                 dtype=particles.dtype,
