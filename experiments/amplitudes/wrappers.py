@@ -64,8 +64,7 @@ class AmplitudeDSIWrapper(nn.Module):
         self.net = net
 
     def forward(self, inputs, type_token, global_token, attn_mask=None):
-        # ignore type_token and attn_mask (architecture is not permutation invariant)
-        out = self.net(inputs[0, ...])[None, ...]
+        out = self.net(inputs[0, ...], type_token)[None, ...]
         return out
 
 
