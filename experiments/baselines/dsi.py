@@ -101,7 +101,9 @@ class DSI(nn.Module):
                 deep_set.append(element)
             deep_set = torch.cat(deep_set, dim=-1)
         else:
-            deep_set = torch.empty(particles.shape[0], 0)
+            deep_set = torch.empty(
+                particles.shape[0], 0, device=particles.device, dtype=particles.dtype
+            )
 
         # invariants
         invariants = compute_invariants(particles)
