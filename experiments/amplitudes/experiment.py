@@ -285,6 +285,7 @@ class AmplitudeExperiment(BaseExperiment):
 
             # compute metrics over preprocessed amplitudes
             mse_prepd = np.mean((amp_pred_prepd - amp_truth_prepd) ** 2)
+            LOGGER.info(f"MSE on {dataset} {title} dataset: {mse_prepd:.4e}")
 
             # undo preprocessing
             amp_truth = undo_preprocess_amplitude(
