@@ -40,6 +40,7 @@ class DSI(nn.Module):
         hidden_channels_net,
         hidden_layers_net,
         use_deepset=True,
+        sum_deepset=True,
         use_invariants=True,
         dropout_prob=None,
     ):
@@ -57,6 +58,10 @@ class DSI(nn.Module):
         hidden_layers_net : int
         use_deepset : bool
             whether to use the deep set part (affects prenet)
+        sum_deepset : bool
+            whether to sum the deep set embeddings or concatenate them
+            Permutation invariance is broken anyways if use_invariants=True,
+            so one can also decide to break it at an earlier stage
         use_invariants : bool
             whether to use the invariants part (affects net)
         dropout_prob : float
@@ -65,6 +70,8 @@ class DSI(nn.Module):
         assert use_deepset or use_invariants
         self.use_deepset = use_deepset
         self.use_invariants = use_invariants
+        self.sum_deepset = sum_deepset
+
         n = len(type_token_list)
         if self.use_deepset:
             assert (
@@ -84,9 +91,11 @@ class DSI(nn.Module):
                     for _ in range(max(type_token_list) + 1)
                 ]
             )
-            mlp_inputs = out_dim_prenet_sep * n
+            mlp_inputs = out_dim_prenet_sep * (
+                max(type_token_list) + 1 if sum_deepset else len(type_token_list)
+            )
         else:
-            mlp_inputs = 0
+            mlp_inputs = n * 4
 
         if self.use_invariants:
             mlp_inputs += n * (n + 1) // 2
@@ -124,15 +133,19 @@ class DSI(nn.Module):
 
         # deep set preprocessing
         if self.use_deepset:
-            deep_set = []
-            for i, type_token_i in enumerate(type_token):
-                element = self.prenets[type_token_i](particles[..., i, :])
-                deep_set.append(element)
-            deep_set = torch.cat(deep_set, dim=-1)
+            preprocessing = []
+            for i in range(max(type_token) + 1):
+                embedding = self.prenets[i](particles[..., type_token == i, :])
+                embedding = (
+                    embedding.sum(dim=-2, keepdim=True)
+                    if self.sum_deepset
+                    else embedding
+                )
+                preprocessing.append(embedding)
+            preprocessing = torch.cat(preprocessing, dim=-2)
+            preprocessing = preprocessing.view(*particles.shape[:-2], -1)
         else:
-            deep_set = torch.empty(
-                *particles.shape[:-2], 0, device=particles.device, dtype=particles.dtype
-            )
+            preprocessing = particles.view(*particles.shape[:-2], -1)
 
         # invariants
         if self.use_invariants:
@@ -146,6 +159,6 @@ class DSI(nn.Module):
             )
 
         # combine everything
-        latent_full = torch.cat((deep_set, invariants), dim=-1)
+        latent_full = torch.cat((preprocessing, invariants), dim=-1)
         result = self.net(latent_full)
         return result
