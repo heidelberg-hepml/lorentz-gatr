@@ -39,6 +39,7 @@ MODEL_TITLE_DICT = {
     "MLP": "MLP",
     "GAP": "GAP",
     "DSI": "DSI",
+    "CGENN": "CGENN",
 }
 BASELINE_MODELS = ["MLP", "Transformer"]
 
@@ -89,6 +90,9 @@ class AmplitudeExperiment(BaseExperiment):
                 self.cfg.model.net.type_token_list = TYPE_TOKEN_DICT[
                     self.cfg.data.dataset[0]
                 ]
+            elif modelname == "CGENN":
+                self.cfg.model.net.in_features_h = token_size
+                self.cfg.model.token_size = token_size
             else:
                 raise ValueError(f"model {modelname} not implemented")
 

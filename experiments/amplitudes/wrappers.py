@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch_geometric.utils import dense_to_sparse
 
 from gatr.interface import embed_vector, extract_scalar
 from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity
@@ -176,3 +177,77 @@ class AmplitudeGATrWrapper(nn.Module):
 
         amplitude = lorentz_scalars[..., 0, :]
         return amplitude
+
+
+class AmplitudeCGENNWrapper(nn.Module):
+    def __init__(self, net, token_size):
+        super().__init__()
+        self.net = net
+        self.token_size = token_size
+
+    def embed_into_ga(self, inputs, type_token, global_token):
+        # same as for GATrWrapper
+        nprocesses, batchsize, num_objects, _ = inputs.shape
+
+        # encode momenta in multivectors
+        multivector = embed_vector(inputs)
+        multivector = multivector.unsqueeze(-2)
+
+        type_token, global_token = encode_tokens(
+            type_token,
+            global_token,
+            self.token_size,
+            isgatr=True,
+            batchsize=batchsize,
+            device=inputs.device,
+        )
+
+        # encode type_token in scalars
+        scalars = type_token
+        return multivector, scalars
+
+    def forward(self, inputs, type_token, global_token, attn_mask=None):
+        # CGENN does not support multiple batch dimensions
+        assert (
+            len(inputs.shape) == 4
+        ), "The CGENN implementation does not support joint training yet"
+
+        multivectors, scalars = self.embed_into_ga(inputs, type_token, global_token)
+
+        # convert to sparse tensors
+        multivectors = multivectors.view(
+            -1, multivectors.shape[-2], multivectors.shape[-1]
+        )
+        scalars = scalars.view(-1, scalars.shape[-1])
+
+        # edge_index of fully connected graph
+        adj_matrix = torch.ones(
+            (inputs.shape[-2], inputs.shape[-2]), device=inputs.device
+        )
+        edge_index_single = dense_to_sparse(adj_matrix)[0]
+        edge_index = torch.cat(
+            ([edge_index_single + inputs.shape[2] * i for i in range(inputs.shape[1])]),
+            dim=-1,
+        )
+
+        # construct edge and node features
+        i, j = edge_index
+        edge_attr_x = torch.cat(
+            (multivectors[i], multivectors[j], multivectors[i] - multivectors[j]),
+            dim=-2,
+        )
+        node_attr_x = multivectors
+        node_attr_h = scalars
+
+        # pass everything through the network
+        out = self.net(
+            x=multivectors,
+            h=scalars,
+            edge_attr_x=edge_attr_x,
+            edge_attr_h=None,
+            node_attr_x=node_attr_x,
+            node_attr_h=node_attr_h,
+            edges=edge_index,
+            n_nodes=inputs.shape[-2],
+        )
+        return out[None, ...]

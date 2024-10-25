@@ -1,0 +1,13 @@
+_target_: experiments.amplitudes.wrappers.AmplitudeCGENNWrapper
+
+net:
+ _target_: experiments.baselines.cgenn.cgenn.CGENN
+
+ in_features_h: 2
+ hidden_features_h: 72
+ in_features_x: 1
+ hidden_features_x: 8
+ decoder_features: 64
+ n_outputs: 1
+ n_layers: 4
+ dropout: 0.2
