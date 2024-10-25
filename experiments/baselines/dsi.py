@@ -107,7 +107,7 @@ class DSI(nn.Module):
     def forward(self, particles, type_token):
         assert len(type_token) == 1
         type_token = type_token[0]
-        assert type_token.numpy().tolist() == self.type_token_list
+        assert type_token.cpu().numpy().tolist() == self.type_token_list
 
         # deep set preprocessing
         if self.use_deepset:
