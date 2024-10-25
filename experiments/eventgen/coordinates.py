@@ -91,11 +91,13 @@ class Fourmomenta(BaseCoordinates):
     # this class effectively does nothing,
     # because fourmomenta are already the baseline representation
     def __init__(self):
+        super().__init__()
         self.transforms = [tr.EmptyTransform()]
 
 
 class PPPM2(BaseCoordinates):
     def __init__(self):
+        super().__init__()
         self.contains_mass = True
         self.transforms = [tr.EPPP_to_PPPM2()]
 
@@ -103,6 +105,7 @@ class PPPM2(BaseCoordinates):
 class EPhiPtPz(BaseCoordinates):
     # (E, phi, pt, pz)
     def __init__(self):
+        super().__init__()
         self.contains_phi = True
         self.transforms = [tr.EPPP_to_EPhiPtPz()]
 
@@ -110,12 +113,14 @@ class EPhiPtPz(BaseCoordinates):
 class PtPhiEtaE(BaseCoordinates):
     # (pt, phi, eta, E)
     def __init__(self):
+        super().__init__()
         self.contains_phi = True
         self.transforms = [tr.EPPP_to_PtPhiEtaE()]
 
 
 class PtPhiEtaM2(BaseCoordinates):
     def __init__(self):
+        super().__init__()
         self.contains_phi = True
         self.contains_mass = True
         self.transforms = [
@@ -127,6 +132,7 @@ class PtPhiEtaM2(BaseCoordinates):
 class PPPLogM2(BaseCoordinates):
     # (px, py, pz, log(m^2))
     def __init__(self):
+        super().__init__()
         self.contains_mass = True
         self.transforms = [
             tr.EPPP_to_PPPM2(),
@@ -137,6 +143,7 @@ class PPPLogM2(BaseCoordinates):
 class StandardPPPLogM2(BaseCoordinates):
     # fitted (px, py, pz, log(m^2))
     def __init__(self, onshell_list=[]):
+        super().__init__()
         self.contains_mass = True
         self.transforms = [
             tr.EPPP_to_PPPM2(),
@@ -148,6 +155,7 @@ class StandardPPPLogM2(BaseCoordinates):
 class LogPtPhiEtaE(BaseCoordinates):
     # (log(pt), phi, eta, E)
     def __init__(self, pt_min, units):
+        super().__init__()
         self.contains_phi = True
         self.transforms = [tr.EPPP_to_PtPhiEtaE(), tr.Pt_to_LogPt(pt_min, units)]
 
@@ -155,6 +163,7 @@ class LogPtPhiEtaE(BaseCoordinates):
 class PtPhiEtaLogM2(BaseCoordinates):
     # (pt, phi, eta, log(m^2))
     def __init__(self):
+        super().__init__()
         self.contains_phi = True
         self.contains_mass = True
         self.transforms = [
@@ -167,6 +176,7 @@ class PtPhiEtaLogM2(BaseCoordinates):
 class LogPtPhiEtaM2(BaseCoordinates):
     # (log(pt), phi, eta, m^2)
     def __init__(self, pt_min, units):
+        super().__init__()
         self.contains_phi = True
         self.contains_mass = True
         self.transforms = [
@@ -179,6 +189,7 @@ class LogPtPhiEtaM2(BaseCoordinates):
 class LogPtPhiEtaLogM2(BaseCoordinates):
     # (log(pt), phi, eta, log(m^2)
     def __init__(self, pt_min, units):
+        super().__init__()
         self.contains_phi = True
         self.contains_mass = True
         self.transforms = [
@@ -192,6 +203,7 @@ class LogPtPhiEtaLogM2(BaseCoordinates):
 class StandardLogPtPhiEtaLogM2(BaseCoordinates):
     # Fitted (log(pt), phi, eta, log(m^2)
     def __init__(self, pt_min, units, onshell_list=[]):
+        super().__init__()
         self.contains_phi = True
         self.contains_mass = True
         self.transforms = [
