@@ -104,6 +104,24 @@ class DSI(nn.Module):
             dropout_prob=dropout_prob,
         )
 
+        # standardization parameters
+        # (could evaluate them pre training,
+        # but we have large batchsizes
+        # so no big difference expected)
+        self.inv_mean, self.inv_std = None, None
+
+    def _compute_invariants(self, particles):
+        invariants = compute_invariants(particles)
+
+        # standardize
+        if self.inv_mean is None or self.inv_std is None:
+            self.inv_mean = invariants.mean(dim=-2, keepdim=True)
+            self.inv_std = invariants.std(dim=-2, keepdim=True)
+            self.inv_std = self.inv_std.clamp(min=1e-5)
+        invariants = (invariants - self.inv_mean) / self.inv_std
+
+        return invariants
+
     def forward(self, particles, type_token):
         assert len(type_token) == 1
         type_token = type_token[0]
@@ -123,7 +141,7 @@ class DSI(nn.Module):
 
         # invariants
         if self.use_invariants:
-            invariants = compute_invariants(particles)
+            invariants = self._compute_invariants(particles)
         else:
             invariants = torch.empty(
                 *particles.shape[:-2],
