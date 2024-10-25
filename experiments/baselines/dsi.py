@@ -127,12 +127,12 @@ class DSI(nn.Module):
         return invariants
 
     def forward(self, particles, type_token):
-        assert len(type_token) == 1
-        type_token = type_token[0]
-        assert type_token.cpu().numpy().tolist() == self.type_token_list
 
         # deep set preprocessing
         if self.use_deepset:
+            assert len(type_token) == 1
+            type_token = type_token[0]
+            assert type_token.cpu().numpy().tolist() == self.type_token_list
             preprocessing = []
             for i in range(max(type_token) + 1):
                 identical_particles = particles[..., type_token == i, :]
