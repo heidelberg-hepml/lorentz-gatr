@@ -186,7 +186,7 @@ class AmplitudeCGENNWrapper(nn.Module):
         self.token_size = token_size
 
     def embed_into_ga(self, inputs, type_token, global_token):
-        # same as for GATrWrapper
+        # very similar to GATrWrapper
         nprocesses, batchsize, num_objects, _ = inputs.shape
 
         # encode momenta in multivectors
