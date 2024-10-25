@@ -135,7 +135,8 @@ class DSI(nn.Module):
         if self.use_deepset:
             preprocessing = []
             for i in range(max(type_token) + 1):
-                embedding = self.prenets[i](particles[..., type_token == i, :])
+                identical_particles = particles[..., type_token == i, :]
+                embedding = self.prenets[i](identical_particles)
                 embedding = (
                     embedding.sum(dim=-2, keepdim=True)
                     if self.sum_deepset
