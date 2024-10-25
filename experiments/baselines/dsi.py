@@ -5,7 +5,7 @@ import numpy as np
 from experiments.baselines import MLP
 
 
-def compute_invariants(particles):
+def compute_invariants(particles, eps=1e-4):
     # compute matrix of all inner products
     inner_product = lambda p1, p2: p1[..., 0] * p2[..., 0] - (
         p1[..., 1:] * p2[..., 1:]
@@ -17,7 +17,8 @@ def compute_invariants(particles):
     # extract upper triangular part (matrix is symmetric)
     idxs = torch.triu_indices(particles.shape[-2], particles.shape[-2], offset=0)
     invariants = invariants_matrix[..., idxs[0], idxs[1]]
-    return invariants
+    invariants = invariants.clamp(min=eps)
+    return invariants.log()
 
 
 class DSI(nn.Module):
