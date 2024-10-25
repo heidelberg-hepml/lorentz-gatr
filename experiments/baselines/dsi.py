@@ -10,13 +10,8 @@ def compute_invariants(particles, eps=1e-4):
     inner_product = lambda p1, p2: p1[..., 0] * p2[..., 0] - (
         p1[..., 1:] * p2[..., 1:]
     ).sum(dim=-1)
-    invariants_matrix = inner_product(
-        particles[..., None, :], particles[..., None, :, :]
-    )
-
-    # extract upper triangular part (matrix is symmetric)
     idxs = torch.triu_indices(particles.shape[-2], particles.shape[-2], offset=0)
-    invariants = invariants_matrix[..., idxs[0], idxs[1]]
+    invariants = inner_product(particles[..., idxs[0], :], particles[..., idxs[1], :])
     invariants = invariants.clamp(min=eps)
     return invariants.log()
 
