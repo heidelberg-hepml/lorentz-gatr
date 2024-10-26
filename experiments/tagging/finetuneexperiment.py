@@ -16,7 +16,7 @@ class TopTaggingFineTuneExperiment(TopTaggingExperiment):
             self.cfg.finetune.backbone_path, self.cfg.finetune.backbone_cfg
         )
         self.warmstart_cfg = OmegaConf.load(warmstart_path)
-        assert self.warmstart_cfg.exp_type == "jctagging"
+        assert self.warmstart_cfg.exp_type in ["jctagging", "binaryjetclass"]
         assert self.warmstart_cfg.data.features == "fourmomenta"
         if self.warmstart_cfg.data.score_token:
             raise NotImplementedError(
