@@ -8,6 +8,7 @@ from experiments.eventgen.processes import (
 )
 from experiments.tagging.jetclassexperiment import JetClassTaggingExperiment
 from experiments.tagging.finetuneexperiment import TopTaggingFineTuneExperiment
+from experiments.tagging.binaryjetclass import BinaryJetClassTaggingExperiment
 
 
 @hydra.main(config_path="config", config_name="amplitudes", version_base=None)
@@ -22,6 +23,8 @@ def main(cfg):
         exp = JetClassTaggingExperiment(cfg)
     elif cfg.exp_type == "toptaggingft":
         exp = TopTaggingFineTuneExperiment(cfg)
+    elif cfg.exp_type == "binaryjetclass":
+        exp = BinaryJetClassTaggingExperiment(cfg)
     elif cfg.exp_type == "ttbar":
         exp = ttbarExperiment(cfg)
     elif cfg.exp_type == "zmumu":
