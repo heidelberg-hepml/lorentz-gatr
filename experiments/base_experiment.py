@@ -574,6 +574,13 @@ class BaseExperiment:
             .cpu()
             .item()
         )
+        if step > 1000 and self.cfg.training.max_grad_norm is not None:
+            if grad_norm > self.cfg.training.max_grad_norm:
+                LOGGER.warning(
+                    f"Gradient norm {grad_norm} exceeds maximum {self.cfg.training.max_grad_norm}, skipping update"
+                )
+                return
+
         self.optimizer.step()
         if self.ema is not None:
             self.ema.update()
