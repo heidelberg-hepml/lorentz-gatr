@@ -8,7 +8,6 @@ from experiments.base_experiment import BaseExperiment
 from experiments.amplitudes.dataset import AmplitudeDataset
 from experiments.amplitudes.preprocessing import (
     preprocess_particles,
-    preprocess_particles_w_invariants,
     preprocess_amplitude,
     undo_preprocess_amplitude,
 )
@@ -40,9 +39,9 @@ MODEL_TITLE_DICT = {
     "MLP": "MLP",
     "GAP": "GAP",
     "DSI": "DSI",
+    "CGENN": "CGENN",
 }
 BASELINE_MODELS = ["MLP", "Transformer"]
-VB_MODELS = ["DSI"]
 
 
 class AmplitudeExperiment(BaseExperiment):
@@ -88,18 +87,12 @@ class AmplitudeExperiment(BaseExperiment):
                     TYPE_TOKEN_DICT[self.cfg.data.dataset[0]]
                 )
             elif modelname == "DSI":
-                self.cfg.model.net.in_shape = (
-                    4 * len(TYPE_TOKEN_DICT[self.cfg.data.dataset[0]])
-                    + (len(TYPE_TOKEN_DICT[self.cfg.data.dataset[0]]) - 1)
-                    * (len(TYPE_TOKEN_DICT[self.cfg.data.dataset[0]]))
-                    // 2
-                )
-                self.cfg.model.net.num_particles_boson = TYPE_TOKEN_DICT[
+                self.cfg.model.net.type_token_list = TYPE_TOKEN_DICT[
                     self.cfg.data.dataset[0]
-                ][2:].count(1)
-                self.cfg.model.net.num_particles_glu = TYPE_TOKEN_DICT[
-                    self.cfg.data.dataset[0]
-                ][2:].count(0) + TYPE_TOKEN_DICT[self.cfg.data.dataset[0]][2:].count(2)
+                ]
+            elif modelname == "CGENN":
+                self.cfg.model.net.in_features_h = token_size
+                self.cfg.model.token_size = token_size
             else:
                 raise ValueError(f"model {modelname} not implemented")
 
@@ -142,8 +135,6 @@ class AmplitudeExperiment(BaseExperiment):
             amplitudes_prepd, prepd_mean, prepd_std = preprocess_amplitude(amplitudes)
             if type(self.model.net).__name__ in BASELINE_MODELS:
                 particles_prepd, _, _ = preprocess_particles(particles)
-            elif type(self.model.net).__name__ in VB_MODELS:
-                particles_prepd = preprocess_particles_w_invariants(particles)
             else:
                 particles_prepd = particles / particles.std()
 
@@ -298,6 +289,7 @@ class AmplitudeExperiment(BaseExperiment):
 
             # compute metrics over preprocessed amplitudes
             mse_prepd = np.mean((amp_pred_prepd - amp_truth_prepd) ** 2)
+            LOGGER.info(f"MSE on {title} {dataset} dataset: {mse_prepd:.4e}")
 
             # undo preprocessing
             amp_truth = undo_preprocess_amplitude(
