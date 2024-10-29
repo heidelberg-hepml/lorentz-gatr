@@ -58,12 +58,15 @@ class DSI(nn.Module):
         hidden_layers_net : int
         use_deepset : bool
             whether to use the deep set part (affects prenet)
+            We find the same results with use_deepset=False
         sum_deepset : bool
             whether to sum the deep set embeddings or concatenate them
             Permutation invariance is broken anyways if use_invariants=True,
             so one can also decide to break it at an earlier stage
+            We find slightly worse results with sum_deepset=False
         use_invariants : bool
             whether to use the invariants part (affects net)
+            We find significantly worse results with use_invariants=False
         dropout_prob : float
         """
         super().__init__()
