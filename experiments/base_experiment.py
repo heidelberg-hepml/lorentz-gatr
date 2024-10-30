@@ -23,7 +23,6 @@ from gatr.layers import MLPConfig, SelfAttentionConfig
 
 from lion_pytorch import Lion
 import schedulefree
-import pytorch_optimizer
 
 cs = ConfigStore.instance()
 cs.store(name="base_attention", node=SelfAttentionConfig)
@@ -385,16 +384,6 @@ class BaseExperiment:
         LOGGER.debug(
             f"Using optimizer {self.cfg.training.optimizer} with lr={self.cfg.training.lr}"
         )
-
-        if self.cfg.training.use_lookahead:
-            self.optimizer = pytorch_optimizer.Lookahead(
-                self.optimizer,
-                k=self.cfg.training.lookahead_k,
-                alpha=self.cfg.training.lookahead_alpha,
-            )
-            LOGGER.debug(
-                f"Apply LookAhead with k={self.cfg.training.lookahead_k}, alpha={self.cfg.training.lookahead_alpha}"
-            )
 
         # load existing optimizer if specified
         if self.warm_start:

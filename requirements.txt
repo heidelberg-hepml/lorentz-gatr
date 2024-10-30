@@ -19,7 +19,6 @@ torch_geometric==2.4.0
 torch-ema
 lion-pytorch==0.1.4
 schedulefree==1.2.5
-pytorch-optimizer
 
 ## Experiment management
 hydra-core
