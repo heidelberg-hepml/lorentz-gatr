@@ -5,11 +5,7 @@ from omegaconf import open_dict
 
 import os, time
 
-from sklearn.metrics import roc_curve, roc_auc_score, accuracy_score
-from scipy.interpolate import interp1d
-
 from experiments.logger import LOGGER
-from experiments.mlflow import log_mlflow
 
 from experiments.tagging.experiment import TaggingExperiment
 from experiments.tagging.embedding import (
@@ -29,7 +25,6 @@ class BinaryJetClassTaggingExperiment(TaggingExperiment):
             "TTBar",
         ]
         with open_dict(self.cfg):
-            self.cfg.data.score_token = False
             self.cfg.data.num_global_tokens = 1
             self.cfg.model.net.out_mv_channels = 1
 
@@ -138,9 +133,4 @@ class BinaryJetClassTaggingExperiment(TaggingExperiment):
         fourmomenta, scalars, ptr = dense_to_sparse_jet(fourmomenta, scalars)
         embedding = embed_tagging_data_into_ga(fourmomenta, scalars, ptr, self.cfg.data)
         y_pred = self.model(embedding)
-        if self.cfg.data.score_token:
-            y_pred = y_pred.reshape(
-                y_pred.shape[0] // self.cfg.data.num_global_tokens,
-                self.cfg.data.num_global_tokens,
-            )
         return y_pred[..., 0], label.float()

@@ -38,12 +38,8 @@ class JetClassTaggingExperiment(TaggingExperiment):
             "ZToQQ",
         ]
         with open_dict(self.cfg):
-            if self.cfg.data.score_token:
-                self.cfg.data.num_global_tokens = len(self.class_names)
-                self.cfg.model.net.out_mv_channels = 1
-            else:
-                self.cfg.data.num_global_tokens = 1
-                self.cfg.model.net.out_mv_channels = len(self.class_names)
+            self.cfg.data.num_global_tokens = 1
+            self.cfg.model.net.out_mv_channels = len(self.class_names)
 
             if self.cfg.data.features == "fourmomenta":
                 self.cfg.model.net.in_s_channels = 0
@@ -265,9 +261,4 @@ class JetClassTaggingExperiment(TaggingExperiment):
         fourmomenta, scalars, ptr = dense_to_sparse_jet(fourmomenta, scalars)
         embedding = embed_tagging_data_into_ga(fourmomenta, scalars, ptr, self.cfg.data)
         y_pred = self.model(embedding)
-        if self.cfg.data.score_token:
-            y_pred = y_pred.reshape(
-                y_pred.shape[0] // self.cfg.data.num_global_tokens,
-                self.cfg.data.num_global_tokens,
-            )
         return y_pred, label
