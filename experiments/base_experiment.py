@@ -14,6 +14,7 @@ from torch_ema import ExponentialMovingAverage
 import gatr.primitives.attention
 import gatr.layers.linear
 import gatr.layers.mlp.geometric_bilinears
+import gatr.layers.mlp.mlp
 from experiments.misc import get_device, flatten_dict
 import experiments.logger
 from experiments.logger import LOGGER, MEMORY_HANDLER, FORMATTER
@@ -106,6 +107,9 @@ class BaseExperiment:
         )
 
     def init_model(self):
+        gatr.layers.mlp.mlp.USE_GEOMETRIC_PRODUCT = (
+            self.cfg.ga_settings.use_geometric_product
+        )
         gatr.layers.linear.MIX_MVPSEUDOSCALAR_INTO_SCALAR = (
             self.cfg.ga_settings.mix_mvpseudoscalar_into_scalar
         )

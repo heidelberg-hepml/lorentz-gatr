@@ -11,6 +11,8 @@ from gatr.layers.mlp.config import MLPConfig
 from gatr.layers.mlp.geometric_bilinears import GeometricBilinear
 from gatr.layers.mlp.nonlinearities import ScalarGatedNonlinearity
 
+USE_GEOMETRIC_PRODUCT = True
+
 
 class GeoMLP(nn.Module):
     """Geometric MLP.
@@ -47,14 +49,17 @@ class GeoMLP(nn.Module):
         layers: List[nn.Module] = []
 
         if len(config.mv_channels) >= 2:
-            layers.append(
-                GeometricBilinear(
-                    in_mv_channels=config.mv_channels[0],
-                    out_mv_channels=config.mv_channels[1],
-                    in_s_channels=s_channels[0],
-                    out_s_channels=s_channels[1],
-                )
+            kwargs = dict(
+                in_mv_channels=config.mv_channels[0],
+                out_mv_channels=config.mv_channels[1],
+                in_s_channels=s_channels[0],
+                out_s_channels=s_channels[1],
             )
+            if USE_GEOMETRIC_PRODUCT:
+                layers.append(GeometricBilinear(**kwargs))
+            else:
+                layers.append(ScalarGatedNonlinearity(config.activation))
+                layers.append(EquiLinear(**kwargs))
             if config.dropout_prob is not None:
                 layers.append(GradeDropout(config.dropout_prob))
 
