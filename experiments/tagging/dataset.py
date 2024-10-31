@@ -29,7 +29,7 @@ class TaggingDataset(torch.utils.data.Dataset):
         super().__init__()
         self.rescale_data = rescale_data
 
-    def load_data(self, filename, mode, data_scale):
+    def load_data(self, filename, mode):
         raise NotImplementedError
 
     def __len__(self):
@@ -44,7 +44,6 @@ class TopTaggingDataset(TaggingDataset):
         self,
         filename,
         mode,
-        data_scale,
         dtype=torch.float32,
     ):
         """
@@ -55,17 +54,10 @@ class TopTaggingDataset(TaggingDataset):
         mode : {"train", "test", "val"}
             Purpose of the dataset
             Train, test and validation datasets are already seperated in the specified file
-        data_scale : float
-            std() of all entries in the train dataset
-            Effectively a change of units to make the network entries O(1)
         """
         data = np.load(filename)
         kinematics = data[f"kinematics_{mode}"]
         labels = data[f"labels_{mode}"]
-
-        # preprocessing
-        if self.rescale_data:
-            kinematics = kinematics / data_scale
 
         kinematics = torch.tensor(kinematics, dtype=dtype)
         labels = torch.tensor(labels, dtype=torch.bool)
@@ -91,7 +83,6 @@ class QGTaggingDataset(TaggingDataset):
         self,
         filename,
         mode,
-        data_scale,
         dtype=torch.float32,
     ):
         """
@@ -102,18 +93,11 @@ class QGTaggingDataset(TaggingDataset):
         mode : {"train", "test", "val"}
             Purpose of the dataset
             Train, test and validation datasets are already seperated in the specified file
-        data_scale : float
-            std() of all entries in the train dataset
-            Effectively a change of units to make the network entries O(1)
         """
         data = np.load(filename)
         kinematics = data[f"kinematics_{mode}"]
         pids = data[f"pid_{mode}"]
         labels = data[f"labels_{mode}"]
-
-        # preprocessing
-        if self.rescale_data:
-            kinematics = kinematics / data_scale
 
         kinematics = torch.tensor(kinematics, dtype=dtype)
         pids = torch.tensor(pids, dtype=dtype)

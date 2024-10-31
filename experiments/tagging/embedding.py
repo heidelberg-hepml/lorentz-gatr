@@ -1,8 +1,17 @@
 import torch
 from torch.nn.functional import one_hot
+from torch_geometric.utils import scatter
 
 from experiments.tagging.dataset import EPS
-from gatr.interface import embed_vector
+from gatr.interface import embed_vector, embed_spurions
+
+UNITS = 20  # We use units of 20 GeV for all tagging experiments
+
+
+def get_batch_from_ptr(ptr):
+    return torch.arange(len(ptr) - 1, device=ptr.device).repeat_interleave(
+        ptr[1:] - ptr[:-1],
+    )
 
 
 def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
@@ -31,20 +40,52 @@ def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
     batchsize = len(ptr) - 1
     arange = torch.arange(batchsize, device=fourmomenta.device)
 
-    # add pt to scalars
-    if cfg_data.add_pt:
-        pt = get_pt(fourmomenta).unsqueeze(-1)
-        scalars = torch.cat((scalars, pt), dim=-1)
+    # add extra scalar channels
+    if cfg_data.add_scalar_features:
+        log_pt = get_pt(fourmomenta).unsqueeze(-1).log()
+        log_energy = fourmomenta[..., 0].unsqueeze(-1).log()
+
+        batch = get_batch_from_ptr(ptr)
+        jet = scatter(fourmomenta, index=batch, dim=0, reduce="sum").index_select(
+            0, batch
+        )
+        log_pt_rel = (get_pt(fourmomenta).log() - get_pt(jet).log()).unsqueeze(-1)
+        log_energy_rel = (fourmomenta[..., 0].log() - jet[..., 0].log()).unsqueeze(-1)
+        phi_4, phi_jet = get_phi(fourmomenta), get_phi(jet)
+        dphi = ((phi_4 - phi_jet + torch.pi) % (2 * torch.pi) - torch.pi).unsqueeze(-1)
+        eta_4, eta_jet = get_eta(fourmomenta), get_eta(jet)
+        deta = -(eta_4 - eta_jet).unsqueeze(-1)
+        dr = torch.sqrt(dphi**2 + deta**2)
+        scalar_features = [
+            log_pt,
+            log_energy,
+            log_pt_rel,
+            log_energy_rel,
+            dphi,
+            deta,
+            dr,
+        ]
+        for i, feature in enumerate(scalar_features):
+            mean, factor = cfg_data.scalar_features_preprocessing[i]
+            scalar_features[i] = (feature - mean) * factor
+        scalars = torch.cat(
+            (scalars, *scalar_features),
+            dim=-1,
+        )
 
     # embed fourmomenta into multivectors
+    if cfg_data.rescale_data:
+        fourmomenta /= UNITS
     multivectors = embed_vector(fourmomenta)
     multivectors = multivectors.unsqueeze(-2)
 
     # beam reference
-    spurions = get_spurion(
+    spurions = embed_spurions(
         cfg_data.beam_reference,
         cfg_data.add_time_reference,
         cfg_data.two_beams,
+        cfg_data.add_xzplane,
+        cfg_data.add_yzplane,
         fourmomenta.device,
         fourmomenta.dtype,
     )
@@ -154,11 +195,6 @@ def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
         is_global = None
 
     # return dict
-    get_batch_from_ptr = lambda ptr: torch.arange(
-        len(ptr) - 1, device=multivectors.device
-    ).repeat_interleave(
-        ptr[1:] - ptr[:-1],
-    )
     batch = get_batch_from_ptr(ptr)
     embedding = {
         "mv": multivectors,
@@ -207,65 +243,17 @@ def dense_to_sparse_jet(fourmomenta_dense, scalars_dense):
     return fourmomenta_sparse, scalars_sparse, ptr
 
 
-def get_spurion(beam_reference, add_time_reference, two_beams, device, dtype):
-    """
-    Construct spurion
-
-    Parameters
-    ----------
-    beam_reference: str
-        Different options for adding a beam_reference
-    add_time_reference: bool
-        Whether to add the time direction as a reference to the network
-    two_beams: bool
-        Whether we only want (x, 0, 0, 1) or both (x, 0, 0, +/- 1) for the beam
-    device
-    dtype
-
-    Returns
-    -------
-    spurion: torch.tensor with shape (n_spurions, 16)
-        spurion embedded as multivector object
-    """
-
-    if beam_reference in ["lightlike", "spacelike", "timelike"]:
-        # add another 4-momentum
-        if beam_reference == "lightlike":
-            beam = [1, 0, 0, 1]
-        elif beam_reference == "timelike":
-            beam = [2**0.5, 0, 0, 1]
-        elif beam_reference == "spacelike":
-            beam = [0, 0, 0, 1]
-        beam = torch.tensor(beam, device=device, dtype=dtype).reshape(1, 4)
-        beam = embed_vector(beam)
-        if two_beams:
-            beam2 = beam.clone()
-            beam2[..., 4] = -1  # flip pz
-            beam = torch.cat((beam, beam2), dim=0)
-
-    elif beam_reference == "xyplane":
-        # add the x-y-plane, embedded as a bivector
-        # convention for bivector components: [tx, ty, tz, xy, xz, yz]
-        beam = torch.zeros(1, 16, device=device, dtype=dtype)
-        beam[..., 8] = 1
-
-    elif beam_reference is None:
-        beam = torch.empty(0, 16, device=device, dtype=dtype)
-
-    else:
-        raise ValueError(f"beam_reference {beam_reference} not implemented")
-
-    if add_time_reference:
-        time = [1, 0, 0, 0]
-        time = torch.tensor(time, device=device, dtype=dtype).reshape(1, 4)
-        time = embed_vector(time)
-    else:
-        time = torch.empty(0, 16, device=device, dtype=dtype)
-
-    spurion = torch.cat((beam, time), dim=-2)
-    return spurion
-
-
 def get_pt(p):
     # transverse momentum
     return torch.sqrt(p[..., 1] ** 2 + p[..., 2] ** 2)
+
+
+def get_phi(p):
+    # azimuthal angle
+    return torch.arctan2(p[..., 2], p[..., 1])
+
+
+def get_eta(p):
+    # rapidity
+    p_abs = torch.sqrt(torch.sum(p[..., 1:] ** 2, dim=-1))
+    return torch.arctanh(p[..., 3] / p_abs)

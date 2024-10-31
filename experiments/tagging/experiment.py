@@ -7,6 +7,7 @@ from omegaconf import open_dict
 
 from sklearn.metrics import roc_curve, roc_auc_score, accuracy_score
 
+from gatr.interface.spurions import get_num_spurions
 from experiments.base_experiment import BaseExperiment
 from experiments.tagging.dataset import TopTaggingDataset
 from experiments.tagging.dataset import QGTaggingDataset
@@ -16,8 +17,6 @@ from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
 
 MODEL_TITLE_DICT = {"GATr": "GATr"}
-
-UNITS = 40  # We use units of 40 GeV for all tagging experiments
 
 
 class TaggingExperiment(BaseExperiment):
@@ -41,22 +40,20 @@ class TaggingExperiment(BaseExperiment):
             self.cfg.model.net.in_mv_channels = 1
 
             # extra scalar channels
-            if self.cfg.data.add_pt:
-                self.cfg.model.net.in_s_channels += 1
+            if self.cfg.data.add_scalar_features:
+                self.cfg.model.net.in_s_channels += 7
             if self.cfg.data.include_global_token:
                 self.cfg.model.net.in_s_channels += self.cfg.data.num_global_tokens
 
             # extra mv channels for beam_reference and time_reference
             if not self.cfg.data.beam_token:
-                if self.cfg.data.beam_reference is not None:
-                    self.cfg.model.net.in_mv_channels += (
-                        2
-                        if self.cfg.data.two_beams
-                        and not self.cfg.data.beam_reference == "xyplane"
-                        else 1
-                    )
-                if self.cfg.data.add_time_reference:
-                    self.cfg.model.net.in_mv_channels += 1
+                self.cfg.model.net.in_mv_channels += get_num_spurions(
+                    self.cfg.data.beam_reference,
+                    self.cfg.data.add_time_reference,
+                    self.cfg.data.two_beams,
+                    self.cfg.data.add_xzplane,
+                    self.cfg.data.add_yzplane,
+                )
 
             # reinsert channels
             if self.cfg.data.reinsert_channels:
@@ -77,9 +74,9 @@ class TaggingExperiment(BaseExperiment):
         self.data_train = Dataset(**kwargs)
         self.data_test = Dataset(**kwargs)
         self.data_val = Dataset(**kwargs)
-        self.data_train.load_data(data_path, "train", data_scale=UNITS)
-        self.data_test.load_data(data_path, "test", data_scale=UNITS)
-        self.data_val.load_data(data_path, "val", data_scale=UNITS)
+        self.data_train.load_data(data_path, "train")
+        self.data_test.load_data(data_path, "test")
+        self.data_val.load_data(data_path, "val")
         dt = time.time() - t0
         LOGGER.info(f"Finished creating datasets after {dt:.2f} s = {dt/60:.2f} min")
 
@@ -131,18 +128,11 @@ class TaggingExperiment(BaseExperiment):
 
     def _evaluate_single(self, loader, title, mode, step=None):
         assert mode in ["val", "eval"]
-        # re-initialize dataloader to make sure it is using the evaluation batchsize
-        # (makes a difference for trainloader)
-        loader = DataLoader(
-            dataset=loader.dataset,
-            batch_size=self.cfg.evaluation.batchsize,
-            shuffle=False,
-        )
 
         if mode == "eval":
             LOGGER.info(
                 f"### Starting to evaluate model on {title} dataset with "
-                f"{len(loader.dataset.data_list)} elements, batchsize {loader.batch_size} ###"
+                f"{len(loader.dataset)} elements, batchsize {loader.batch_size} ###"
             )
         metrics = {}
 
@@ -198,6 +188,11 @@ class TaggingExperiment(BaseExperiment):
                 f"{metrics['rej05']:.0f} (epsS=0.5), {metrics['rej08']:.0f}"
             )
 
+        # create latex string
+        if mode == "eval":
+            tex_string = f"{self.cfg.run_name} & {metrics['accuracy']:.4f} & {metrics['auc']:.4f} & {metrics['rej03']:.0f} & {metrics['rej05']:.0f} \\\\"
+            LOGGER.info(tex_string)
+
         if self.cfg.use_mlflow:
             for key, value in metrics.items():
                 if key in ["labels_true", "labels_predict", "fpr", "tpr"]:
@@ -234,6 +229,7 @@ class TaggingExperiment(BaseExperiment):
             plot_dict["train_lr"] = self.train_lr
             plot_dict["train_metrics"] = self.train_metrics
             plot_dict["val_metrics"] = self.val_metrics
+            plot_dict["grad_norm"] = self.train_grad_norm
         plot_mixer(self.cfg, plot_path, title, plot_dict)
 
     # overwrite _validate method to compute metrics over the full validation set

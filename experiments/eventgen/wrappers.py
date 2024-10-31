@@ -2,9 +2,7 @@ import torch
 import numpy as np
 from torch import nn
 
-from gatr.interface import embed_vector, extract_vector
-from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity
-from experiments.tagging.embedding import get_spurion
+from gatr.interface import embed_vector, extract_vector, embed_spurions
 from experiments.eventgen.cfm import EventCFM
 
 from experiments.eventgen.coordinates import (
@@ -121,10 +119,12 @@ class GAPCFM(EventCFM):
 
         # mv embedding
         mv = embed_vector(x.reshape(x.shape[0], -1, 4))
-        beam = get_spurion(
+        beam = embed_spurions(
             self.beam_reference,
             self.add_time_reference,
             self.two_beams,
+            add_xzplane=False,
+            add_yzplane=False,
             device=mv.device,
             dtype=mv.dtype,
         )
@@ -207,7 +207,7 @@ class GATrCFM(EventCFM):
         beam_reference : str
             Type of beam reference used to break the Lorentz symmetry
             Options: [None, "xyplane", "spacelike", "lightlike", "timelike"]
-            See experiments.toptagging.embedding.py::get_spurion for details
+            See gatr.interface.spurions.py::embed_spurions for details
         two_beams : bool
             If beam_reference in ["spacelike", "lightlike", "timelike"],
             decide whether only (alpha,0,0,1) or both (alpha,0,0,+/-1) are included
@@ -266,10 +266,12 @@ class GATrCFM(EventCFM):
 
         # mv embedding
         mv = embed_vector(x).unsqueeze(-2)
-        beam = get_spurion(
+        beam = embed_spurions(
             self.beam_reference,
             self.add_time_reference,
             self.two_beams,
+            add_xzplane=False,
+            add_yzplane=False,
             device=mv.device,
             dtype=mv.dtype,
         )

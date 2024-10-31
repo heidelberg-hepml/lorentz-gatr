@@ -30,6 +30,7 @@ cs.store(name="base_mlp", node=MLPConfig)
 
 # set to 'True' to debug autograd issues (slows down code)
 torch.autograd.set_detect_anomaly(False)
+MIN_STEP_SKIP = 1000
 
 
 class BaseExperiment:
@@ -57,7 +58,7 @@ class BaseExperiment:
     def run_mlflow(self):
         experiment_id, run_name = self._init()
         LOGGER.info(
-            f"### Starting experiment {self.cfg.exp_name}/{run_name} (id={experiment_id}) ###"
+            f"### Starting experiment {self.cfg.exp_name}/{run_name} (mlflowid={experiment_id}) (jobid={self.cfg.jobid}) ###"
         )
         if self.cfg.use_mlflow:
             with mlflow.start_run(experiment_id=experiment_id, run_name=run_name):
@@ -444,7 +445,12 @@ class BaseExperiment:
 
     def train(self):
         # performance metrics
-        self.train_lr, self.train_loss, self.val_loss = [], [], []
+        self.train_lr, self.train_loss, self.val_loss, self.train_grad_norm = (
+            [],
+            [],
+            [],
+            [],
+        )
         self.train_metrics = self._init_metrics()
         self.val_metrics = self._init_metrics()
 
@@ -553,11 +559,18 @@ class BaseExperiment:
             torch.nn.utils.clip_grad_norm_(
                 self.model.parameters(),
                 self.cfg.training.clip_grad_norm,
-                error_if_nonfinite=True,
+                error_if_nonfinite=False,
             )
             .cpu()
             .item()
         )
+        if step > MIN_STEP_SKIP and self.cfg.training.max_grad_norm is not None:
+            if grad_norm > self.cfg.training.max_grad_norm:
+                LOGGER.warning(
+                    f"Skipping update, gradient norm {grad_norm} exceeds maximum {self.cfg.training.max_grad_norm}"
+                )
+                return
+
         self.optimizer.step()
         if self.ema is not None:
             self.ema.update()
@@ -568,6 +581,7 @@ class BaseExperiment:
         # collect metrics
         self.train_loss.append(loss.item())
         self.train_lr.append(self.optimizer.param_groups[0]["lr"])
+        self.train_grad_norm.append(grad_norm)
         for key, value in metrics.items():
             self.train_metrics[key].append(value)
 
