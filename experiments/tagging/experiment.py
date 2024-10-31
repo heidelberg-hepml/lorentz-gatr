@@ -7,6 +7,7 @@ from omegaconf import open_dict
 
 from sklearn.metrics import roc_curve, roc_auc_score, accuracy_score
 
+from gatr.interface.spurions import get_num_spurions
 from experiments.base_experiment import BaseExperiment
 from experiments.tagging.dataset import TopTaggingDataset
 from experiments.tagging.dataset import QGTaggingDataset
@@ -46,19 +47,13 @@ class TaggingExperiment(BaseExperiment):
 
             # extra mv channels for beam_reference and time_reference
             if not self.cfg.data.beam_token:
-                if self.cfg.data.beam_reference is not None:
-                    self.cfg.model.net.in_mv_channels += (
-                        2
-                        if self.cfg.data.two_beams
-                        and not self.cfg.data.beam_reference == "xyplane"
-                        else 1
-                    )
-                if self.cfg.data.add_time_reference:
-                    self.cfg.model.net.in_mv_channels += 1
-                if self.cfg.data.add_xzplane:
-                    self.cfg.model.net.in_mv_channels += 1
-                if self.cfg.data.add_yzplane:
-                    self.cfg.model.net.in_mv_channels += 1
+                self.cfg.model.net.in_mv_channels += get_num_spurions(
+                    self.cfg.data.beam_reference,
+                    self.cfg.data.add_time_reference,
+                    self.cfg.data.two_beams,
+                    self.cfg.data.add_xzplane,
+                    self.cfg.data.add_yzplane,
+                )
 
             # reinsert channels
             if self.cfg.data.reinsert_channels:

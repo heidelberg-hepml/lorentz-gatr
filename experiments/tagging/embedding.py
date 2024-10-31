@@ -3,7 +3,7 @@ from torch.nn.functional import one_hot
 from torch_geometric.utils import scatter
 
 from experiments.tagging.dataset import EPS
-from gatr.interface import embed_vector
+from gatr.interface.spurions import embed_vector, embed_spurions
 
 UNITS = 20  # We use units of 20 GeV for all tagging experiments
 
@@ -80,7 +80,7 @@ def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
     multivectors = multivectors.unsqueeze(-2)
 
     # beam reference
-    spurions = get_spurion(
+    spurions = embed_spurions(
         cfg_data.beam_reference,
         cfg_data.add_time_reference,
         cfg_data.two_beams,
@@ -241,91 +241,6 @@ def dense_to_sparse_jet(fourmomenta_dense, scalars_dense):
     )
     ptr[1:] = torch.cumsum(num_particles, dim=0)
     return fourmomenta_sparse, scalars_sparse, ptr
-
-
-def get_spurion(
-    beam_reference,
-    add_time_reference,
-    two_beams,
-    add_xzplane,
-    add_yzplane,
-    device,
-    dtype,
-):
-    """
-    Construct spurion
-
-    Parameters
-    ----------
-    beam_reference: str
-        Different options for adding a beam_reference
-    add_time_reference: bool
-        Whether to add the time direction as a reference to the network
-    two_beams: bool
-        Whether we only want (x, 0, 0, 1) or both (x, 0, 0, +/- 1) for the beam
-    add_xzplane: bool
-        Whether to add the x-z-plane as a reference to the network
-    add_yzplane: bool
-        Whether to add the y-z-plane as a reference to the network
-    device
-    dtype
-
-    Returns
-    -------
-    spurion: torch.tensor with shape (n_spurions, 16)
-        spurion embedded as multivector object
-    """
-
-    if beam_reference in ["lightlike", "spacelike", "timelike"]:
-        # add another 4-momentum
-        if beam_reference == "lightlike":
-            beam = [1, 0, 0, 1]
-        elif beam_reference == "timelike":
-            beam = [2**0.5, 0, 0, 1]
-        elif beam_reference == "spacelike":
-            beam = [0, 0, 0, 1]
-        beam = torch.tensor(beam, device=device, dtype=dtype).reshape(1, 4)
-        beam = embed_vector(beam)
-        if two_beams:
-            beam2 = beam.clone()
-            beam2[..., 4] = -1  # flip pz
-            beam = torch.cat((beam, beam2), dim=0)
-
-    elif beam_reference == "xyplane":
-        # add the x-y-plane, embedded as a bivector
-        # convention for bivector components: [tx, ty, tz, xy, xz, yz]
-        beam = torch.zeros(1, 16, device=device, dtype=dtype)
-        beam[..., 8] = 1
-
-    elif beam_reference is None:
-        beam = torch.empty(0, 16, device=device, dtype=dtype)
-
-    else:
-        raise ValueError(f"beam_reference {beam_reference} not implemented")
-
-    if add_xzplane:
-        # add the x-z-plane, embedded as a bivector
-        xzplane = torch.zeros(1, 16, device=device, dtype=dtype)
-        xzplane[..., 10] = 1
-    else:
-        xzplane = torch.empty(0, 16, device=device, dtype=dtype)
-
-    if add_yzplane:
-        # add the y-z-plane, embedded as a bivector
-        yzplane = torch.zeros(1, 16, device=device, dtype=dtype)
-        yzplane[..., 9] = 1
-    else:
-        yzplane = torch.empty(0, 16, device=device, dtype=dtype)
-
-    if add_time_reference:
-        time = [1, 0, 0, 0]
-        time = torch.tensor(time, device=device, dtype=dtype).reshape(1, 4)
-        time = embed_vector(time)
-    else:
-        time = torch.empty(0, 16, device=device, dtype=dtype)
-
-    spurion = torch.cat((beam, xzplane, yzplane, time), dim=-2)
-    return spurion
 
 
 def get_pt(p):
