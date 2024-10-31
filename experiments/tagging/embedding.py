@@ -3,7 +3,7 @@ from torch.nn.functional import one_hot
 from torch_geometric.utils import scatter
 
 from experiments.tagging.dataset import EPS
-from gatr.interface.spurions import embed_vector, embed_spurions
+from gatr.interface import embed_vector, embed_spurions
 
 UNITS = 20  # We use units of 20 GeV for all tagging experiments
 

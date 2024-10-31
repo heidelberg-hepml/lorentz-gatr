@@ -3,7 +3,6 @@ from torch import nn
 from torch_geometric.utils import dense_to_sparse
 
 from gatr.interface import embed_vector, extract_scalar
-from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity
 
 
 def encode_tokens(type_token, global_token, token_size, isgatr, batchsize, device):

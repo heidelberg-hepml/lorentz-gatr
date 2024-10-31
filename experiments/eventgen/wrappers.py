@@ -2,9 +2,7 @@ import torch
 import numpy as np
 from torch import nn
 
-from gatr.interface import embed_vector, extract_vector
-from gatr.layers import EquiLinear, GeometricBilinear, ScalarGatedNonlinearity
-from gatr.interface.spurions import embed_spurions
+from gatr.interface import embed_vector, extract_vector, embed_spurions
 from experiments.eventgen.cfm import EventCFM
 
 from experiments.eventgen.coordinates import (
