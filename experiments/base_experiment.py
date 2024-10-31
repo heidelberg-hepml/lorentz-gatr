@@ -106,12 +106,11 @@ class BaseExperiment:
         )
 
     def init_model(self):
-        gatr.layers.linear.MIX_DUALS = self.cfg.ga_representations.mix_duals
-        gatr.layers.linear.INCLUDE_AXIALVECTOR = (
-            self.cfg.ga_representations.include_axialvector
+        gatr.layers.linear.MIX_MVPSEUDOSCALAR_INTO_SCALAR = (
+            self.cfg.ga_settings.mix_mvpseudoscalar_into_scalar
         )
-        gatr.layers.mlp.geometric_bilinears.INCLUDE_TENSOR = (
-            self.cfg.ga_representations.include_tensor
+        gatr.layers.mlp.geometric_bilinears.ZERO_BIVECTOR = (
+            self.cfg.ga_settings.zero_bivector
         )
 
         # initialize model

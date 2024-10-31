@@ -9,8 +9,10 @@ from torch import nn
 from gatr.interface import embed_scalar
 from gatr.primitives.linear import NUM_PIN_LINEAR_BASIS_ELEMENTS, equi_linear
 
-MIX_DUALS = False
-INCLUDE_AXIALVECTOR = True
+# switch to mix pseudoscalar multivector components directly into scalar components
+# this only makes sense when working with the special orthochronous Lorentz group,
+# Note: This is an efficiency boost, the same action can be achieved with an extra linear layer
+MIX_MVPSEUDOSCALAR_INTO_SCALAR = True
 
 
 class EquiLinear(nn.Module):
@@ -100,7 +102,7 @@ class EquiLinear(nn.Module):
 
         # Scalars -> MV scalars
         self.s2mvs: Optional[nn.Linear]
-        mix_factor = 2 if MIX_DUALS else 1
+        mix_factor = 2 if MIX_MVPSEUDOSCALAR_INTO_SCALAR else 1
         if in_s_channels:
             self.s2mvs = nn.Linear(
                 in_s_channels, mix_factor * out_mv_channels, bias=bias
@@ -165,7 +167,7 @@ class EquiLinear(nn.Module):
             outputs_mv = outputs_mv + bias
 
         if self.s2mvs is not None and scalars is not None:
-            if MIX_DUALS:
+            if MIX_MVPSEUDOSCALAR_INTO_SCALAR:
                 outputs_mv[..., [0, -1]] += self.s2mvs(scalars).view(
                     *outputs_mv.shape[:-2], outputs_mv.shape[-2], 2
                 )
@@ -173,7 +175,7 @@ class EquiLinear(nn.Module):
                 outputs_mv[..., 0] += self.s2mvs(scalars)
 
         if self.mvs2s is not None:
-            if MIX_DUALS:
+            if MIX_MVPSEUDOSCALAR_INTO_SCALAR:
                 outputs_s = self.mvs2s(multivectors[..., [0, -1]].flatten(start_dim=-2))
             else:
                 outputs_s = self.mvs2s(multivectors[..., 0])
@@ -181,9 +183,6 @@ class EquiLinear(nn.Module):
                 outputs_s = outputs_s + self.s2s(scalars)
         else:
             outputs_s = None
-
-        if not INCLUDE_AXIALVECTOR:
-            outputs_mv[..., 11:15] = 0.0
 
         return outputs_mv, outputs_s
 
@@ -336,7 +335,7 @@ class EquiLinear(nn.Module):
             # contribution from scalar -> mv scalar
             bound = mv_component_factors[0] * mv_factor / np.sqrt(fan_in) / np.sqrt(2)
             nn.init.uniform_(self.weight[..., [0]], a=-bound, b=bound)
-            if MIX_DUALS:
+            if MIX_MVPSEUDOSCALAR_INTO_SCALAR:
                 # contribution from scalar -> mv pseudoscalar
                 bound = (
                     mv_component_factors[-1] * mv_factor / np.sqrt(fan_in) / np.sqrt(2)

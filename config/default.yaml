@@ -13,10 +13,9 @@ use_mlflow: true
 save_source: true
 ema: false
 
-ga_representations:
- mix_duals: true
- include_axialvector: true
- include_tensor: true
+ga_settings:
+ mix_mvpseudoscalar_into_scalar: true
+ zero_bivector: false
 
 train: true
 training:
