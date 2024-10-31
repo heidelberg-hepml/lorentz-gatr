@@ -78,6 +78,7 @@ class BaseExperiment:
         self._save_config(f"config_{self.cfg.run_idx}.yaml")
 
         self.init_physics()
+        self.init_geometric_algebra()
         self.init_model()
         self.init_data()
         self._init_dataloader()
@@ -106,7 +107,7 @@ class BaseExperiment:
             f"Finished experiment {self.cfg.exp_name}/{self.cfg.run_name} after {dt/60:.2f}min = {dt/60**2:.2f}h"
         )
 
-    def init_model(self):
+    def init_geometric_algebra(self):
         gatr.layers.mlp.mlp.USE_GEOMETRIC_PRODUCT = (
             self.cfg.ga_settings.use_geometric_product
         )
@@ -117,6 +118,7 @@ class BaseExperiment:
             self.cfg.ga_settings.zero_bivector
         )
 
+    def init_model(self):
         # initialize model
         self.model = instantiate(self.cfg.model)
         num_parameters = sum(
