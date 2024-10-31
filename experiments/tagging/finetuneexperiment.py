@@ -16,7 +16,7 @@ class TopTaggingFineTuneExperiment(TopTaggingExperiment):
             self.cfg.finetune.backbone_path, self.cfg.finetune.backbone_cfg
         )
         self.warmstart_cfg = OmegaConf.load(warmstart_path)
-        assert self.warmstart_cfg.exp_type in ["jctagging", "binaryjetclass"]
+        assert self.warmstart_cfg.exp_type in ["jctagging"]
         assert self.warmstart_cfg.data.features == "fourmomenta"
 
         # merge config files
