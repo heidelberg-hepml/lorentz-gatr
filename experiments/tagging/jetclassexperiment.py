@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from omegaconf import open_dict
@@ -11,7 +10,7 @@ from scipy.interpolate import interp1d
 from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
 
-from experiments.tagging.experiment import TaggingExperiment, UNITS
+from experiments.tagging.experiment import TaggingExperiment
 from experiments.tagging.embedding import (
     dense_to_sparse_jet,
     embed_tagging_data_into_ga,
@@ -24,9 +23,6 @@ from experiments.tagging.miniweaver.loader import to_filelist
 class JetClassTaggingExperiment(TaggingExperiment):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        assert (
-            not self.cfg.model.mean_aggregation
-        ), "Mean-aggregation not implemented for multi-class classification"
         assert not self.cfg.plotting.roc and not self.cfg.plotting.score
         self.class_names = [
             "ZJetsToNuNu",
@@ -41,12 +37,8 @@ class JetClassTaggingExperiment(TaggingExperiment):
             "ZToQQ",
         ]
         with open_dict(self.cfg):
-            if self.cfg.data.score_token:
-                self.cfg.data.num_global_tokens = len(self.class_names)
-                self.cfg.model.net.out_mv_channels = 1
-            else:
-                self.cfg.data.num_global_tokens = 1
-                self.cfg.model.net.out_mv_channels = len(self.class_names)
+            self.cfg.data.num_global_tokens = 1
+            self.cfg.model.net.out_mv_channels = len(self.class_names)
 
             if self.cfg.data.features == "fourmomenta":
                 self.cfg.model.net.in_s_channels = 0
@@ -56,6 +48,11 @@ class JetClassTaggingExperiment(TaggingExperiment):
             elif self.cfg.data.features == "pid":
                 self.cfg.model.net.in_s_channels = 6
                 self.cfg.data.data_config = "experiments/tagging/miniweaver/pid.yaml"
+            elif self.cfg.data.features == "displacements":
+                self.cfg.model.net.in_s_channels = 4
+                self.cfg.data.data_config = (
+                    "experiments/tagging/miniweaver/displacements.yaml"
+                )
             elif self.cfg.data.features == "default":
                 self.cfg.model.net.in_s_channels = 10
                 self.cfg.data.data_config = (
@@ -103,7 +100,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
             datasets[label] = SimpleIterDataset(
                 file_dict,
                 self.cfg.data.data_config,
-                for_training=True,
+                for_training=for_training[label],
                 extra_selection=self.cfg.jc_params.extra_selection,
                 remake_weights=not self.cfg.jc_params.not_remake_weights,
                 load_range_and_fraction=((0, 1), 1),
@@ -155,15 +152,6 @@ class JetClassTaggingExperiment(TaggingExperiment):
 
     def _evaluate_single(self, loader, title, mode, step=None):
         assert mode in ["val", "eval"]
-        # re-initialize dataloader to make sure it is using the evaluation batchsize
-        # (makes a difference for trainloader)
-        loader = DataLoader(
-            dataset=loader.dataset,
-            batch_size=self.cfg.evaluation.batchsize,
-            shuffle=False,
-            drop_last=False,
-            **self.loader_kwargs,
-        )
 
         if mode == "eval":
             LOGGER.info(f"### Starting to evaluate model on {title} dataset ###")
@@ -207,27 +195,32 @@ class JetClassTaggingExperiment(TaggingExperiment):
         )  # unweighted mean of AUCs across classes
         if mode == "eval":
             LOGGER.info(f"The ovo mean AUC is\t\t{metrics['auc_ovo']:.5f}")
-        fpr_list, tpr_list = [], []
-        for i in range(len(self.class_names)):
-            fpr, tpr, _ = roc_curve(labels_true == i, labels_predict[:, i])
-            fpr_list.append(fpr)
-            tpr_list.append(tpr)
 
         # 1/epsB at fixed epsS
-        def get_rej(epsS, class_idx):
-            background_eff_fn = interp1d(tpr_list[class_idx], fpr_list[class_idx])
+        def get_rej(epsS, tpr, fpr):
+            background_eff_fn = interp1d(tpr, fpr)
             return 1 / background_eff_fn(epsS)
 
         class_rej_dict = [None, 0.5, 0.5, 0.5, 0.5, 0.99, 0.5, 0.995, 0.5, 0.5]
 
-        for i, rej in enumerate(class_rej_dict):
-            if rej is None:
-                continue
-            rej_string = str(rej).replace(".", "")
-            metrics[f"rej{rej_string}_{i}"] = get_rej(rej, i)
+        for i in range(1, len(self.class_names)):
+            labels_predict_class = labels_predict[
+                (labels_true == 0) | (labels_true == i)
+            ]
+            labels_true_class = labels_true[(labels_true == 0) | (labels_true == i)]
+            labels_predict_class = labels_predict_class[:, [0, i]]
+
+            predict_score = labels_predict_class[:, 1] / (
+                labels_predict_class[:, 0] + labels_predict_class[:, 1]
+            )
+
+            fpr, tpr, _ = roc_curve(labels_true_class == i, predict_score)
+
+            rej_string = str(class_rej_dict[i]).replace(".", "")
+            metrics[f"rej{rej_string}_{i}"] = get_rej(class_rej_dict[i], tpr, fpr)
             if mode == "eval":
                 LOGGER.info(
-                    f"Rejection rate for class {self.class_names[i]:>10} on {title} dataset:{metrics[f'rej{rej_string}_{i}']:>5.0f} (epsS={rej})"
+                    f"Rejection rate for class {self.class_names[i]:>10} on {title} dataset:{metrics[f'rej{rej_string}_{i}']:>5.0f} (epsS={class_rej_dict[i]})"
                 )
 
         # create latex string
@@ -252,7 +245,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
         return metrics
 
     def _get_ypred_and_label(self, batch):
-        fourmomenta = batch[0]["pf_vectors"].to(self.device) / UNITS
+        fourmomenta = batch[0]["pf_vectors"].to(self.device)
         if self.cfg.data.features == "fourmomenta":
             scalars = torch.empty(
                 fourmomenta.shape[0],
@@ -267,9 +260,4 @@ class JetClassTaggingExperiment(TaggingExperiment):
         fourmomenta, scalars, ptr = dense_to_sparse_jet(fourmomenta, scalars)
         embedding = embed_tagging_data_into_ga(fourmomenta, scalars, ptr, self.cfg.data)
         y_pred = self.model(embedding)
-        if self.cfg.data.score_token:
-            y_pred = y_pred.reshape(
-                y_pred.shape[0] // self.cfg.data.num_global_tokens,
-                self.cfg.data.num_global_tokens,
-            )
         return y_pred, label

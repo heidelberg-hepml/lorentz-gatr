@@ -3,7 +3,6 @@ exp_name: jc_local_debug
 
 data:
  data_dir: data/jetclass/
- score_token: false
  features: default
  train_files_range: [0,100]
  test_files_range: [100,120]

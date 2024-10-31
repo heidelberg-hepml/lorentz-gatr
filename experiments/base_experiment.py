@@ -30,6 +30,7 @@ cs.store(name="base_mlp", node=MLPConfig)
 
 # set to 'True' to debug autograd issues (slows down code)
 torch.autograd.set_detect_anomaly(False)
+MIN_STEP_SKIP = 1000
 
 
 class BaseExperiment:
@@ -563,11 +564,18 @@ class BaseExperiment:
             torch.nn.utils.clip_grad_norm_(
                 self.model.parameters(),
                 self.cfg.training.clip_grad_norm,
-                error_if_nonfinite=True,
+                error_if_nonfinite=False,
             )
             .cpu()
             .item()
         )
+        if step > MIN_STEP_SKIP and self.cfg.training.max_grad_norm is not None:
+            if grad_norm > self.cfg.training.max_grad_norm:
+                LOGGER.warning(
+                    f"Skipping update, gradient norm {grad_norm} exceeds maximum {self.cfg.training.max_grad_norm}"
+                )
+                return
+
         self.optimizer.step()
         if self.ema is not None:
             self.ema.update()
