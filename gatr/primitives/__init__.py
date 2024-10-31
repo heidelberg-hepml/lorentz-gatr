@@ -8,7 +8,6 @@ from .invariants import (
     pin_invariants,
 )
 from .linear import (
-    NUM_PIN_LINEAR_BASIS_ELEMENTS,
     equi_linear,
     grade_involute,
     grade_project,

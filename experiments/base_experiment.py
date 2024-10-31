@@ -15,6 +15,7 @@ import gatr.primitives.attention
 import gatr.layers.linear
 import gatr.layers.mlp.geometric_bilinears
 import gatr.layers.mlp.mlp
+import gatr.primitives.linear
 from experiments.misc import get_device, flatten_dict
 import experiments.logger
 from experiments.logger import LOGGER, MEMORY_HANDLER, FORMATTER
@@ -108,11 +109,22 @@ class BaseExperiment:
         )
 
     def init_geometric_algebra(self):
+        gatr.primitives.linear.USE_FULLY_CONNECTED_SUBGROUP = (
+            self.cfg.ga_settings.use_fully_connected_subgroup
+        )
+        if self.cfg.ga_settings.use_fully_connected_subgroup:
+            gatr.layers.linear.MIX_MVPSEUDOSCALAR_INTO_SCALAR = (
+                self.cfg.ga_settings.mix_mvpseudoscalar_into_scalar
+            )
+        else:
+            gatr.layers.linear.NUM_PIN_LINEAR_BASIS_ELEMENTS = 5
+            if self.cfg.ga_settings.mix_mvpseudoscalar_into_scalar:
+                LOGGER.warning(
+                    f"Mixing mvpseudoscalar into scalar is only possible if ga_settings.use_fully_connected_subgroup=True"
+                )
+                gatr.layers.linear.MIX_MVPSEUDOSCALAR_INTO_SCALAR = False
         gatr.layers.mlp.mlp.USE_GEOMETRIC_PRODUCT = (
             self.cfg.ga_settings.use_geometric_product
-        )
-        gatr.layers.linear.MIX_MVPSEUDOSCALAR_INTO_SCALAR = (
-            self.cfg.ga_settings.mix_mvpseudoscalar_into_scalar
         )
         gatr.layers.mlp.geometric_bilinears.ZERO_BIVECTOR = (
             self.cfg.ga_settings.zero_bivector

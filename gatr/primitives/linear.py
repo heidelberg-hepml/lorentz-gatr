@@ -6,6 +6,11 @@ import numpy as np
 
 from gatr.utils.einsum import cached_einsum, custom_einsum
 
+# switch to decide whether to use the full Lorentz group ('False')
+# or the special orthochronous Lorentz group ('True')
+# They only differ in the construction of linear maps in _compute_pin_equi_linear_basis
+USE_FULLY_CONNECTED_SUBGROUP = True
+
 
 @lru_cache()
 def _compute_pin_equi_linear_basis(
@@ -26,7 +31,7 @@ def _compute_pin_equi_linear_basis(
 
     Returns
     -------
-    basis : torch.Tensor with shape (10, 16, 16)
+    basis : torch.Tensor with shape (NUM_PIN_LINEAR_BASIS_ELEMENTS, 16, 16)
         Basis elements for equivariant linear maps.
     """
 
@@ -36,7 +41,8 @@ def _compute_pin_equi_linear_basis(
         # explicit construction of a pin-equilinear basis for the Lorentz group
         layout, blades = clifford.Cl(1, 3)
         linear_basis = []
-        for mult in [1, layout.pseudoScalar]:
+        mults = [1, layout.pseudoScalar] if USE_FULLY_CONNECTED_SUBGROUP else [1]
+        for mult in mults:
             for grade in range(5):
                 w = np.stack([(x(grade) * mult).value for x in blades.values()], 1)
                 w = w.astype(np.float32)
@@ -93,9 +99,6 @@ def _compute_grade_involution(
     involution_flat[1:5] = -1
     involution_flat[11:15] = -1
     return involution_flat
-
-
-NUM_PIN_LINEAR_BASIS_ELEMENTS = len(_compute_pin_equi_linear_basis())
 
 
 def equi_linear(x: torch.Tensor, coeffs: torch.Tensor) -> torch.Tensor:

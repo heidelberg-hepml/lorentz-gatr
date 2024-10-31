@@ -7,12 +7,13 @@ import torch
 from torch import nn
 
 from gatr.interface import embed_scalar
-from gatr.primitives.linear import NUM_PIN_LINEAR_BASIS_ELEMENTS, equi_linear
+from gatr.primitives.linear import equi_linear
 
 # switch to mix pseudoscalar multivector components directly into scalar components
 # this only makes sense when working with the special orthochronous Lorentz group,
 # Note: This is an efficiency boost, the same action can be achieved with an extra linear layer
 MIX_MVPSEUDOSCALAR_INTO_SCALAR = True
+NUM_PIN_LINEAR_BASIS_ELEMENTS = 10
 
 
 class EquiLinear(nn.Module):
