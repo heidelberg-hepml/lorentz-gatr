@@ -4,7 +4,6 @@ from experiments.tagging.experiment import TopTaggingExperiment, QGTaggingExperi
 from experiments.eventgen.processes import (
     ttbarExperiment,
     zmumuExperiment,
-    z5gExperiment,
 )
 from experiments.tagging.jetclassexperiment import JetClassTaggingExperiment
 from experiments.tagging.finetuneexperiment import TopTaggingFineTuneExperiment
@@ -26,8 +25,6 @@ def main(cfg):
         exp = ttbarExperiment(cfg)
     elif cfg.exp_type == "zmumu":
         exp = zmumuExperiment(cfg)
-    elif cfg.exp_type == "z5g":
-        exp = z5gExperiment(cfg)
     else:
         raise ValueError(f"exp_type {cfg.exp_type} not implemented")
 
