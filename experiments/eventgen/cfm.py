@@ -10,6 +10,9 @@ from experiments.eventgen.distributions import (
     StandardPPPLogM2,
     StandardLogPtPhiEtaLogM2,
 )
+import experiments.eventgen.helpers
+import experiments.eventgen.transforms
+import experiments.eventgen.distributions
 from experiments.eventgen.utils import GaussianFourierProjection
 import experiments.eventgen.coordinates as c
 from experiments.eventgen.geometry import BaseGeometry, SimplePossiblyPeriodicGeometry
@@ -69,6 +72,9 @@ class CFM(nn.Module):
             c.DTYPE = torch.float64
         else:
             c.DTYPE = torch.float32
+        experiments.eventgen.helpers.EPS1 = cfm.eps1
+        experiments.eventgen.transforms.EPS1 = cfm.eps1
+        experiments.eventgen.distributions.EPS1 = cfm.eps1
 
     def init_distribution(self):
         raise NotImplementedError
