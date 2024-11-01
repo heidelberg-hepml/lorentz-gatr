@@ -1,18 +1,14 @@
-# pytest
-.coverage
-.pytest
-.pytest_cache
-
-# Python
 *__pycache__*
 *.egg-info
 *.py[cod]
+.ipynb_checkpoints/
+.pytest/
+.pytest_cache/
 
+venv/
+data/
 runs/
 mlruns/
 outputs/
-*~
 scripts/
-*.hdf5
-*.npy
-*.npz
+*~

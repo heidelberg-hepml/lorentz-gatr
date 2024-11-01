@@ -5,7 +5,7 @@ black==22.3.0
 ## Standard science stack
 h5py
 matplotlib
-numpy==1.23.0
+numpy<1.25
 scipy
 
 ## Standard utils
