@@ -152,11 +152,13 @@ lorentz-gatr
 |   |   amplitudes.yaml: configuration for the amplitude experiment
 |   |   default.yaml: default configuration
 |   |   hydra.yaml: hydra configuration
+|   |   default_tagging.yaml: default configuration for tagging experiments
+|   |   toptagging.yaml: configuration for the top-tagging experiment
+|   |   jctagging.yaml: configuration for the JetClass tagging experiment
 |   |   qgtagging.yaml: configuration for the quark-gluon-tagging experiment
-|   |   toptagging.yaml: configuration for the toptagging experiment
 |   |   ttbar.yaml: configuration for the ttbar event-generation experiment
-|   |   z5g.yaml: configuration for the z+5g event-generation experiment
-|   |   zmumu.yaml: configuration for the z->mumu event-generation experiment|
+|   |   zmumu.yaml: configuration for the z->mumu event-generation experiment
+|
 └───config_paper: configuration YAML files for the experiments, with the hyperparameters used in the paper
 |   └───model: model configurations
 |   └───classifier: classifier metric configuration (event generation experiment)
@@ -168,11 +170,25 @@ lorentz-gatr
 |
 └───data: space to store datasets
 |   |   download_data.py: download and unpack datasets
+|
+└───experiments: experiments that use gatr
+|   └───baselines: baseline layers and architectures
+|   └───amplitudes: amplitude experiment
+|   └───tagging: tagging experiments
+|   └───eventgen: event generation experiments
+|   |
+|   |   misc.py: various utility functions
+|   |   logger.py: Logger setup
+|   |   mlflow.py: MLFlow logger 
+|   |   base_experiment.py: Base class for all experiments including model, optimizer and scheduler initialization, logging protocol and training/validation loops
+|   |   base_plots.py: Example plot functions (not used)
+|   |   base_wrapper.py: Example wrapper for L-GATr (not used) 
+│
 └───gatr: core library
 |   └───interface: embedding of geometric quantities into projective geometric algebra
-|   |   |   vector.py: Lorentz vector
-|   |   |   pseudoscalar.py: pseudoscalars (not used)
+|   |   |   vector.py: Lorentz vectors
 |   |   |   scalar.py: scalars
+|   |   |   spurions.py: spurions for symmetry breaking
 |   |
 |   └───layers: network layers
 |   |   └───attention: self-attention layer, its components, and the corresponding configuration
@@ -201,18 +217,7 @@ lorentz-gatr
 |       |   einsum.py: optimized einsum function
 |       |   tensors.py: various tensor operations
 |
-└───experiments: experiments that use gatr
-|   └───baselines: baseline layers and architectures
-|   └───amplitudes: amplitude experiment
-|   └───toptagging: top tagging experiment
-|   └───eventgen: event generation experiment
-|   |
-|   |   misc.py: various utility functions
-|   |   logger.py: Logger setup
-|   |   mlflow.py: MLFlow logger 
-|   |   base_experiment.py: Base class for all experiments including model, optimizer and scheduler initialization, logging protocol and training/validation loops
-|   |   base_plots.py: Example plot functions (not used)
-|   |   base_wrapper.py: Example wrapper for L-GATr (not used) 
+└───img: images
 │
 └───tests: unit tests (e.g. for self-consistency and Pin equivariance)
 |   └───gatr
@@ -223,17 +228,18 @@ lorentz-gatr
 |   |   └───utils: unit tests for gatr.utils
 |   |
 |   └───helpers: utility functions for unit tests
-|       |   constants.py: test settings (like tolerances)
-|       |   equivariance.py: helper functions to test Pin equivariance
-|       |   geometric_algebra.py: helper functions to test GA functionality
-│
+|   |   |   constants.py: test settings (like tolerances)
+|   |   |   equivariance.py: helper functions to test Pin equivariance
+|   |   |   geometric_algebra.py: helper functions to test GA functionality
 |   |
 |   └───experiments
-|   |   └───eventgen: units tests for base distributions and transforms/coordinates classes
+|   |   └───eventgen: unit tests for base distributions and transforms/coordinates classes
 │
 └───tests_regression: regression tests
 │  
+|   .gitignore: git configuration
 │   LICENSE: license under which this code may be used
+|   pyproject.toml: project settings
 │   README.md: this README file
 |   requirements.txt: external dependencies
 ```
