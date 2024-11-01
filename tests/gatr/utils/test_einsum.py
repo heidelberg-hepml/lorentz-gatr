@@ -9,14 +9,6 @@ from gatr.utils.einsum import cached_einsum
 _DIM = 5
 
 
-@pytest.fixture(autouse=True, scope="module")
-def disable_opt_einsum() -> Iterator[None]:
-    """Disable usage of opt_einsum by torch during tests in this module."""
-    torch.backends.opt_einsum.enabled = False
-    yield
-    torch.backends.opt_einsum.enabled = True
-
-
 @pytest.fixture(name="einsum_eq")
 def einsum_eq_fixture() -> str:
     """Provides a non-trivial einsum equation."""
