@@ -2,6 +2,9 @@
 
 This repository contains the official implementation of the [**Lorentz-Equivariant Geometric Algebra Transformer**](https://arxiv.org/abs/2405.14806) by [Jonas Spinner](mailto:j.spinner@thphys.uni-heidelberg.de), [Víctor Bresó](mailto:breso@thphys.uni-heidelberg.de), Pim de Haan, Tilman Plehn, Jesse Thaler, and Johann Brehmer.
 
+![](img/gatr.png)
+
+
 ## 1. Getting started
 
 Clone the repository
