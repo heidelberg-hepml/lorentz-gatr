@@ -242,7 +242,7 @@ Here we list some additional functional elements of the code that are not explic
 1. Tagging experiment for a quark gluon dataset containing extra scalar features
 2. Extra options in the tagging experiment to include more scalar variables, mean aggregation etc
 3. Extra base distributions and variable parametrizations for event generation
-4. Event generation experiments for Z + jets and Z + 5 gluons
+4. Event generation experiment for Z + jets
 5. Features of the original GATr repo that we do not use: Positional encodings, axial transformer and axial L-GATr build
 
 ## 5. Citation
