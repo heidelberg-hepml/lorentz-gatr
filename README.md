@@ -1,13 +1,22 @@
+<div align="center">
+
 # Lorentz-Equivariant Geometric Algebra Transformer
 
-This repository contains the official implementation of the **Lorentz-Equivariant Geometric Algebra Transformer (L-GATr)** by [Jonas Spinner](mailto:j.spinner@thphys.uni-heidelberg.de), [Víctor Bresó](mailto:breso@thphys.uni-heidelberg.de), Pim de Haan, Tilman Plehn, Jesse Thaler, and Johann Brehmer. L-GATr uses geometric algebra representations to construct Lorentz-equivariant layers and combines them into a transformer architecture.
+[![OT-CFM Preprint](http://img.shields.io/badge/paper-arxiv.2405.14806-B31B1B.svg)](https://arxiv.org/abs/2405.14806)
+[![pytorch](https://img.shields.io/badge/PyTorch_2.2+-ee4c2c?logo=pytorch&logoColor=white)](https://pytorch.org/get-started/locally/)
+[![hydra](https://img.shields.io/badge/Config-Hydra_1.3-89b8cd)](https://hydra.cc/)
+[![black](https://img.shields.io/badge/Code%20Style-Black-black.svg?labelColor=gray)](https://black.readthedocs.io/en/stable/)
+
+</div>
+
+This repository contains the official implementation of the **Lorentz-Equivariant Geometric Algebra Transformer (L-GATr)** by [Jonas Spinner](mailto:j.spinner@thphys.uni-heidelberg.de), [Víctor Bresó](mailto:breso@thphys.uni-heidelberg.de), Pim de Haan, Tilman Plehn, Huilin Qu, Jesse Thaler, and Johann Brehmer. L-GATr uses geometric algebra representations to construct Lorentz-equivariant layers and combines them into a transformer architecture.
 
 ![](img/gatr.png)
 
 You can read more about L-GATr in the following two preprints. This repository contains the code to reproduce the main results presented there:
 
-- [Lorentz-Equivariant Geometric Algebra Transformers for High-Energy Physics](https://arxiv.org/abs/2405.14806) by Jonas Spinner, Víctor Bresó, Pim de Haan, Tilman Plehn, Jesse Thaler, and Johann Brehmer (targeted at a computer science audience)
-- A Lorentz-Equivariant Transformer for All of the LHC by Johann Brehmer, Víctor Bresó, Pim de Haan, Tilman Plehn, Huilin Qu, Jonas Spinner, and Jesse Thaler (targeted at a high-energy physics audience)
+- [Lorentz-Equivariant Geometric Algebra Transformers for High-Energy Physics](https://arxiv.org/abs/2405.14806) (targeted at a computer science audience)
+- A Lorentz-Equivariant Transformer for All of the LHC (targeted at a high-energy physics audience)
 
 ## 1. Getting started
 
@@ -63,7 +72,7 @@ To use L-GATr on your own problem, you will at least need two components from th
 - Interface functions that embed various geometric
 objects into this multivector representations
 
-Here is an example code snippet for a jet tagger that illustrates the recipe:
+Here is an example code snippet for a GATr jet tagger that illustrates the recipe, you can find more examples at `experiments/amplitudes/wrappers.py`, `experiments/tagging/wrappers.py` and `experiments/eventgen/wrappers.py`
 
 ```python
 from gatr import GATr, SelfAttentionConfig, MLPConfig
@@ -74,13 +83,9 @@ import torch
 class ExampleWrapper(torch.nn.Module):
     """Example wrapper around a L-GATr model.
     
-    Expects a point cloud of particles as input: 
-    one 4-momentum for each token in the event.
-    Returns outputs that consists of one scalar number for the whole dataset.
-    
     Parameters
     ----------
-    blocks : int
+    num_blocks : int
         Number of transformer blocks
     hidden_mv_channels : int
         Number of hidden multivector channels
@@ -97,7 +102,7 @@ class ExampleWrapper(torch.nn.Module):
             in_s_channels=None,
             out_s_channels=None,
             hidden_s_channels=hidden_s_channels,
-            num_blocks=blocks,
+            num_blocks=num_blocks,
             attention=SelfAttentionConfig(),  # Use default parameters for attention
             mlp=MLPConfig(),  # Use default parameters for MLP
         )
