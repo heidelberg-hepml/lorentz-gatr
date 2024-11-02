@@ -293,5 +293,14 @@ If you find this code useful in your research, please cite the following papers
     month = "5",
     year = "2024"
 }
+@inproceedings{brehmer2023geometric,
+  title = {Geometric Algebra Transformer},
+  author = {Brehmer, Johann and de Haan, Pim and Behrends, S{\"o}nke and Cohen, Taco},
+  booktitle = {Advances in Neural Information Processing Systems},
+  year = {2023},
+  volume = {37},
+  eprint = {2305.18415},
+  url = {https://arxiv.org/abs/2305.18415},
+}
 ```
 
