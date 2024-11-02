@@ -169,7 +169,7 @@ class GATrCFM(EventCFMForGA):
         ----------
         net : torch.nn.Module
         cfm : Dict
-            Information about how to set up CFM
+            Information about how to set up CFM (used in parent classes)
         type_token_channels : int
             Number of different particle id's
             Used for one-hot encoding to break permutation symmetry
@@ -183,9 +183,11 @@ class GATrCFM(EventCFMForGA):
         two_beams : bool
             If beam_reference in ["spacelike", "lightlike", "timelike"],
             decide whether only (alpha,0,0,1) or both (alpha,0,0,+/-1) are included
+            See gatr.interface.spurions.py::embed_spurions for details
         add_time_reference : bool
             Whether time direction (1,0,0,0) is included to break Lorentz group down to SO(3)
             This is formally required, because equivariant generation on non-compact groups is not possible
+            See gatr.interface.spurions.py::embed_spurions for details
         scalar_dims : List[int]
             Components within the used parametrization
             for which the equivariantly predicted velocity (using multivector channels)
