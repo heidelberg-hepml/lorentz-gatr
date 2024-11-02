@@ -1,9 +1,13 @@
 # Lorentz-Equivariant Geometric Algebra Transformer
 
-This repository contains the official implementation of the [**Lorentz-Equivariant Geometric Algebra Transformer**](https://arxiv.org/abs/2405.14806) by [Jonas Spinner](mailto:j.spinner@thphys.uni-heidelberg.de), [Víctor Bresó](mailto:breso@thphys.uni-heidelberg.de), Pim de Haan, Tilman Plehn, Jesse Thaler, and Johann Brehmer.
+This repository contains the official implementation of the **Lorentz-Equivariant Geometric Algebra Transformer (L-GATr)** by [Jonas Spinner](mailto:j.spinner@thphys.uni-heidelberg.de), [Víctor Bresó](mailto:breso@thphys.uni-heidelberg.de), Pim de Haan, Tilman Plehn, Jesse Thaler, and Johann Brehmer. L-GATr uses geometric algebra representations to construct Lorentz-equivariant layers and combines them into a transformer architecture.
 
 ![](img/gatr.png)
 
+You can read more about L-GATr in the following two preprints. This repository contains the code to reproduce the main results presented there:
+
+- [Lorentz-Equivariant Geometric Algebra Transformers for High-Energy Physics](https://arxiv.org/abs/2405.14806) by Jonas Spinner, Víctor Bresó, Pim de Haan, Tilman Plehn, Jesse Thaler, and Johann Brehmer (targeted at a computer science audience)
+- A Lorentz-Equivariant Transformer for All of the LHC by Johann Brehmer, Víctor Bresó, Pim de Haan, Tilman Plehn, Huilin Qu, Jonas Spinner, and Jesse Thaler (targeted at a high-energy physics audience)
 
 ## 1. Getting started
 
@@ -26,47 +30,52 @@ python data/collect_data.py
 
 ## 2. Running experiments
 
-You can run any of our experiments with the following commands:
+You can run any of our experiments with the following commands, the results will be stored in a folder called `runs/exp_name/run_name`, where `exp_name` and `run_name` can be specified in the config file
 ```bash
-python run.py -cn amplitudes model=gatr_amplitudes exp_name=amplitudes run_name=hello_world_amplitudes
-python run.py -cn toptagging model=gatr_toptagging exp_name=toptagging run_name=hello_world_toptagging
-python run.py -cn ttbar model=gatr_eventgen exp_name=eventgen run_name=hello_world_eventgen
+python run.py -cn amplitudes model=gatr_amplitudes
+python run.py -cn toptagging model=gatr_toptagging
+python run.py -cn ttbar model=gatr_eventgen
 ```
 
-We use hydra for configuration management, allowing to quickly override parameters in e.g. config/amplitudes.yaml. Further, we use mlflow for tracking. You can start a mlflow server based on the saved results in runs/tracking/mlflow.db on port 4242 of your machine with the following command, executed from a directory that contains the `runs` folder.
-
+We use hydra for configuration management, allowing to quickly override parameters in e.g. `config/amplitudes.yaml`. The default configuration files for quick test experiments are located in the `config` folder, whereas longer experiments to reproduce the results of the papers can be found in `config_paper`. You can select the config file with `-cn`, and its location with `-cp`. Hyperparameters of the config file can be simply overwritten as extra command line arguments. For instance, to train a big amplitude regression L-GATr for 10k iterations run
 ```bash
-mlflow ui --port 4242 --backend-store-uri sqlite:///runs/tracking/mlflow.db
+python run.py -cp config_paper -cn amplitudes training.iterations=10000
 ```
 
-An existing run can be reloaded to perform additional tests with the trained model. For a previous run with exp_name=amplitudes and run_name=hello_world_amplitudes, one can run for example. 
+Further, we use mlflow for tracking. You can start a mlflow server based on the saved results in `runs/tracking/mlflow.db` on port 4242 of your machine with the following command
 
 ```bash
-python run.py -cn config -cp runs/amplitudes/hello_world_amplitudes train=false warm_start_idx=0
+mlflow ui --port 4242 --backend-store-uri sqlite:///path/to/runs/tracking/mlflow.db
 ```
 
-The warm_start_idx specifies which model in the models folder should be loaded and defaults to 0. 
+An existing run can be reloaded to perform additional tests using the trained model. For a previous run with `exp_name=amplitudes` and `run_name=hello_world`, one can run for example. 
 
-The default configuration files in the `config` folder define small models to allow quick test runs. If you want to reproduce the longer experiments in the paper, you can use the configuration files in `config_paper`.
+```bash
+python run.py -cp runs/amplitudes/hello_world -cn config train=false warm_start_idx=0
+```
+
+The `warm_start_idx` specifies which model in the models folder should be loaded and defaults to `warm_start_idx=0`. 
 
 ## 3. Using L-GATr 
 
 To use L-GATr on your own problem, you will at least need two components from this repository:
-L-GATr networks, which act on multivector data, and interface functions that embed various geometric
-objects into this multivector representations.
+- L-GATr networks, which act on multivector data
+- Interface functions that embed various geometric
+objects into this multivector representations
 
-Here is an example code snippet that illustrates the recipe:
+Here is an example code snippet for a jet tagger that illustrates the recipe:
 
 ```python
 from gatr import GATr, SelfAttentionConfig, MLPConfig
-from gatr.interface import embed_vector, extract_scalar
+from gatr.interface import embed_vector, extract_scalar, embed_spurions
 import torch
 
 
 class ExampleWrapper(torch.nn.Module):
     """Example wrapper around a L-GATr model.
     
-    Expects input data that consists of a point cloud: one 4-momentum point for each item in the data.
+    Expects a point cloud of particles as input: 
+    one 4-momentum for each token in the event.
     Returns outputs that consists of one scalar number for the whole dataset.
     
     Parameters
@@ -79,10 +88,10 @@ class ExampleWrapper(torch.nn.Module):
         Number of hidden scalar channels
     """
 
-    def __init__(self, blocks=10, hidden_mv_channels=16, hidden_s_channels=32):
+    def __init__(self, blocks=6, hidden_mv_channels=16, hidden_s_channels=32):
         super().__init__()
         self.gatr = GATr(
-            in_mv_channels=1,
+            in_mv_channels=3,
             out_mv_channels=1,
             hidden_mv_channels=hidden_mv_channels,
             in_s_channels=None,
@@ -93,30 +102,39 @@ class ExampleWrapper(torch.nn.Module):
             mlp=MLPConfig(),  # Use default parameters for MLP
         )
         
-    def forward(self, inputs):
+    def forward(self, fourmomenta):
         """Forward pass.
         
         Parameters
         ----------
-        inputs : torch.Tensor with shape (*batch_dimensions, num_points, 4)
-            4-momentum point cloud input data
+        fourmomenta : torch.Tensor with shape (batchsize, num_points, 4)
+            fourmomentum point cloud input data
         
         Returns
         -------
-        outputs : torch.Tensor with shape (*batch_dimensions, 1)
+        outputs : torch.Tensor with shape (batchsize, 1)
             Model prediction: a single scalar for the whole point cloud.
         """
+        batchsize, num_points, _ = fourmomenta.shape
         
-        # Embed 4-momentum point cloud inputs in GA
-        embedded_inputs = embed_vector(inputs).unsqueeze(-2)  # (..., num_points, 1, 16)
+        # Embed fourmomentum point cloud inputs in GA
+        multivectors = embed_vector(fourmomenta).unsqueeze(-2)  # (batchsize, num_points, 1, 16)
+        
+        # Append spurions for symmetry breaking (optional)
+        spurions = embed_spurions(beam_reference="xyplane", add_time_reference=True, device=fourmomenta.device, dtype=fourmomenta.dtype)  # (2, 16)
+        spurions = spurions[None, None, ...].repeat(batchsize, num_points, 1, 1)  # (batchsize, num_points, 2, 16)
+        multivectors = torch.cat((multivectors, spurions), dim=-2)  # (batchsize, num_points, 3, 16)
         
         # Pass data through GATr
-        embedded_outputs, _ = self.gatr(embedded_inputs, scalars=None)  # (..., num_points, 1, 16)
+        multivector_outputs, _ = self.gatr(multivectors, scalars=None)  # (batchsize, num_points, 1, 16)
         
         # Extract scalar outputs 
-        outputs = extract_scalar(embedded_outputs)  # (..., 1)
-
-        return outputs
+        outputs = extract_scalar(multivector)  # (batchsize, num_points, 1)
+        
+        # Mean aggregation to extract a single scalar for the whole point cloud
+        score = outputs.mean(dim=1)
+        
+        return score
 ```
 
 In the following, we will go into more detail on the conventions used in this code base and the
@@ -127,18 +145,18 @@ structure of the repository.
 **Representations**: L-GATr operates with two kind of representations: geometric algebra multivectors
 and auxiliary scalar representations. Both are simply represented as `torch.Tensor` instances.
 
-The multivectors are based on the geometric algebra Cl(1, 3). They are tensors of the
+The multivectors are based on the spacetime geometric algebra Cl(1, 3). They are tensors of the
 shape `(..., 16)`, for instance `(batchsize, items, channels, 16)`. The sixteen multivector
 components are sorted as in the
 [`clifford` library](https://clifford.readthedocs.io/en/latest/), as follows:
 `[x_scalars, x_0, x_1, x_2, x_3, x_01, x_02, x_03, x_12, x_13, x_23, x_012, x_013, x_023, x_123,
-x_0123]`.
+x_0123]`, or `[x_S, x_V0, x_V1, x_V2, x_V3, x_B01, x_B02, x_B03, x_B12, x_B13, x_B23, x_A3, x_A2, x_A1, x_A1, x_P]` in the notation of [A Lorentz-Equivariant Transformer for All of the LHC].
 
 Scalar representations have free shapes, but should match the multivector representations they
 accompany in batchsize and number of items. The number of channels may be different.
 
 **Functions**: We distinguish between primitives (functions) and layers (often stateful
-`torch.nn.Module` instances). Almost all primitives and layers are Pin(1, 3)-equivariant,
+`torch.nn.Module` instances). Almost all primitives and layers are Lorentz-equivariant,
 see docstrings for exceptions.
 
 ### Repository structure
@@ -252,13 +270,14 @@ Here we list some additional functional elements of the code that are not explic
 2. Extra options in the tagging experiment to include more scalar variables, mean aggregation etc
 3. Extra base distributions and variable parametrizations for event generation
 4. Event generation experiment for Z + jets
-5. Features of the original GATr repo that we do not use: Positional encodings, axial transformer and axial L-GATr build
+5. Switches to control the geometric algebra representations  under `ga_settings` in `config/default.yaml`, e.g. to turn off the bivector representations, turn off the geometric product, or have equivariance under the full Lorentz group including parity and time reversal
+6. Features of the original GATr repo that we do not use: Positional encodings, axial transformer and axial L-GATr build
 
 ## 5. Citation
 
-If you find our code useful, please cite:
+If you find this code useful in your research, please cite the following papers
 
-```text
+```bibtex
 @article{Spinner:2024hjm,
     author = "Spinner, Jonas and Bres\'o, Victor and de Haan, Pim and Plehn, Tilman and Thaler, Jesse and Brehmer, Johann",
     title = "{Lorentz-Equivariant Geometric Algebra Transformers for High-Energy Physics}",
@@ -270,3 +289,4 @@ If you find our code useful, please cite:
     year = "2024"
 }
 ```
+
