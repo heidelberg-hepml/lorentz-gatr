@@ -9,11 +9,11 @@
 
 </div>
 
-This repository contains the official implementation of the **Lorentz-Equivariant Geometric Algebra Transformer (L-GATr)** by [Jonas Spinner](mailto:j.spinner@thphys.uni-heidelberg.de), [Víctor Bresó](mailto:breso@thphys.uni-heidelberg.de), Pim de Haan, Tilman Plehn, Huilin Qu, Jesse Thaler, and Johann Brehmer. L-GATr uses geometric algebra representations to construct Lorentz-equivariant layers and combines them into a transformer architecture.
+This repository contains the official implementation of the **Lorentz-Equivariant Geometric Algebra Transformer (L-GATr)** by [Jonas Spinner](mailto:j.spinner@thphys.uni-heidelberg.de), [Víctor Bresó](mailto:breso@thphys.uni-heidelberg.de), Pim de Haan, Tilman Plehn, Huilin Qu, Jesse Thaler, and Johann Brehmer. L-GATr uses spacetime geometric algebra representations to construct Lorentz-equivariant layers and combines them into a transformer architecture.
 
 ![](img/gatr.png)
 
-You can read more about L-GATr in the following two preprints. This repository contains the code to reproduce the main results presented there:
+You can read more about L-GATr in the following two preprints. This repository contains the code to reproduce their main results:
 
 - [Lorentz-Equivariant Geometric Algebra Transformers for High-Energy Physics](https://arxiv.org/abs/2405.14806) (targeted at a computer science audience)
 - A Lorentz-Equivariant Transformer for All of the LHC (targeted at a high-energy physics audience)
