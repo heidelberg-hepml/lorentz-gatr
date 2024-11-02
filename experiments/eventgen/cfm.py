@@ -300,15 +300,6 @@ class CFM(nn.Module):
             - logdetjac_forward
             - logdetjac_inverse
         )
-
-        # the infamous clipper
-        # (MLP sometimes has single large-NLL events -> exclude those from NLL computation)
-        mask = log_prob_fourmomenta > -100
-        if (~mask).any():
-            LOGGER.warning(
-                f"Found {(~mask).sum(dim=0)} events with NLL>100 while evaluating log_prob"
-            )
-            log_prob_fourmomenta = log_prob_fourmomenta[mask]
         return log_prob_fourmomenta
 
 
