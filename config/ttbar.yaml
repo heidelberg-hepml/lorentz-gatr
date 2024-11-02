@@ -25,7 +25,7 @@ cfm:
  embed_t_dim: 8
  embed_t_scale: 30.
  hutchinson: true
- coordinates_straight: StandardLogPtPhiEtaLogM2
+ coordinates: StandardLogPtPhiEtaLogM2
  geometry:
   type: simple
   periodic: true

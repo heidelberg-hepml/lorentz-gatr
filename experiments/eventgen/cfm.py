@@ -246,7 +246,7 @@ class CFM(nn.Module):
                 )
             return vt_straight.detach(), dlogp_dt_straight.detach()
 
-        # solve ODE in coordinates_straight
+        # solve ODE in coordinates
         x0_straight = self.coordinates.fourmomenta_to_x(x0_fourmomenta)
         logdetjac0_cfm_straight = torch.zeros(
             (x0_straight.shape[0], 1),
@@ -386,7 +386,7 @@ class EventCFM(CFM):
             raise ValueError(f"base_type={self.base_type} not implemented")
 
     def init_coordinates(self):
-        self.coordinates = self._init_coordinates(self.cfm.coordinates_straight)
+        self.coordinates = self._init_coordinates(self.cfm.coordinates)
 
     def _init_coordinates(self, coordinates_label):
         if coordinates_label == "Fourmomenta":

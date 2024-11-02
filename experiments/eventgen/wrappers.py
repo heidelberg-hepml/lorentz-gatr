@@ -170,8 +170,6 @@ class GATrCFM(EventCFMForGA):
         net : torch.nn.Module
         cfm : Dict
             Information about how to set up CFM
-            technical keys: embed_t_dim, embed_t_scale, hutchinson, transforms_float64, eps1_pt, eps1_m2
-            conceptional keys: coordinates_straight, coordinates_network
         type_token_channels : int
             Number of different particle id's
             Used for one-hot encoding to break permutation symmetry
@@ -192,8 +190,7 @@ class GATrCFM(EventCFMForGA):
             Components within the used parametrization
             for which the equivariantly predicted velocity (using multivector channels)
             is overwritten by a scalar network output (using scalar channels)
-            This is required whenever coordinates_network != coordinates_straight,
-            and the transformation between the two contains e.g. log transforms
+            This is required when cfm.coordinates contains log-transforms
         odeint : Dict
             ODE solver settings to be passed to torchdiffeq.odeint
         """
