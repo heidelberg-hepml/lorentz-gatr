@@ -233,8 +233,9 @@ class CFM(nn.Module):
 
         def net_wrapper(t, state):
             with torch.set_grad_enabled(True):
-                xt_straight = state[0].detach().requires_grad_(True)
+                xt_straight = state[0]
                 xt_straight = self.geometry._handle_periodic(xt_straight)
+                xt_straight = xt_straight.detach().requires_grad_(True)
                 t = t * torch.ones(
                     xt_straight.shape[0],
                     1,
@@ -244,10 +245,10 @@ class CFM(nn.Module):
                 )
                 vt_straight = self.get_velocity(xt_straight, t, ijet=ijet)
                 vt_straight = self.handle_velocity(vt_straight)
-                dlogp_dt_straight = (
-                    -self.trace_fn(vt_straight, xt_straight).unsqueeze(-1).detach()
+                dlogp_dt_straight = -self.trace_fn(vt_straight, xt_straight).unsqueeze(
+                    -1
                 )
-            return vt_straight, dlogp_dt_straight
+            return vt_straight.detach(), dlogp_dt_straight.detach()
 
         # solve ODE in coordinates_straight
         x0_straight = self.coordinates.fourmomenta_to_x(x0_fourmomenta)
