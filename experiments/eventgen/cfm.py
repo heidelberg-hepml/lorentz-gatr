@@ -199,9 +199,9 @@ class CFM(nn.Module):
         # just sample another event in this case)
         mask = torch.isfinite(x0_straight).all(dim=[1, 2])
         if (~mask).any():
+            mask2 = torch.isfinite(x0_straight)
             x0_straight = x0_straight[mask, ...]
             x1_fourmomenta = x1_fourmomenta[mask, ...]
-            mask2 = torch.isfinite(x0_straight)
             LOGGER.warning(f"Found {(~mask2).sum(dim=0)} nan events while sampling")
 
         # transform generated event back to fourmomenta
@@ -274,10 +274,10 @@ class CFM(nn.Module):
         # just remove these events from the log_prob computation)
         mask = torch.isfinite(x1_straight).all(dim=[1, 2])
         if (~mask).any():
+            mask2 = torch.isfinite(x1_straight)
             logdetjac_cfm_straight = logdetjac_cfm_straight[mask]
             x1_straight = x1_straight[mask]
             x0_fourmomenta = x0_fourmomenta[mask]
-            mask2 = torch.isfinite(x1_straight)
             LOGGER.warning(f"Found {(~mask2).sum(dim=0)} nan events while sampling")
 
         x1_fourmomenta = self.coordinates.x_to_fourmomenta(x1_straight)
