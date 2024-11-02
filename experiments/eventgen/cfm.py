@@ -233,8 +233,8 @@ class CFM(nn.Module):
 
         def net_wrapper(t, state):
             with torch.set_grad_enabled(True):
-                xt_straight = self.geometry._handle_periodic(xt_straight)
                 xt_straight = state[0].detach().requires_grad_(True)
+                xt_straight = self.geometry._handle_periodic(xt_straight)
                 t = t * torch.ones(
                     xt_straight.shape[0],
                     1,
