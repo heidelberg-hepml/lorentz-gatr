@@ -5,9 +5,9 @@ from gatr.interface import embed_vector
 def get_num_spurions(
     beam_reference,
     add_time_reference,
-    two_beams,
-    add_xzplane,
-    add_yzplane,
+    two_beams=True,
+    add_xzplane=False,
+    add_yzplane=False,
 ):
     """
     Compute how many reference multivectors/spurions a given configuration will have
@@ -48,11 +48,11 @@ def get_num_spurions(
 def embed_spurions(
     beam_reference,
     add_time_reference,
-    two_beams,
-    add_xzplane,
-    add_yzplane,
-    device,
-    dtype,
+    two_beams=True,
+    add_xzplane=False,
+    add_yzplane=False,
+    device="cpu",
+    dtype=torch.float32,
 ):
     """
     Construct a list of reference multivectors/spurions for symmetry breaking
