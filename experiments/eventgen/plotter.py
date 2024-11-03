@@ -9,7 +9,7 @@ from experiments.eventgen.helpers import (
     get_virtual_particle,
     fourmomenta_to_jetmomenta,
 )
-from experiments.base_plots import plot_loss
+from experiments.base_plots import plot_loss, plot_metric
 from experiments.eventgen.plots import (
     plot_histogram,
     plot_histogram_2d,
@@ -27,6 +27,12 @@ def plot_losses(exp, filename, model_label):
             exp.train_lr,
             labels=["train loss", "val loss"],
             logy=True if exp.modeltype == "CFM" else False,
+        )
+        plot_metric(
+            file,
+            [exp.train_grad_norm],
+            "Gradient norm",
+            logy=True,
         )
 
         for ijet, n_jets in enumerate(exp.cfg.data.n_jets):
@@ -233,7 +239,7 @@ def plot_preprocessed(exp, filename, model_label, weights, mask_dict):
         for ijet in range(len(exp.cfg.data.n_jets)):
 
             def extract(x, channel):
-                x = exp.model.coordinates_sampling.fourmomenta_to_x(x)
+                x = exp.model.coordinates.fourmomenta_to_x(x)
                 x = x.reshape(x.shape[0], -1)
                 return x[:, channel]
 

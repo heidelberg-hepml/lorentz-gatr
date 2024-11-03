@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 import experiments.eventgen.coordinates as c
 from experiments.eventgen.coordinates import StandardLogPtPhiEtaLogM2
-from experiments.eventgen.wrappers import get_type_token, get_process_token
+from experiments.eventgen.utils import get_type_token, get_process_token
 
 
 class CustomMixtureModel:
@@ -83,6 +83,9 @@ class GPT(nn.Module):
     def _embed_condition(self, x):
         raise NotImplementedError
 
+    def init_geometry(self, *args, **kwargs):
+        pass
+
     def _get_idx(self, shape, device):
         # indices to go back and forth between default (pt, phi, eta, m) ordering
         # and the ordering specified in self.channels
@@ -116,11 +119,11 @@ class GPT(nn.Module):
         x0_gaussian = x0_condition[:, 1:]
         x0_gaussian = x0_gaussian[:, reverse_idx]
         x0_gaussian = x0_gaussian.reshape(shape[0], shape[1] // 4, 4)
-        x0_fourmomenta = self.coordinates_sampling.x_to_fourmomenta(x0_gaussian)
+        x0_fourmomenta = self.coordinates.x_to_fourmomenta(x0_gaussian)
         return x0_fourmomenta
 
     def _log_prob_gaussian(self, x0_fourmomenta, ijet):
-        x0_gaussian = self.coordinates_sampling.fourmomenta_to_x(x0_fourmomenta)
+        x0_gaussian = self.coordinates.fourmomenta_to_x(x0_fourmomenta)
         x0_gaussian = x0_gaussian.reshape(
             x0_gaussian.shape[0], -1
         )  # shape (batchsize, num_components)
@@ -145,7 +148,7 @@ class GPT(nn.Module):
     def log_prob(self, x0_fourmomenta, ijet):
         log_prob_gaussian, x0_gaussian = self._log_prob_gaussian(x0_fourmomenta, ijet)
         log_prob_gaussian = log_prob_gaussian.sum(dim=-1, keepdims=True)
-        logdetjac, _ = self.coordinates_sampling.logdetjac_x_to_fourmomenta(x0_gaussian)
+        logdetjac, _ = self.coordinates.logdetjac_x_to_fourmomenta(x0_gaussian)
         log_prob_fourmomenta = log_prob_gaussian + logdetjac
         return log_prob_fourmomenta[:, 0]
 
@@ -163,6 +166,7 @@ class EventGPT(GPT):
         delta_r_min,
         onshell_list,
         onshell_mass,
+        virtual_components,
         base_type,
         use_pt_min,
         use_delta_r_min,
@@ -172,6 +176,7 @@ class EventGPT(GPT):
         self.delta_r_min = delta_r_min
         self.onshell_list = onshell_list
         self.onshell_mass = onshell_mass
+        self.virtual_components = virtual_components
         self.base_type = base_type
         self.use_delta_r_min = use_delta_r_min
         self.use_pt_min = use_pt_min
@@ -180,10 +185,9 @@ class EventGPT(GPT):
         self.distributions = []
 
     def init_coordinates(self):
-        self.coordinates_sampling = StandardLogPtPhiEtaLogM2(
+        self.coordinates = StandardLogPtPhiEtaLogM2(
             self.pt_min, self.units, self.onshell_list
         )
-        self.coordinates = [self.coordinates_sampling]
 
     def preprocess(self, fourmomenta):
         fourmomenta = fourmomenta / self.units
@@ -207,9 +211,8 @@ class JetGPT(EventGPT):
         return c
 
     def _embed(self, x, idx, ijet):
+        x = x[..., None]
         channels_embedding = get_type_token(x, self.channel_channels)
         ijet_embedding = get_process_token(x, ijet, self.process_token_channels)
-        embedding = torch.cat(
-            (x[..., None], channels_embedding, ijet_embedding), dim=-1
-        )
+        embedding = torch.cat((x, channels_embedding, ijet_embedding), dim=-1)
         return embedding
