@@ -1,40 +1,9 @@
 exp_type: toptagging
-exp_name: topt_local
-base_dir: .
+exp_name: topt_local_debug
 
 data:
  data_dir : data/
- dataset: full
- beam_reference: spacelike
- two_beams: true
- beam_token: true
- add_time_reference: true
- add_pt: false
- reinsert_channels: true
- rescale_data: true
-
-ema: true
-train: true
-training:
- iterations: 200000
- optimizer: Lion
- batchsize: 128
- lr: 3e-4
- scheduler: CosineAnnealingLR
- weight_decay: 0.2
- force_xformers: true # requires gpu (can run on cpu+slower with 'false')
-
-evaluation:
- batchsize: 128
- save_roc: false
-
-plotting:
- roc: true
- loss: true
- score: true
+ dataset: mini
 
 defaults:
- - model: gatr_toptagging
- - default
- - hydra
- - _self_
+ - default_tagging
