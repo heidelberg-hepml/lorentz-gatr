@@ -1,5 +1,3 @@
-import math
-import numpy as np
 import torch
 from torch import nn
 from torch.autograd import grad
@@ -12,26 +10,10 @@ from experiments.eventgen.distributions import (
     StandardPPPLogM2,
     StandardLogPtPhiEtaLogM2,
 )
+from experiments.eventgen.utils import GaussianFourierProjection
 import experiments.eventgen.coordinates as c
-from experiments.eventgen.coordinates import (
-    convert_coordinates,
-    convert_velocity,
-)
-
-
-class GaussianFourierProjection(nn.Module):
-    def __init__(self, embed_dim, input_dim=1, scale=30.0):
-        super().__init__()
-        # Randomly sample weights during initialization. These weights are fixed
-        # during optimization and are not trainable.
-        self.weights = nn.Parameter(
-            scale * torch.randn(input_dim, embed_dim // 2), requires_grad=False
-        )
-
-    def forward(self, t):
-        projection = 2 * math.pi * torch.matmul(t, self.weights)
-        embedding = torch.cat([torch.sin(projection), torch.cos(projection)], dim=-1)
-        return embedding
+from experiments.eventgen.geometry import BaseGeometry, SimplePossiblyPeriodicGeometry
+from experiments.logger import LOGGER
 
 
 def hutchinson_trace(x_out, x_in):
@@ -78,18 +60,11 @@ class CFM(nn.Module):
         self.trace_fn = hutchinson_trace if cfm.hutchinson else autograd_trace
         self.odeint = odeint
         self.cfm = cfm
-        self.loss = lambda v1, v2: nn.functional.mse_loss(v1, v2)
 
         # initialize to base objects, this will be overwritten later
         self.distribution = BaseDistribution()
-        self.coordinates_straight = c.BaseCoordinates()
-        self.coordinates_network = c.BaseCoordinates()
-        self.coordinates_sampling = c.BaseCoordinates()
-        self.coordinates_list = [
-            self.coordinates_straight,
-            self.coordinates_network,
-            self.coordinates_sampling,
-        ]
+        self.coordinates = c.BaseCoordinates()
+        self.geometry = BaseGeometry()
 
         if cfm.transforms_float64:
             c.DTYPE = torch.float64
@@ -100,6 +75,9 @@ class CFM(nn.Module):
         raise NotImplementedError
 
     def init_coordinates(self):
+        raise NotImplementedError
+
+    def init_geometry(self):
         raise NotImplementedError
 
     def sample_base(self, shape, device, dtype, generator=None):
@@ -118,21 +96,6 @@ class CFM(nn.Module):
         """
         # implemented by architecture-specific subclasses
         raise NotImplementedError
-
-    def get_velocity_sampling(self, xt_network, t, ijet):
-        """
-        Parameters
-        ----------
-        xt_network : torch.tensor with shape (batchsize, n_particles, 4)
-        t : torch.tensor with shape (batchsize, 1, 1)
-        ijet: int
-        """
-        # This method is only overwritten by GATrCFM and GAPCFM
-        vp_network = self.get_velocity(xt_network, t, ijet=ijet)
-        vp_sampling, xt_sampling = convert_velocity(
-            vp_network, xt_network, self.coordinates_network, self.coordinates_sampling
-        )
-        return vp_sampling, xt_sampling
 
     def handle_velocity(self, v):
         # default: do nothing
@@ -166,33 +129,23 @@ class CFM(nn.Module):
         )
 
         # construct target trajectories
-        x0_straight = self.coordinates_straight.fourmomenta_to_x(x0_fourmomenta)
-        x1_straight = self.coordinates_straight.fourmomenta_to_x(x1_fourmomenta)
-        xt_straight, vt_straight = self.coordinates_straight.get_trajectory(
+        x0_straight = self.coordinates.fourmomenta_to_x(x0_fourmomenta)
+        x1_straight = self.coordinates.fourmomenta_to_x(x1_fourmomenta)
+        xt_straight, vt_straight = self.geometry.get_trajectory(
             x0_straight, x1_straight, t
         )
-        vt_sampling = convert_velocity(
-            vt_straight,
-            xt_straight,
-            self.coordinates_straight,
-            self.coordinates_sampling,
-        )[0]
-
-        # predict velocity
-        xt_network = convert_coordinates(
-            xt_straight, self.coordinates_straight, self.coordinates_network
-        )
-        vp_sampling = self.get_velocity_sampling(xt_network, t, ijet=ijet)[0]
+        vp_straight = self.get_velocity(xt_straight, t, ijet=ijet)
 
         # evaluate conditional flow matching objective
-        loss = self.loss(vp_sampling, vt_sampling)
-        return loss, [
-            self.loss(vp_sampling[..., i], vt_sampling[..., i]) for i in range(4)
+        distance = self.geometry.get_metric(
+            vp_straight, vt_straight, xt_straight
+        ).mean()
+        distance_particlewise = [
+            ((vp_straight - vt_straight) ** 2)[:, i].mean() for i in range(4)
         ]
+        return distance, distance_particlewise
 
-    def sample(
-        self, ijet, shape, device, dtype, trajectory_path=None, n_trajectories=100
-    ):
+    def sample(self, ijet, shape, device, dtype):
         """
         Sample from CFM model
         Solve an ODE using a NN-parametrized velocity field
@@ -206,49 +159,30 @@ class CFM(nn.Module):
             Shape of events that should be generated
         device : torch.device
         dtype : torch.dtype
-        trajectory_path : str
-            path where trajectories should be saved
-            no trajectories will be saved if 'trajectory_path is None'
-        n_trajectories: int
-            Number of trajectories to keep, out of the full batchsize trajectories
 
         Returns
         -------
         x0_fourmomenta : torch.tensor with shape shape = (batchsize, n_particles, 4)
             Generated events
         """
-        # overhead for saving trajectories
-        save_trajectory = trajectory_path is not None
-        if save_trajectory:
-            xts_sampling, vts_sampling, ts = [], [], []
 
-        def velocity(t, xt_sampling):
+        def velocity(t, xt_straight):
+            xt_straight = self.geometry._handle_periodic(xt_straight)
             t = t * torch.ones(
-                shape[0], 1, 1, dtype=xt_sampling.dtype, device=xt_sampling.device
+                shape[0], 1, 1, dtype=xt_straight.dtype, device=xt_straight.device
             )
-            xt_network = convert_coordinates(
-                xt_sampling, self.coordinates_sampling, self.coordinates_network
-            )
-            vt_sampling, xt_sampling = self.get_velocity_sampling(
-                xt_network, t, ijet=ijet
-            )
-            vt_sampling = self.handle_velocity(vt_sampling)
-
-            # collect trajectories
-            if save_trajectory:
-                xts_sampling.append(xt_sampling[:n_trajectories, ...])
-                vts_sampling.append(vt_sampling[:n_trajectories, ...])
-                ts.append(t[0, 0, 0])
-            return vt_sampling
+            vt_straight = self.get_velocity(xt_straight, t, ijet=ijet)
+            vt_straight = self.handle_velocity(vt_straight)
+            return vt_straight
 
         # sample fourmomenta from base distribution
         x1_fourmomenta = self.sample_base(shape, device, dtype)
-        x1_sampling = self.coordinates_sampling.fourmomenta_to_x(x1_fourmomenta)
+        x1_straight = self.coordinates.fourmomenta_to_x(x1_fourmomenta)
 
-        # solve ODE in sampling space
-        x0_sampling = odeint(
+        # solve ODE in straight space
+        x0_straight = odeint(
             velocity,
-            x1_sampling,
+            x1_straight,
             torch.tensor([1.0, 0.0]),
             **self.odeint,
         )[-1]
@@ -257,58 +191,17 @@ class CFM(nn.Module):
         # (MLP sometimes returns nan for single events,
         # and all components of the event are nan...
         # just sample another event in this case)
-        mask = torch.isfinite(x0_sampling).all(dim=[1, 2])
-        x0_sampling = x0_sampling[mask, ...]
-        x1_fourmomenta = x1_fourmomenta[mask, ...]
+        mask = torch.isfinite(x0_straight).all(dim=[1, 2])
+        if (~mask).any():
+            mask2 = torch.isfinite(x0_straight)
+            x0_straight = x0_straight[mask, ...]
+            x1_fourmomenta = x1_fourmomenta[mask, ...]
+            LOGGER.warning(
+                f"Found {(~mask2).sum(dim=0).numpy()} nan events while sampling"
+            )
 
         # transform generated event back to fourmomenta
-        x0_fourmomenta = self.coordinates_sampling.x_to_fourmomenta(x0_sampling)
-
-        # save trajectories to file
-        if save_trajectory:
-            # collect trajectories
-            xts_sampling = torch.stack(xts_sampling, dim=0)
-            vts_sampling = torch.stack(vts_sampling, dim=0)
-            ts = torch.stack(ts, dim=0)
-
-            # determine true trajectories
-            xts_straight = convert_coordinates(
-                xts_sampling, self.coordinates_sampling, self.coordinates_straight
-            )
-            vts_straight_t, xts_straight_t = self.coordinates_straight.get_trajectory(
-                xts_straight[-1, ...]
-                .reshape(1, *xts_straight.shape[1:])
-                .expand(xts_straight.shape),
-                xts_straight[0, ...]
-                .reshape(1, *xts_straight.shape[1:])
-                .expand(xts_straight.shape),
-                ts.reshape(ts.shape[0], 1, 1, 1),
-            )
-
-            # transform to fourmomenta space
-            (
-                vts_fourmomenta_t,
-                xts_fourmomenta_t,
-            ) = self.coordinates_straight.velocity_x_to_fourmomenta(
-                vts_straight_t, xts_straight_t
-            )
-            (
-                vts_fourmomenta,
-                xts_fourmomenta,
-            ) = self.coordinates_sampling.velocity_x_to_fourmomenta(
-                vts_sampling, xts_sampling
-            )
-
-            # save
-            np.savez_compressed(
-                trajectory_path,
-                xts_learned=xts_fourmomenta.cpu() * self.units,
-                vts_learned=vts_fourmomenta.cpu() * self.units,
-                xts_true=xts_fourmomenta_t.cpu() * self.units,
-                vts_true=vts_fourmomenta_t.cpu() * self.units,
-                ts=ts.cpu(),
-            )
-
+        x0_fourmomenta = self.coordinates.x_to_fourmomenta(x0_straight)
         return x0_fourmomenta
 
     def log_prob(self, x0_fourmomenta, ijet):
@@ -336,56 +229,60 @@ class CFM(nn.Module):
 
         def net_wrapper(t, state):
             with torch.set_grad_enabled(True):
-                xt_sampling = state[0].detach().requires_grad_(True)
+                xt_straight = state[0]
+                xt_straight = self.geometry._handle_periodic(xt_straight)
+                xt_straight = xt_straight.detach().requires_grad_(True)
                 t = t * torch.ones(
-                    xt_sampling.shape[0],
+                    xt_straight.shape[0],
                     1,
                     1,
-                    dtype=xt_sampling.dtype,
-                    device=xt_sampling.device,
+                    dtype=xt_straight.dtype,
+                    device=xt_straight.device,
                 )
-                xt_network = convert_coordinates(
-                    xt_sampling, self.coordinates_sampling, self.coordinates_network
+                vt_straight = self.get_velocity(xt_straight, t, ijet=ijet)
+                vt_straight = self.handle_velocity(vt_straight)
+                dlogp_dt_straight = -self.trace_fn(vt_straight, xt_straight).unsqueeze(
+                    -1
                 )
-                vt_sampling = self.get_velocity_sampling(xt_network, t, ijet=ijet)[0]
-                vt_sampling = self.handle_velocity(vt_sampling)
-                dlogp_dt_sampling = (
-                    -self.trace_fn(vt_sampling, xt_sampling).unsqueeze(-1).detach()
-                )
-            return vt_sampling, dlogp_dt_sampling
+            return vt_straight.detach(), dlogp_dt_straight.detach()
 
-        # solve ODE in coordinates_sampling
-        x0_sampling = self.coordinates_sampling.fourmomenta_to_x(x0_fourmomenta)
-        logdetjac0_cfm_sampling = torch.zeros(
-            (x0_sampling.shape[0], 1),
-            dtype=x0_sampling.dtype,
-            device=x0_sampling.device,
+        # solve ODE in coordinates
+        x0_straight = self.coordinates.fourmomenta_to_x(x0_fourmomenta)
+        logdetjac0_cfm_straight = torch.zeros(
+            (x0_straight.shape[0], 1),
+            dtype=x0_straight.dtype,
+            device=x0_straight.device,
         )
-        state0 = (x0_sampling, logdetjac0_cfm_sampling)
-        xt_sampling, logdetjact_cfm_sampling = odeint(
+        state0 = (x0_straight, logdetjac0_cfm_straight)
+        xt_straight, logdetjact_cfm_straight = odeint(
             net_wrapper,
             state0,
             torch.tensor(
-                [0.0, 1.0], dtype=x0_sampling.dtype, device=x0_sampling.device
+                [0.0, 1.0], dtype=x0_straight.dtype, device=x0_straight.device
             ),
             **self.odeint,
         )
-        logdetjac_cfm_sampling = logdetjact_cfm_sampling[-1].detach()
-        x1_sampling = xt_sampling[-1].detach()
+        logdetjac_cfm_straight = logdetjact_cfm_straight[-1].detach()
+        x1_straight = xt_straight[-1].detach()
 
         # the infamous nan remover
         # (MLP sometimes returns nan for single events,
         # just remove these events from the log_prob computation)
-        mask = torch.isfinite(x1_sampling).all(dim=[1, 2])
-        logdetjac_cfm_sampling = logdetjac_cfm_sampling[mask, ...]
-        x1_sampling = x1_sampling[mask, ...]
-        x0_fourmomenta = x0_fourmomenta[mask, ...]
+        mask = torch.isfinite(x1_straight).all(dim=[1, 2])
+        if (~mask).any():
+            mask2 = torch.isfinite(x1_straight)
+            logdetjac_cfm_straight = logdetjac_cfm_straight[mask]
+            x1_straight = x1_straight[mask]
+            x0_fourmomenta = x0_fourmomenta[mask]
+            LOGGER.warning(
+                f"Found {(~mask2).sum(dim=0).numpy()} nan events while sampling"
+            )
 
-        x1_fourmomenta = self.coordinates_sampling.x_to_fourmomenta(x1_sampling)
-        logdetjac_forward = self.coordinates_sampling.logdetjac_fourmomenta_to_x(
-            x0_fourmomenta
-        )[0]
-        logdetjac_inverse = -self.coordinates_sampling.logdetjac_fourmomenta_to_x(
+        x1_fourmomenta = self.coordinates.x_to_fourmomenta(x1_straight)
+        logdetjac_forward = self.coordinates.logdetjac_fourmomenta_to_x(x0_fourmomenta)[
+            0
+        ]
+        logdetjac_inverse = -self.coordinates.logdetjac_fourmomenta_to_x(
             x1_fourmomenta
         )[0]
 
@@ -393,14 +290,10 @@ class CFM(nn.Module):
         log_prob_base_fourmomenta = self.distribution.log_prob(x1_fourmomenta)
         log_prob_fourmomenta = (
             log_prob_base_fourmomenta
-            - logdetjac_cfm_sampling
+            - logdetjac_cfm_straight
             - logdetjac_forward
             - logdetjac_inverse
         )
-
-        # the infamous clipper
-        # (MLP sometimes has single large-NLL events -> exclude those from NLL computation)
-        log_prob_fourmomenta = log_prob_fourmomenta[log_prob_fourmomenta > -100]
         return log_prob_fourmomenta
 
 
@@ -422,6 +315,7 @@ class EventCFM(CFM):
         delta_r_min,
         onshell_list,
         onshell_mass,
+        virtual_components,
         base_type,
         use_pt_min,
         use_delta_r_min,
@@ -448,6 +342,8 @@ class EventCFM(CFM):
         onshell_mass: List[float]
             Masses of the onshell particles in the same order as in onshell_list
             Hard-coded in EventGenerationExperiment
+        virtual_components: List[List[int]]
+            Indices of the virtual particles
         base_type: int
             Which base distribution to use
         use_delta_r_min: bool
@@ -460,6 +356,7 @@ class EventCFM(CFM):
         self.delta_r_min = delta_r_min
         self.onshell_list = onshell_list
         self.onshell_mass = onshell_mass
+        self.virtual_components = virtual_components
         self.base_type = base_type
         self.use_delta_r_min = use_delta_r_min
         self.use_pt_min = use_pt_min
@@ -489,18 +386,7 @@ class EventCFM(CFM):
             raise ValueError(f"base_type={self.base_type} not implemented")
 
     def init_coordinates(self):
-        self.coordinates_straight = self._init_coordinates(
-            self.cfm.coordinates_straight
-        )
-        self.coordinates_network = self._init_coordinates(self.cfm.coordinates_network)
-        self.coordinates_sampling = self._init_coordinates(
-            self.cfm.coordinates_sampling
-        )
-        self.coordinates = [
-            self.coordinates_straight,
-            self.coordinates_network,
-            self.coordinates_sampling,
-        ]
+        self.coordinates = self._init_coordinates(self.cfm.coordinates)
 
     def _init_coordinates(self, coordinates_label):
         if coordinates_label == "Fourmomenta":
@@ -534,6 +420,16 @@ class EventCFM(CFM):
             raise ValueError(f"coordinates={coordinates_label} not implemented")
         return coordinates
 
+    def init_geometry(self):
+        # placeholder for any initialization that needs to be done
+        if self.cfm.geometry.type == "simple":
+            self.geometry = SimplePossiblyPeriodicGeometry(
+                contains_phi=self.coordinates.contains_phi,
+                periodic=self.cfm.geometry.periodic,
+            )
+        else:
+            raise ValueError(f"geometry={self.cfm.geometry} not implemented")
+
     def preprocess(self, fourmomenta):
         fourmomenta = fourmomenta / self.units
         return fourmomenta
@@ -547,16 +443,7 @@ class EventCFM(CFM):
         return fourmomenta
 
     def handle_velocity(self, v):
-        if self.cfm.coordinates_straight in [
-            "PPPM2",
-            "PPPLogM2",
-            "StandardPPPLogM2",
-            "PtPhiEtaM2",
-            "LogPtPhiEtaM2",
-            "PtPhiEtaLogM2",
-            "LogPtPhiEtaLogM2",
-            "StandardLogPtPhiEtaLogM2",
-        ]:
+        if self.coordinates.contains_mass:
             # manually set mass velocity of onshell events to zero
             v[..., self.onshell_list, 3] = 0.0
         return v

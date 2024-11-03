@@ -25,9 +25,10 @@ cfm:
  embed_t_dim: 8
  embed_t_scale: 30.
  hutchinson: true
- coordinates_straight: ${cfm.coordinates_sampling}
- coordinates_network: Fourmomenta
- coordinates_sampling: StandardLogPtPhiEtaLogM2
+ coordinates: StandardLogPtPhiEtaLogM2
+ geometry:
+  type: simple
+  periodic: true
  transforms_float64: true
 
 gpt:
@@ -57,7 +58,6 @@ plotting:
  virtual: true
  delta: true
  deta_dphi: true
- save_trajectories: false
  log_prob: true
  reweighted: true
  create_mask: false

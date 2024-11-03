@@ -1,31 +1,7 @@
 import torch
 import experiments.eventgen.transforms as tr
 
-from experiments.eventgen.helpers import ensure_angle
-
 DTYPE = torch.float64
-
-
-def convert_coordinates(x1, coordinates1, coordinates2):
-    if type(coordinates1) == type(coordinates2):
-        # no conversion necessary
-        x2 = x1
-    else:
-        # go the long way to fourmomenta and back (could be improved)
-        fourmomenta = coordinates1.x_to_fourmomenta(x1)
-        x2 = coordinates2.fourmomenta_to_x(fourmomenta)
-    return x2
-
-
-def convert_velocity(v1, x1, coordinates1, coordinates2):
-    if type(coordinates1) == type(coordinates2):
-        # no conversion necessary
-        v2, x2 = v1, x1
-    else:
-        # go the long way to fourmomenta and back (could be improved)
-        v_fourmomenta, fourmomenta = coordinates1.velocity_x_to_fourmomenta(v1, x1)
-        v2, x2 = coordinates2.velocity_fourmomenta_to_x(v_fourmomenta, fourmomenta)
-    return v2, x2
 
 
 class BaseCoordinates:
@@ -36,6 +12,8 @@ class BaseCoordinates:
     """
 
     def __init__(self):
+        self.contains_phi = False
+        self.contains_mass = False
         self.transforms = []
 
     def init_fit(self, fourmomenta_list):
@@ -48,11 +26,6 @@ class BaseCoordinates:
 
     def init_unit(self, particles_list):
         self.transforms[-1].init_unit(particles_list)
-
-    def get_trajectory(self, x1, x2, t):
-        v_t = x2 - x1
-        x_t = x1 + t * v_t
-        return x_t, v_t
 
     def fourmomenta_to_x(self, a_in):
         assert torch.isfinite(a_in).all()
@@ -118,38 +91,38 @@ class Fourmomenta(BaseCoordinates):
     # this class effectively does nothing,
     # because fourmomenta are already the baseline representation
     def __init__(self):
+        super().__init__()
         self.transforms = [tr.EmptyTransform()]
 
 
 class PPPM2(BaseCoordinates):
     def __init__(self):
+        super().__init__()
+        self.contains_mass = True
         self.transforms = [tr.EPPP_to_PPPM2()]
 
 
-class PhiCoordinates(BaseCoordinates):
-    # abstract class for coordinates with phi in component 1
-    def get_trajectory(self, x1, x2, t):
-        v_t = x2 - x1
-        v_t[..., 1] = ensure_angle(v_t[..., 1])
-        x_t = x1 + t * v_t
-        x_t[..., 1] = ensure_angle(x_t[..., 1])
-        return x_t, v_t
-
-
-class EPhiPtPz(PhiCoordinates):
+class EPhiPtPz(BaseCoordinates):
     # (E, phi, pt, pz)
     def __init__(self):
+        super().__init__()
+        self.contains_phi = True
         self.transforms = [tr.EPPP_to_EPhiPtPz()]
 
 
-class PtPhiEtaE(PhiCoordinates):
+class PtPhiEtaE(BaseCoordinates):
     # (pt, phi, eta, E)
     def __init__(self):
+        super().__init__()
+        self.contains_phi = True
         self.transforms = [tr.EPPP_to_PtPhiEtaE()]
 
 
-class PtPhiEtaM2(PhiCoordinates):
+class PtPhiEtaM2(BaseCoordinates):
     def __init__(self):
+        super().__init__()
+        self.contains_phi = True
+        self.contains_mass = True
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
@@ -159,6 +132,8 @@ class PtPhiEtaM2(PhiCoordinates):
 class PPPLogM2(BaseCoordinates):
     # (px, py, pz, log(m^2))
     def __init__(self):
+        super().__init__()
+        self.contains_mass = True
         self.transforms = [
             tr.EPPP_to_PPPM2(),
             tr.M2_to_LogM2(),
@@ -168,6 +143,8 @@ class PPPLogM2(BaseCoordinates):
 class StandardPPPLogM2(BaseCoordinates):
     # fitted (px, py, pz, log(m^2))
     def __init__(self, onshell_list=[]):
+        super().__init__()
+        self.contains_mass = True
         self.transforms = [
             tr.EPPP_to_PPPM2(),
             tr.M2_to_LogM2(),
@@ -175,15 +152,20 @@ class StandardPPPLogM2(BaseCoordinates):
         ]
 
 
-class LogPtPhiEtaE(PhiCoordinates):
+class LogPtPhiEtaE(BaseCoordinates):
     # (log(pt), phi, eta, E)
     def __init__(self, pt_min, units):
+        super().__init__()
+        self.contains_phi = True
         self.transforms = [tr.EPPP_to_PtPhiEtaE(), tr.Pt_to_LogPt(pt_min, units)]
 
 
-class PtPhiEtaLogM2(PhiCoordinates):
+class PtPhiEtaLogM2(BaseCoordinates):
     # (pt, phi, eta, log(m^2))
     def __init__(self):
+        super().__init__()
+        self.contains_phi = True
+        self.contains_mass = True
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
@@ -191,9 +173,12 @@ class PtPhiEtaLogM2(PhiCoordinates):
         ]
 
 
-class LogPtPhiEtaM2(PhiCoordinates):
+class LogPtPhiEtaM2(BaseCoordinates):
     # (log(pt), phi, eta, m^2)
     def __init__(self, pt_min, units):
+        super().__init__()
+        self.contains_phi = True
+        self.contains_mass = True
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
@@ -201,9 +186,12 @@ class LogPtPhiEtaM2(PhiCoordinates):
         ]
 
 
-class LogPtPhiEtaLogM2(PhiCoordinates):
+class LogPtPhiEtaLogM2(BaseCoordinates):
     # (log(pt), phi, eta, log(m^2)
     def __init__(self, pt_min, units):
+        super().__init__()
+        self.contains_phi = True
+        self.contains_mass = True
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
@@ -212,9 +200,12 @@ class LogPtPhiEtaLogM2(PhiCoordinates):
         ]
 
 
-class StandardLogPtPhiEtaLogM2(PhiCoordinates):
+class StandardLogPtPhiEtaLogM2(BaseCoordinates):
     # Fitted (log(pt), phi, eta, log(m^2)
     def __init__(self, pt_min, units, onshell_list=[]):
+        super().__init__()
+        self.contains_phi = True
+        self.contains_mass = True
         self.transforms = [
             tr.EPPP_to_PtPhiEtaE(),
             tr.PtPhiEtaE_to_PtPhiEtaM2(),
