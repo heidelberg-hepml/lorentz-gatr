@@ -2,7 +2,8 @@
 
 # Lorentz-Equivariant Geometric Algebra Transformer
 
-[![OT-CFM Preprint](http://img.shields.io/badge/paper-arxiv.2405.14806-B31B1B.svg)](https://arxiv.org/abs/2405.14806)
+[![LGATr-CS](http://img.shields.io/badge/paper-arxiv.2405.14806-B31B1B.svg)](https://arxiv.org/abs/2405.14806)
+[![LGATr-HEP](http://img.shields.io/badge/paper-arxiv.2411.00446-B31B1B.svg)](https://arxiv.org/abs/2411.00446)
 [![pytorch](https://img.shields.io/badge/PyTorch_2.2+-ee4c2c?logo=pytorch&logoColor=white)](https://pytorch.org/get-started/locally/)
 [![hydra](https://img.shields.io/badge/Config-Hydra_1.3-89b8cd)](https://hydra.cc/)
 [![black](https://img.shields.io/badge/Code%20Style-Black-black.svg?labelColor=gray)](https://black.readthedocs.io/en/stable/)
@@ -16,7 +17,7 @@ This repository contains the official implementation of the **Lorentz-Equivarian
 You can read more about L-GATr in the following two preprints. This repository contains the code to reproduce their main results:
 
 - [Lorentz-Equivariant Geometric Algebra Transformers for High-Energy Physics](https://arxiv.org/abs/2405.14806) (targeted at a computer science audience)
-- A Lorentz-Equivariant Transformer for All of the LHC (targeted at a high-energy physics audience)
+- [A Lorentz-Equivariant Transformer for All of the LHC](https://arxiv.org/abs/2411.00446) (targeted at a high-energy physics audience)
 
 ## 1. Getting started
 
@@ -155,7 +156,7 @@ shape `(..., 16)`, for instance `(batchsize, items, channels, 16)`. The sixteen 
 components are sorted as in the
 [`clifford` library](https://clifford.readthedocs.io/en/latest/), as follows:
 `[x_scalars, x_0, x_1, x_2, x_3, x_01, x_02, x_03, x_12, x_13, x_23, x_012, x_013, x_023, x_123,
-x_0123]`, or `[x_S, x_V0, x_V1, x_V2, x_V3, x_B01, x_B02, x_B03, x_B12, x_B13, x_B23, x_A3, x_A2, x_A1, x_A0, x_P]` in the notation of [A Lorentz-Equivariant Transformer for All of the LHC].
+x_0123]`, or `[x_S, x_V0, x_V1, x_V2, x_V3, x_B01, x_B02, x_B03, x_B12, x_B13, x_B23, x_A3, x_A2, x_A1, x_A0, x_P]` in the notation of [A Lorentz-Equivariant Transformer for All of the LHC](https://arxiv.org/abs/2411.00446).
 
 Scalar representations have free shapes, but should match the multivector representations they
 accompany in batchsize and number of items. The number of channels may be different.
@@ -283,6 +284,16 @@ Here we list some additional functional elements of the code that are not explic
 If you find this code useful in your research, please cite the following papers
 
 ```bibtex
+@article{Brehmer:2024yqw,
+    author = "Brehmer, Johann and Bres\'o, V\'\i{}ctor and de Haan, Pim and Plehn, Tilman and Qu, Huilin and Spinner, Jonas and Thaler, Jesse",
+    title = "{A Lorentz-Equivariant Transformer for All of the LHC}",
+    eprint = "2411.00446",
+    archivePrefix = "arXiv",
+    primaryClass = "hep-ph",
+    reportNumber = "MIT-CTP/5802",
+    month = "11",
+    year = "2024"
+}
 @article{Spinner:2024hjm,
     author = "Spinner, Jonas and Bres\'o, Victor and de Haan, Pim and Plehn, Tilman and Thaler, Jesse and Brehmer, Johann",
     title = "{Lorentz-Equivariant Geometric Algebra Transformers for High-Energy Physics}",
