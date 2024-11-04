@@ -18,6 +18,14 @@ FILENAMES = {
 }
 DATA_DIR = "data"
 
+"""
+To use the JetClass dataset, download all .tar files from 
+https://zenodo.org/records/6619768 (around 100G),
+unzip them, e.g. with 'tar -xvf *.tar', 
+modify the data.data_dir in jctagging.yaml 
+to point to the directory containing the train_100M, test_20M, val_5M folders.
+"""
+
 
 def load(filename):
     url = os.path.join(BASE_URL, filename)
