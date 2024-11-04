@@ -278,6 +278,7 @@ Here we list some additional functional elements of the code that are not explic
 4. Event generation experiment for Z + jets
 5. Switches to control the geometric algebra representations  under `ga_settings` in `config/default.yaml`, e.g. to turn off the bivector representations, turn off the geometric product, or have equivariance under the full Lorentz group including parity and time reversal
 6. Features of the original GATr repo that we do not use: Positional encodings, axial transformer and axial L-GATr build
+7. More options for the transformer architecture: `dropout`, several activation functions (`relu`, `gelu`, `sigmoid`), `multi_query` attention, `increase_hidden_channels` option for the transformer MLP, `double_layernorm` before and after attention/MLP blocks, `head_scale` (learnable coefficients for each attention head), option to reinsert input channels in each attention step
 
 ## 5. Citation
 
