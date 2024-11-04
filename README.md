@@ -47,7 +47,7 @@ python run.py -cn toptagging model=gatr_toptagging
 python run.py -cn ttbar model=gatr_eventgen
 ```
 
-We use hydra for configuration management, allowing to quickly override parameters in e.g. `config/amplitudes.yaml`. The default configuration files for quick test experiments are located in the `config` folder, whereas longer experiments to reproduce the results of the papers can be found in `config_paper`. You can select the config file with `-cn`, and its location with `-cp`. Hyperparameters of the config file can be simply overwritten as extra command line arguments. For instance, to train a big amplitude regression L-GATr for 10k iterations run
+We use hydra for configuration management, allowing to quickly override parameters in e.g. `config/amplitudes.yaml`. The default configuration files for quick test experiments are located in the `config` folder, whereas longer experiments to reproduce the results of the papers can be found in `config_paper`. You can select the config file with `-cn`, and its location with `-cp`. Hyperparameters of the config file can be simply overwritten as extra command line arguments. For instance, to train a amplitude regression L-GATr for 10k iterations
 ```bash
 python run.py -cp config_paper -cn amplitudes training.iterations=10000
 ```
