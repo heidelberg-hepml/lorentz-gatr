@@ -161,9 +161,7 @@ x_0123]`, or `[x_S, x_V0, x_V1, x_V2, x_V3, x_B01, x_B02, x_B03, x_B12, x_B13, x
 Scalar representations have free shapes, but should match the multivector representations they
 accompany in batchsize and number of items. The number of channels may be different.
 
-**Functions**: We distinguish between primitives (functions) and layers (often stateful
-`torch.nn.Module` instances). Almost all primitives and layers are Lorentz-equivariant,
-see docstrings for exceptions.
+**Functions**: We distinguish between primitives (functions) and layers (`torch.nn.Module` instances). All primitives and layers are Lorentz-equivariant.
 
 ### Repository structure
 
