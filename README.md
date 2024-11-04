@@ -69,9 +69,9 @@ The `warm_start_idx` specifies which model in the models folder should be loaded
 ## 3. Using L-GATr 
 
 To use L-GATr on your own problem, you will at least need two components from this repository:
-- L-GATr networks, which act on multivector data
+- The L-GATr network, which acts on multivector data (in `gatr/nets/gatr.py`)
 - Interface functions that embed various geometric
-objects into this multivector representations
+objects into this multivector representations (in `gatr/interface/`)
 
 Here is an example code snippet for a GATr jet tagger that illustrates the recipe, you can find more examples at `experiments/amplitudes/wrappers.py`, `experiments/tagging/wrappers.py` and `experiments/eventgen/wrappers.py`
 
