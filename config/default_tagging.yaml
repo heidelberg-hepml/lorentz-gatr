@@ -1,5 +1,5 @@
 data:
- beam_reference: spacelike
+ beam_reference: xyplane
  two_beams: true
  beam_token: true
  add_time_reference: true
@@ -24,7 +24,7 @@ training:
  lr: 1e-3
  validate_every_n_steps: 5000
 
- force_xformers: false
+ force_xformers: false # 'false' runs on cpu and gpu, 'true' only runs on gpu but is much faster
 
 evaluation:
  batchsize: 128

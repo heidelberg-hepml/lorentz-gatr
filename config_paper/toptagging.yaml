@@ -1,9 +1,10 @@
 exp_type: toptagging
-exp_name: topt_local_debug
+exp_name: topt
 
 data:
  data_dir : data/
- dataset: mini
+ dataset: full
+ add_scalar_features: false
 
 defaults:
  - default_tagging

@@ -1,11 +1,11 @@
 exp_type: toptaggingft
-exp_name: topft_local_debug
+exp_name: topft_debug
 
 finetune:
  backbone_path: null
  backbone_cfg: config.yaml
- lr_backbone: 1e-4
- lr_head: 5e-3
+ lr_backbone: 3e-5
+ lr_head: 3e-3
 
 defaults:
  - toptagging

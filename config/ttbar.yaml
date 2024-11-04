@@ -1,5 +1,5 @@
 exp_type: ttbar
-exp_name: ttbar_local_debug
+exp_name: ttbar_debug
 
 data:
  n_jets: [0]
@@ -37,14 +37,14 @@ gpt:
 
 training:
  iterations: 50
- batchsize: 1024
+ batchsize: 2048
  scheduler: ReduceLROnPlateau
 
 evaluation:
  sample: true
  save_samples: false
  nsamples: 1000
- batchsize: 1024
+ batchsize: 4096
  eval_loss: []
  eval_log_prob: [] # expensive
  classifier: true

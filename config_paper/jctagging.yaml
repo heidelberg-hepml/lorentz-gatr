@@ -1,9 +1,10 @@
 exp_type: jctagging
-exp_name: jc_local_debug
+exp_name: jc
 
 data:
- data_dir: null
- features: fourmomenta
+ data_dir: data/jetclass
+ features: default
+ add_scalar_features: true
  train_files_range: [0,100]
  test_files_range: [100,120]
  val_files_range: [120,125]

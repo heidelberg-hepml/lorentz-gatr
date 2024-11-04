@@ -1,5 +1,5 @@
 exp_type: zmumu
-exp_name: zmumu_local_debug
+exp_name: zmumu_debug
 
 data:
  n_jets: [1]

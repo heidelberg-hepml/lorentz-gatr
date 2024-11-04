@@ -1,5 +1,6 @@
+# not properly implemented and tested
 exp_type: qgtagging
-exp_name: qg_local_debug
+exp_name: qg_debug
 
 data:
  data_dir : data/

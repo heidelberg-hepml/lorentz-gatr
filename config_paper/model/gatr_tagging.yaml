@@ -23,7 +23,7 @@ net:
   num_heads: 8
   multi_query: false
   increase_hidden_channels: 2
-  head_scale: false
+  head_scale: true
 
 defaults:
  - /base_attention@net.attention
