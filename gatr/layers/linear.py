@@ -192,7 +192,6 @@ class EquiLinear(nn.Module):
         initialization: str,
         gain: float = 1.0,
         additional_factor=1.0 / np.sqrt(3.0),
-        use_mv_heuristics=False,
     ) -> None:
         """Initializes the weights of the layer.
 
@@ -217,11 +216,6 @@ class EquiLinear(nn.Module):
             (to the best of our knowledge) never published, but see
             https://github.com/pytorch/pytorch/issues/57109 and
             https://soumith.ch/files/20141213_gplus_nninit_discussion.htm.
-        use_mv_heuristics : bool
-            Multivector components are differently affected by the equivariance constraint. If
-            `use_mv_heuristics` is set to True, we initialize the weights for each output
-            multivector component differently, with factors determined empirically to preserve the
-            variance of each multivector component in the forward pass.
         """
 
         # Prefactors depending on initialization scheme
@@ -231,7 +225,9 @@ class EquiLinear(nn.Module):
             mvs_bias_shift,
             s_factor,
         ) = self._compute_init_factors(
-            initialization, gain, additional_factor, use_mv_heuristics
+            initialization,
+            gain,
+            additional_factor,
         )
 
         # Following He et al, 1502.01852, we aim to preserve the variance in the forward pass.
@@ -250,7 +246,9 @@ class EquiLinear(nn.Module):
 
     @staticmethod
     def _compute_init_factors(
-        initialization, gain, additional_factor, use_mv_heuristics
+        initialization,
+        gain,
+        additional_factor,
     ):
         """Computes prefactors for the initialization.
 
@@ -290,19 +288,8 @@ class EquiLinear(nn.Module):
                 ' "default", "small", "unit_scalar" or "almost_unit_scalar".'
             )
 
-        # Individual factors for each multivector component
-        if use_mv_heuristics:
-            # Without corrections, the variance of standard normal inputs after a forward pass
-            # through this layer is different for each output grade. The reason is that the
-            # equivariance constraints affect different grades differently.
-            # We heuristically correct for this by initializing the weights for different basis
-            # elements differently, using the following additional factors on the weight bound:
-            # mv_component_factors = torch.sqrt(torch.Tensor([0.5, 4.0, 6.0, 4.0, 1.0, 0.5, 0.5]))
-            mv_component_factors = torch.sqrt(
-                torch.Tensor([1.0, 4.0, 6.0, 2.0, 0.5, 0.5, 1.5, 1.5, 0.5])
-            )
-        else:
-            mv_component_factors = torch.ones(NUM_PIN_LINEAR_BASIS_ELEMENTS)
+        # Individual factors for each multivector component (could be tuned for performance)
+        mv_component_factors = torch.ones(NUM_PIN_LINEAR_BASIS_ELEMENTS)
         return mv_component_factors, mv_factor, mvs_bias_shift, s_factor
 
     def _init_multivectors(self, mv_component_factors, mv_factor, mvs_bias_shift):
