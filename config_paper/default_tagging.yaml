@@ -19,12 +19,12 @@ data:
 
 train: true
 training:
- iterations: 10
+ iterations: 2e5
  batchsize: 128
- lr: 1e-3
+ lr: 3e-4
  validate_every_n_steps: 5000
 
- force_xformers: false # 'false' runs on cpu and gpu, 'true' only runs on gpu but is much faster
+ force_xformers: true
 
 evaluation:
  batchsize: 128

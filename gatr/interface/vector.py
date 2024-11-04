@@ -1,11 +1,8 @@
-"""Functions that embed Lorentz vector in the geometric algebra."""
-
-
 import torch
 
 
 def embed_vector(vector: torch.Tensor) -> torch.Tensor:
-    """Embeds Lorentz vector in multivectors.
+    """Embeds Lorentz vectors in multivectors.
 
     Parameters
     ----------

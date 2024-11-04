@@ -3,8 +3,8 @@
 import pytest
 import torch
 
+from gatr.layers.linear import NUM_PIN_LINEAR_BASIS_ELEMENTS
 from gatr.primitives.linear import (
-    NUM_PIN_LINEAR_BASIS_ELEMENTS,
     equi_linear,
     grade_involute,
     grade_project,

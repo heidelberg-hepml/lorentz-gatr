@@ -26,8 +26,6 @@ class SelfAttentionConfig:
         Whether additional scalar features for the keys and queries will be provided.
     multi_query: bool
         Whether to do multi-query attention
-    attention_type : {"scalar", "geometric", "sdp_dist"}
-        Whether the attention mechanism is based on the scalar product or also the join.
     pos_encoding : bool
         Whether to apply rotary positional embeddings along the item dimension to the scalar keys
         and queries.

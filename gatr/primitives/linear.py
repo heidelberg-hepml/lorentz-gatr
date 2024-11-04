@@ -6,6 +6,11 @@ import numpy as np
 
 from gatr.utils.einsum import cached_einsum, custom_einsum
 
+# switch to decide whether to use the full Lorentz group ('False')
+# or the special orthochronous Lorentz group ('True')
+# They only differ in the construction of linear maps in _compute_pin_equi_linear_basis
+USE_FULLY_CONNECTED_SUBGROUP = True
+
 
 @lru_cache()
 def _compute_pin_equi_linear_basis(
@@ -26,7 +31,7 @@ def _compute_pin_equi_linear_basis(
 
     Returns
     -------
-    basis : torch.Tensor with shape (10, 16, 16)
+    basis : torch.Tensor with shape (NUM_PIN_LINEAR_BASIS_ELEMENTS, 16, 16)
         Basis elements for equivariant linear maps.
     """
 
@@ -36,7 +41,8 @@ def _compute_pin_equi_linear_basis(
         # explicit construction of a pin-equilinear basis for the Lorentz group
         layout, blades = clifford.Cl(1, 3)
         linear_basis = []
-        for mult in [1, layout.pseudoScalar]:
+        mults = [1, layout.pseudoScalar] if USE_FULLY_CONNECTED_SUBGROUP else [1]
+        for mult in mults:
             for grade in range(5):
                 w = np.stack([(x(grade) * mult).value for x in blades.values()], 1)
                 w = w.astype(np.float32)
@@ -95,9 +101,6 @@ def _compute_grade_involution(
     return involution_flat
 
 
-NUM_PIN_LINEAR_BASIS_ELEMENTS = len(_compute_pin_equi_linear_basis())
-
-
 def equi_linear(x: torch.Tensor, coeffs: torch.Tensor) -> torch.Tensor:
     """Pin-equivariant linear map f(x) = sum_{a,j} coeffs_a W^a_ij x_j.
 
@@ -107,8 +110,8 @@ def equi_linear(x: torch.Tensor, coeffs: torch.Tensor) -> torch.Tensor:
     ----------
     x : torch.Tensor with shape (..., in_channels, 16)
         Input multivector. Batch dimensions must be broadcastable between x and coeffs.
-    coeffs : torch.Tensor with shape (out_channels, in_channels, 7)
-        Coefficients for the 59 basis elements. Batch dimensions must be broadcastable between x and
+    coeffs : torch.Tensor with shape (out_channels, in_channels, 10)
+        Coefficients for the basis elements. Batch dimensions must be broadcastable between x and
         coeffs.
 
     Returns

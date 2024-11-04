@@ -14,6 +14,8 @@ from torch_ema import ExponentialMovingAverage
 import gatr.primitives.attention
 import gatr.layers.linear
 import gatr.layers.mlp.geometric_bilinears
+import gatr.layers.mlp.mlp
+import gatr.primitives.linear
 from experiments.misc import get_device, flatten_dict
 import experiments.logger
 from experiments.logger import LOGGER, MEMORY_HANDLER, FORMATTER
@@ -57,8 +59,9 @@ class BaseExperiment:
 
     def run_mlflow(self):
         experiment_id, run_name = self._init()
+        git_hash = os.popen("git rev-parse HEAD").read().strip()
         LOGGER.info(
-            f"### Starting experiment {self.cfg.exp_name}/{run_name} (mlflowid={experiment_id}) (jobid={self.cfg.jobid}) ###"
+            f"### Starting experiment {self.cfg.exp_name}/{run_name} (mlflowid={experiment_id}) (jobid={self.cfg.jobid}) (git_hash={git_hash} ###"
         )
         if self.cfg.use_mlflow:
             with mlflow.start_run(experiment_id=experiment_id, run_name=run_name):
@@ -77,6 +80,7 @@ class BaseExperiment:
         self._save_config(f"config_{self.cfg.run_idx}.yaml")
 
         self.init_physics()
+        self.init_geometric_algebra()
         self.init_model()
         self.init_data()
         self._init_dataloader()
@@ -105,15 +109,29 @@ class BaseExperiment:
             f"Finished experiment {self.cfg.exp_name}/{self.cfg.run_name} after {dt/60:.2f}min = {dt/60**2:.2f}h"
         )
 
-    def init_model(self):
-        gatr.layers.linear.MIX_DUALS = self.cfg.ga_representations.mix_duals
-        gatr.layers.linear.INCLUDE_AXIALVECTOR = (
-            self.cfg.ga_representations.include_axialvector
+    def init_geometric_algebra(self):
+        gatr.primitives.linear.USE_FULLY_CONNECTED_SUBGROUP = (
+            self.cfg.ga_settings.use_fully_connected_subgroup
         )
-        gatr.layers.mlp.geometric_bilinears.INCLUDE_TENSOR = (
-            self.cfg.ga_representations.include_tensor
+        if self.cfg.ga_settings.use_fully_connected_subgroup:
+            gatr.layers.linear.MIX_MVPSEUDOSCALAR_INTO_SCALAR = (
+                self.cfg.ga_settings.mix_mvpseudoscalar_into_scalar
+            )
+        else:
+            gatr.layers.linear.NUM_PIN_LINEAR_BASIS_ELEMENTS = 5
+            if self.cfg.ga_settings.mix_mvpseudoscalar_into_scalar:
+                LOGGER.warning(
+                    f"Mixing mvpseudoscalar into scalar is only possible if ga_settings.use_fully_connected_subgroup=True"
+                )
+                gatr.layers.linear.MIX_MVPSEUDOSCALAR_INTO_SCALAR = False
+        gatr.layers.mlp.mlp.USE_GEOMETRIC_PRODUCT = (
+            self.cfg.ga_settings.use_geometric_product
+        )
+        gatr.layers.mlp.geometric_bilinears.ZERO_BIVECTOR = (
+            self.cfg.ga_settings.zero_bivector
         )
 
+    def init_model(self):
         # initialize model
         self.model = instantiate(self.cfg.model)
         num_parameters = sum(

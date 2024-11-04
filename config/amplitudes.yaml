@@ -1,5 +1,5 @@
 exp_type: amplitudes
-exp_name: amp_local_debug
+exp_name: amp_debug
 
 data:
  dataset : [zgg]

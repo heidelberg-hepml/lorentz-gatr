@@ -1,5 +1,5 @@
 exp_type: ttbar
-exp_name: ttbar_local
+exp_name: ttbar
 
 data:
  n_jets: [0]
@@ -25,9 +25,14 @@ cfm:
  embed_t_dim: 8
  embed_t_scale: 30.
  hutchinson: true
- coordinates_straight: ${cfm.coordinates_sampling}
- coordinates_network: Fourmomenta
- coordinates_sampling: StandardLogPtPhiEtaLogM2
+ coordinates: StandardLogPtPhiEtaLogM2
+ geometry:
+  type: simple
+  periodic: true
+ transforms_float64: true
+
+gpt:
+ channels: [1,0,2,3,5,4,6,7,9,8,10,11,13,12,14,15,17,16,18,19,21,20,22,23,25,24,26,27,29,28,30,31,33,32,34,35,37,36,38,39]
  transforms_float64: true
 
 training:
@@ -40,7 +45,7 @@ evaluation:
  save_samples: false
  nsamples: 1000000
  batchsize: 4096
- eval_loss: [train, test, val, gen]
+ eval_loss: []
  eval_log_prob: [val] # expensive
  classifier: true
 
@@ -53,7 +58,6 @@ plotting:
  virtual: true
  delta: true
  deta_dphi: true
- save_trajectories: false
  log_prob: true
  reweighted: true
  create_mask: false
@@ -62,5 +66,3 @@ defaults:
 - model: gatr_eventgen
 - classifier: classifier
 - default
-- hydra
-- _self_

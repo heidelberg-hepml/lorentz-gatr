@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lorentz-gatr"
+version = "1.0.0"
+description = "A versatile Lorentz-equivariant transformer for high-energy physics"
+requires-python = ">=3.10" # tested with 3.10.12 and 3.11.2
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Jonas Spinner", email = "j.spinner@thphys.uni-heidelberg.de"}]
+dependencies = [
+    "torch>=2.0",
+    "numpy<1.25",
+    "einops",
+    "opt_einsum @ git+https://github.com/dgasmith/opt_einsum.git@1a984b7b75f3e532e7129f6aa13f7ddc3da66e10",
+    "xformers",
+    "clifford==1.4.0",
+]
+
+[project.urls]
+homepage = "https://github.com/heidelberg-hepml/lorentz-gatr"
+repository = "https://github.com/heidelberg-hepml/lorentz-gatr"
+
+[tool.setuptools]
+packages = ["gatr"]

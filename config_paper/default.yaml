@@ -3,6 +3,7 @@ exp_type: ???
 run_name: null
 base_dir: .
 
+jobid: null
 seed: null
 debug: false
 
@@ -12,10 +13,11 @@ use_mlflow: true
 save_source: true
 ema: false
 
-ga_representations:
- mix_duals: true
- include_axialvector: true
- include_tensor: true
+ga_settings:
+ use_fully_connected_subgroup: true
+ use_geometric_product: true
+ mix_mvpseudoscalar_into_scalar: true
+ zero_bivector: false
 
 train: true
 training:
@@ -28,6 +30,7 @@ training:
 
  clip_grad_norm: 5
  clip_grad_value: null
+ max_grad_norm: null
  log_every_n_steps: 100
 
  optimizer : Adam
@@ -64,3 +67,7 @@ plotting:
 mlflow:
  db: '${base_dir}/runs/${exp_name}/mlflow/mlflow.db'
  artifacts: '${base_dir}/runs/${exp_name}/mlflow/artifacts'
+
+defaults:
+ - hydra
+ - _self_

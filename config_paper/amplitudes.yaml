@@ -1,5 +1,5 @@
 exp_type: amplitudes
-exp_name: amp_local
+exp_name: amp
 
 data:
  dataset : [zgg]
@@ -10,7 +10,7 @@ data:
 
 train: true
 training:
- iterations: 250000 # MLP, DSI: 2500000; Tr: 1000000; GAP: 250000
+ iterations: 250000 # MLP, DSI: 2500000; Tr: 1000000; GAP, GATr, CGENN: 250000
  optimizer: Adam
  lr: 1e-4
  batchsize: 256
@@ -25,5 +25,3 @@ plotting:
 defaults:
  - model: gatr_amplitudes
  - default
- - hydra
- - _self_

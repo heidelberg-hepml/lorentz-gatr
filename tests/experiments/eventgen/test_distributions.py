@@ -8,7 +8,7 @@ from experiments.eventgen.distributions import (
     StandardPPPLogM2,
     StandardLogPtPhiEtaLogM2,
 )
-from experiments.eventgen.processes import ttbarExperiment, zmumuExperiment
+from experiments.eventgen.processes import ttbarExperiment
 from experiments.eventgen.transforms import EPPP_to_PPPM2
 from tests.helpers import MILD_TOLERANCES as TOLERANCES
 
@@ -22,7 +22,7 @@ from tests.helpers import MILD_TOLERANCES as TOLERANCES
         StandardLogPtPhiEtaLogM2,
     ],
 )
-@pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
+@pytest.mark.parametrize("experiment_np", [[ttbarExperiment, 10]])
 @pytest.mark.parametrize("nevents", [10000])
 @pytest.mark.parametrize("use_delta_r_min", [False, True])
 @pytest.mark.parametrize("use_pt_min", [False, True])
@@ -68,7 +68,7 @@ def test_cuts(
         StandardLogPtPhiEtaLogM2,
     ],
 )
-@pytest.mark.parametrize("experiment_np", [[zmumuExperiment, 5], [ttbarExperiment, 10]])
+@pytest.mark.parametrize("experiment_np", [[ttbarExperiment, 10]])
 @pytest.mark.parametrize("nevents", [10000])
 @pytest.mark.parametrize("use_delta_r_min", [False, True])
 @pytest.mark.parametrize("use_pt_min", [False, True])

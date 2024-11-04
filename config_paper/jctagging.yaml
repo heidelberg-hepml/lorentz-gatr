@@ -1,8 +1,8 @@
 exp_type: jctagging
-exp_name: jc_debug
+exp_name: jc
 
 data:
- data_dir: data/jetclass/
+ data_dir: data/jetclass
  features: default
  add_scalar_features: true
  train_files_range: [0,100]

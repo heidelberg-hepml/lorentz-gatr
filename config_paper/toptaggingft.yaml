@@ -1,5 +1,5 @@
 exp_type: toptaggingft
-exp_name: topft_debug
+exp_name: topft
 
 finetune:
  backbone_path: null

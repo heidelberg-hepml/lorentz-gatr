@@ -7,10 +7,13 @@ import torch
 from torch import nn
 
 from gatr.interface import embed_scalar
-from gatr.primitives.linear import NUM_PIN_LINEAR_BASIS_ELEMENTS, equi_linear
+from gatr.primitives.linear import equi_linear
 
-MIX_DUALS = False
-INCLUDE_AXIALVECTOR = True
+# switch to mix pseudoscalar multivector components directly into scalar components
+# this only makes sense when working with the special orthochronous Lorentz group,
+# Note: This is an efficiency boost, the same action can be achieved with an extra linear layer
+MIX_MVPSEUDOSCALAR_INTO_SCALAR = True
+NUM_PIN_LINEAR_BASIS_ELEMENTS = 10
 
 
 class EquiLinear(nn.Module):
@@ -74,7 +77,7 @@ class EquiLinear(nn.Module):
         super().__init__()
 
         # Check inputs
-        if initialization == "unit_scalar":
+        if initialization in ["unit_scalar", "almost_unit_scalar"]:
             assert bias, "unit_scalar initialization requires bias"
             if in_s_channels is None:
                 raise NotImplementedError(
@@ -100,7 +103,7 @@ class EquiLinear(nn.Module):
 
         # Scalars -> MV scalars
         self.s2mvs: Optional[nn.Linear]
-        mix_factor = 2 if MIX_DUALS else 1
+        mix_factor = 2 if MIX_MVPSEUDOSCALAR_INTO_SCALAR else 1
         if in_s_channels:
             self.s2mvs = nn.Linear(
                 in_s_channels, mix_factor * out_mv_channels, bias=bias
@@ -165,7 +168,7 @@ class EquiLinear(nn.Module):
             outputs_mv = outputs_mv + bias
 
         if self.s2mvs is not None and scalars is not None:
-            if MIX_DUALS:
+            if MIX_MVPSEUDOSCALAR_INTO_SCALAR:
                 outputs_mv[..., [0, -1]] += self.s2mvs(scalars).view(
                     *outputs_mv.shape[:-2], outputs_mv.shape[-2], 2
                 )
@@ -173,7 +176,7 @@ class EquiLinear(nn.Module):
                 outputs_mv[..., 0] += self.s2mvs(scalars)
 
         if self.mvs2s is not None:
-            if MIX_DUALS:
+            if MIX_MVPSEUDOSCALAR_INTO_SCALAR:
                 outputs_s = self.mvs2s(multivectors[..., [0, -1]].flatten(start_dim=-2))
             else:
                 outputs_s = self.mvs2s(multivectors[..., 0])
@@ -182,9 +185,6 @@ class EquiLinear(nn.Module):
         else:
             outputs_s = None
 
-        if not INCLUDE_AXIALVECTOR:
-            outputs_mv[..., 11:15] = 0.0
-
         return outputs_mv, outputs_s
 
     def reset_parameters(
@@ -192,7 +192,6 @@ class EquiLinear(nn.Module):
         initialization: str,
         gain: float = 1.0,
         additional_factor=1.0 / np.sqrt(3.0),
-        use_mv_heuristics=False,
     ) -> None:
         """Initializes the weights of the layer.
 
@@ -217,11 +216,6 @@ class EquiLinear(nn.Module):
             (to the best of our knowledge) never published, but see
             https://github.com/pytorch/pytorch/issues/57109 and
             https://soumith.ch/files/20141213_gplus_nninit_discussion.htm.
-        use_mv_heuristics : bool
-            Multivector components are differently affected by the equivariance constraint. If
-            `use_mv_heuristics` is set to True, we initialize the weights for each output
-            multivector component differently, with factors determined empirically to preserve the
-            variance of each multivector component in the forward pass.
         """
 
         # Prefactors depending on initialization scheme
@@ -231,7 +225,9 @@ class EquiLinear(nn.Module):
             mvs_bias_shift,
             s_factor,
         ) = self._compute_init_factors(
-            initialization, gain, additional_factor, use_mv_heuristics
+            initialization,
+            gain,
+            additional_factor,
         )
 
         # Following He et al, 1502.01852, we aim to preserve the variance in the forward pass.
@@ -250,7 +246,9 @@ class EquiLinear(nn.Module):
 
     @staticmethod
     def _compute_init_factors(
-        initialization, gain, additional_factor, use_mv_heuristics
+        initialization,
+        gain,
+        additional_factor,
     ):
         """Computes prefactors for the initialization.
 
@@ -270,39 +268,28 @@ class EquiLinear(nn.Module):
             s_factor = gain * additional_factor * np.sqrt(3)
             mvs_bias_shift = 0.0
         elif initialization == "small":
-            # Change scale by a factor of 0.3 in this layer
+            # Change scale by a factor of 0.1 in this layer
             mv_factor = 0.1 * gain * additional_factor * np.sqrt(3)
             s_factor = 0.1 * gain * additional_factor * np.sqrt(3)
             mvs_bias_shift = 0.0
         elif initialization == "unit_scalar":
-            # Change scale by a factor of 0.3 for MV outputs, and initialize bias around 1
+            # Change scale by a factor of 0.1 for MV outputs, and initialize bias around 1
             mv_factor = 0.1 * gain * additional_factor * np.sqrt(3)
             s_factor = gain * additional_factor * np.sqrt(3)
             mvs_bias_shift = 1.0
         elif initialization == "almost_unit_scalar":
-            # Change scale by a factor of 0.3 for MV outputs, and initialize bias around 1
+            # Change scale by a factor of 0.5 for MV outputs, and initialize bias around 1
             mv_factor = 0.5 * gain * additional_factor * np.sqrt(3)
             s_factor = gain * additional_factor * np.sqrt(3)
             mvs_bias_shift = 1.0
         else:
             raise ValueError(
                 f"Unknown initialization scheme {initialization}, expected"
-                ' "default", "small", or "unit_scalar".'
+                ' "default", "small", "unit_scalar" or "almost_unit_scalar".'
             )
 
-        # Individual factors for each multivector component
-        if use_mv_heuristics:
-            # Without corrections, the variance of standard normal inputs after a forward pass
-            # through this layer is different for each output grade. The reason is that the
-            # equivariance constraints affect different grades differently.
-            # We heuristically correct for this by initializing the weights for different basis
-            # elements differently, using the following additional factors on the weight bound:
-            # mv_component_factors = torch.sqrt(torch.Tensor([0.5, 4.0, 6.0, 4.0, 1.0, 0.5, 0.5]))
-            mv_component_factors = torch.sqrt(
-                torch.Tensor([1.0, 4.0, 6.0, 2.0, 0.5, 0.5, 1.5, 1.5, 0.5])
-            )
-        else:
-            mv_component_factors = torch.ones(NUM_PIN_LINEAR_BASIS_ELEMENTS)
+        # Individual factors for each multivector component (could be tuned for performance)
+        mv_component_factors = torch.ones(NUM_PIN_LINEAR_BASIS_ELEMENTS)
         return mv_component_factors, mv_factor, mvs_bias_shift, s_factor
 
     def _init_multivectors(self, mv_component_factors, mv_factor, mvs_bias_shift):
@@ -336,7 +323,7 @@ class EquiLinear(nn.Module):
             # contribution from scalar -> mv scalar
             bound = mv_component_factors[0] * mv_factor / np.sqrt(fan_in) / np.sqrt(2)
             nn.init.uniform_(self.weight[..., [0]], a=-bound, b=bound)
-            if MIX_DUALS:
+            if MIX_MVPSEUDOSCALAR_INTO_SCALAR:
                 # contribution from scalar -> mv pseudoscalar
                 bound = (
                     mv_component_factors[-1] * mv_factor / np.sqrt(fan_in) / np.sqrt(2)
