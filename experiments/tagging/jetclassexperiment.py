@@ -58,11 +58,6 @@ class JetClassTaggingExperiment(TaggingExperiment):
                 self.cfg.data.data_config = (
                     "experiments/tagging/miniweaver/default.yaml"
                 )
-            elif self.cfg.data.features == "kitchensink":
-                self.cfg.model.net.in_s_channels = 17
-                self.cfg.data.data_config = (
-                    "experiments/tagging/miniweaver/kitchensink.yaml"
-                )
             else:
                 raise ValueError(
                     f"Input feature option {self.cfg.data.features} not implemented"
