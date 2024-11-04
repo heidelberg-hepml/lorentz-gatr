@@ -110,8 +110,8 @@ def equi_linear(x: torch.Tensor, coeffs: torch.Tensor) -> torch.Tensor:
     ----------
     x : torch.Tensor with shape (..., in_channels, 16)
         Input multivector. Batch dimensions must be broadcastable between x and coeffs.
-    coeffs : torch.Tensor with shape (out_channels, in_channels, 7)
-        Coefficients for the 59 basis elements. Batch dimensions must be broadcastable between x and
+    coeffs : torch.Tensor with shape (out_channels, in_channels, 10)
+        Coefficients for the basis elements. Batch dimensions must be broadcastable between x and
         coeffs.
 
     Returns
