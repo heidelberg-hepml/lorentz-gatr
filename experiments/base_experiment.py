@@ -391,6 +391,12 @@ class BaseExperiment:
                 betas=self.cfg.training.betas,
                 weight_decay=self.cfg.training.weight_decay,
             )
+        elif self.cfg.training.optimizer == "ADOPT":
+            self.optimizer = pytorch_optimizer.ADOPT(
+                param_groups,
+                betas=self.cfg.training.betas,
+                weight_decay=self.cfg.training.weight_decay,
+            )
         else:
             raise ValueError(f"Optimizer {self.cfg.training.optimizer} not implemented")
         LOGGER.debug(
