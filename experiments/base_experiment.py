@@ -10,6 +10,7 @@ from hydra.core.config_store import ConfigStore
 from hydra.utils import instantiate
 import mlflow
 from torch_ema import ExponentialMovingAverage
+import pytorch_optimizer
 
 import gatr.primitives.attention
 import gatr.layers.linear
@@ -22,9 +23,6 @@ from experiments.logger import LOGGER, MEMORY_HANDLER, FORMATTER
 from experiments.mlflow import log_mlflow
 
 from gatr.layers import MLPConfig, SelfAttentionConfig
-
-from lion_pytorch import Lion
-import schedulefree
 
 cs = ConfigStore.instance()
 cs.store(name="base_attention", node=SelfAttentionConfig)
@@ -388,13 +386,7 @@ class BaseExperiment:
                 weight_decay=self.cfg.training.weight_decay,
             )
         elif self.cfg.training.optimizer == "Lion":
-            self.optimizer = Lion(
-                param_groups,
-                betas=self.cfg.training.betas,
-                weight_decay=self.cfg.training.weight_decay,
-            )
-        elif self.cfg.training.optimizer == "ScheduleFree":
-            self.optimizer = schedulefree.AdamWScheduleFree(
+            self.optimizer = pytorch_optimizer.Lion(
                 param_groups,
                 betas=self.cfg.training.betas,
                 weight_decay=self.cfg.training.weight_decay,
