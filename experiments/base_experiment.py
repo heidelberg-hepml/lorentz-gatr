@@ -499,8 +499,6 @@ class BaseExperiment:
         for step in range(self.cfg.training.iterations):
             # training
             self.model.train()
-            if self.cfg.training.optimizer == "ScheduleFree":
-                self.optimizer.train()
             data = next(iterator)
             self._step(data, step)
 
@@ -632,8 +630,6 @@ class BaseExperiment:
         metrics = self._init_metrics()
 
         self.model.eval()
-        if self.cfg.training.optimizer == "ScheduleFree":
-            self.optimizer.eval()
         with torch.no_grad():
             for data in self.val_loader:
                 # use EMA for validation if available

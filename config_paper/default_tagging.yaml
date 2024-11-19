@@ -20,9 +20,13 @@ data:
 train: true
 training:
  iterations: 2e5
+ optimizer: Lion
  batchsize: 128
  lr: 3e-4
  validate_every_n_steps: 5000
+ weight_decay: 0 # top tagging from scratch: 0.2; JetClass pretraining/training: 0; top finetuning: 0.01
+ scheduler: CosineAnnealingLR
+
 
  force_xformers: true
 
