@@ -27,7 +27,6 @@ training:
  weight_decay: 0 # top tagging from scratch: 0.2; JetClass pretraining/training: 0; top finetuning: 0.01
  scheduler: CosineAnnealingLR
 
-
  force_xformers: true
 
 evaluation:
