@@ -5,7 +5,7 @@ black==22.3.0
 ## Standard science stack
 h5py
 matplotlib
-nnumpy>=1.25.0,<=1.26.4
+numpy>=1.25.0,<=1.26.4 # numpy>=1.25.0 is needed for pytorch-optimizer, numpy<=1.26.4 is needed for numba
 scipy
 
 ## Standard utils
@@ -13,7 +13,7 @@ tqdm
 
 ## Deep learning
 einops
-git+https://github.com/dgasmith/opt_einsum.git@1a984b7b75f3e532e7129f6aa13f7ddc3da66e10 # Un-released latest master (pinned for repro); the latest released version 3.3.0 has bugs in shape-based contraction path computations (used for einsum)
+opt_einsum
 torch==2.2.0
 torch_geometric==2.4.0
 torch-ema
