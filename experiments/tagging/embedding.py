@@ -90,7 +90,7 @@ def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
         fourmomenta.dtype,
     )
     n_spurions = spurions.shape[0]
-    if cfg_data.beam_token:
+    if cfg_data.beam_token and n_spurions > 0:
         # prepend spurions to the token list (within each block)
         spurion_idxs = torch.stack(
             [ptr[:-1] + i for i in range(n_spurions)], dim=0
@@ -126,9 +126,9 @@ def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
         multivectors = torch.cat((multivectors, spurions), dim=-2)
 
     # global tokens
-    if cfg_data.include_global_token:
+    num_global_tokens = cfg_data.num_global_tokens
+    if cfg_data.include_global_token and num_global_tokens > 0:
         # prepend global tokens to the token list
-        num_global_tokens = cfg_data.num_global_tokens
         global_idxs = torch.stack(
             [ptr[:-1] + i for i in range(num_global_tokens)], dim=0
         ) + num_global_tokens * torch.arange(batchsize, device=ptr.device)
