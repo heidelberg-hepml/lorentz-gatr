@@ -27,7 +27,7 @@ optuna
 ## Project-specific: general
 clifford==1.4.0
 numba==0.58.1 # otherwise has conflicts
-xformers==0.0.24
+xformers==0.0.24 # there exists known compatibility issues with xformers on Mac systems
 torchdiffeq # for CFM sampling
 
 #weaver packages
