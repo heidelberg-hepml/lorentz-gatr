@@ -18,7 +18,7 @@ class GeometricBilinear(nn.Module):
     """Geometric bilinear layer.
 
     Pin-equivariant map between multivector tensors that constructs new geometric features via
-    geometric products and the equivariant join (based on a reference vector).
+    geometric products.
 
     Parameters
     ----------

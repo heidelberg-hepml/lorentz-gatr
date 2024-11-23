@@ -18,7 +18,7 @@ class GeoMLP(nn.Module):
     """Geometric MLP.
 
     This is a core component of GATr's transformer blocks. It is similar to a regular MLP, except
-    that it uses geometric bilinears (GP and equivariant join) in place of the first linear layer.
+    that it uses geometric bilinears (the geometric product) in place of the first linear layer.
 
     Assumes input has shape `(..., channels[0], 16)`, output has shape `(..., channels[-1], 16)`,
     will create hidden layers with shape `(..., channel, 16)` for each additional entry in
