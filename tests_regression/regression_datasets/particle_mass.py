@@ -1,6 +1,5 @@
 import torch
 
-from experiments.base_wrapper import BaseWrapper
 from gatr.interface import embed_vector, extract_scalar
 from tests_regression.regression_datasets.constants import DATASET_SIZE, DEVICE
 
@@ -31,7 +30,7 @@ class ParticleMassDataset(torch.utils.data.Dataset):
         return self.particle[idx], self.mass[idx]
 
 
-class ParticleMassWrapper(BaseWrapper):
+class ParticleMassWrapper(torch.nn.Module):
     """Wrapper around GATr networks for PointsDistanceDataset."""
 
     mv_in_channels = 1
@@ -42,7 +41,34 @@ class ParticleMassWrapper(BaseWrapper):
     raw_out_channels = 1
 
     def __init__(self, net):
-        super().__init__(net, scalars=True, return_other=False)
+        super().__init__()
+        self.net = net
+
+    def forward(self, inputs: torch.Tensor):
+        """Wrapped forward pass pass.
+
+        Parses inputs into GA + scalar representation, calls the forward pass of the wrapped net,
+        and extracts the outputs from the GA + scalar representation again.
+
+        Parameters
+        ----------
+        inputs : torch.Tensor
+            Raw inputs, as given by dataset.
+
+        Returns
+        -------
+        outputs : torch.Tensor
+            Raw outputs, as expected in dataset.
+        """
+
+        multivector, scalars = self.embed_into_ga(inputs)
+        multivector_outputs, scalar_outputs = self.net(
+            multivector,
+            scalars=scalars,
+        )
+        outputs = self.extract_from_ga(multivector_outputs, scalar_outputs)
+
+        return outputs
 
     def embed_into_ga(self, inputs):
         """Embeds raw inputs into the geometric algebra (+ scalar) representation.
@@ -89,8 +115,6 @@ class ParticleMassWrapper(BaseWrapper):
         -------
         outputs : torch.Tensor
             Raw outputs, as expected in dataset.
-        other : torch.Tensor
-            Additional output data, e.g. required for regularization.
         """
 
         _, num_objects, num_channels, num_ga_components = multivector.shape
@@ -99,4 +123,4 @@ class ParticleMassWrapper(BaseWrapper):
         assert num_ga_components == 16
 
         norm = extract_scalar(multivector[:, :, 0, :])  # (batchsize, 1, 1)
-        return norm, None
+        return norm
