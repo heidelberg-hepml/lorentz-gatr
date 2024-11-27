@@ -115,17 +115,18 @@ class DSI(nn.Module):
         # (could evaluate them pre training,
         # but we have large batchsizes
         # so no big difference expected)
-        self.register_buffer("inv_mean", None)
-        self.register_buffer("inv_std", None)
+        n_invariants = n * (n + 1) // 2 if self.use_invariants else 0
+        self.register_buffer("inv_inited", torch.tensor(False, dtype=torch.bool))
+        self.register_buffer("inv_mean", torch.zeros(1, 1, n_invariants))
+        self.register_buffer("inv_std", torch.ones(1, 1, n_invariants))
 
     def _compute_invariants(self, particles):
         invariants = compute_invariants(particles)
 
         # standardize
-        if self.inv_mean is None or self.inv_std is None:
+        if not self.inv_inited:
             self.inv_mean = invariants.mean(dim=-2, keepdim=True)
-            self.inv_std = invariants.std(dim=-2, keepdim=True)
-            self.inv_std = self.inv_std.clamp(min=1e-5)
+            self.inv_std = invariants.std(dim=-2, keepdim=True).clamp(min=1e-5)
         invariants = (invariants - self.inv_mean) / self.inv_std
 
         return invariants
