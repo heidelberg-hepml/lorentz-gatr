@@ -585,7 +585,14 @@ class BaseExperiment:
                 .item()
             )
         else:
-            grad_norm = 0.0  # meaningless placeholder
+            grad_norm =grad_norm = (
+                torch.nn.utils.clip_grad_norm_(
+                    self.model.parameters(),
+                    float('inf'),
+                    error_if_nonfinite=False,
+                )
+                .cpu()
+                .item()
         if step > MIN_STEP_SKIP and self.cfg.training.max_grad_norm is not None:
             if grad_norm > self.cfg.training.max_grad_norm:
                 LOGGER.warning(
