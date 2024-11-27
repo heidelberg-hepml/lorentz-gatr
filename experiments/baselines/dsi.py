@@ -115,7 +115,8 @@ class DSI(nn.Module):
         # (could evaluate them pre training,
         # but we have large batchsizes
         # so no big difference expected)
-        self.inv_mean, self.inv_std = None, None
+        self.register_buffer("inv_mean", None)
+        self.register_buffer("inv_std", None)
 
     def _compute_invariants(self, particles):
         invariants = compute_invariants(particles)
