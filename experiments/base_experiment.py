@@ -10,6 +10,7 @@ from hydra.core.config_store import ConfigStore
 from hydra.utils import instantiate
 import mlflow
 from torch_ema import ExponentialMovingAverage
+import pytorch_optimizer
 
 import gatr.primitives.attention
 import gatr.layers.linear
@@ -22,9 +23,6 @@ from experiments.logger import LOGGER, MEMORY_HANDLER, FORMATTER
 from experiments.mlflow import log_mlflow
 
 from gatr.layers import MLPConfig, SelfAttentionConfig
-
-from lion_pytorch import Lion
-import schedulefree
 
 cs = ConfigStore.instance()
 cs.store(name="base_attention", node=SelfAttentionConfig)
@@ -61,7 +59,7 @@ class BaseExperiment:
         experiment_id, run_name = self._init()
         git_hash = os.popen("git rev-parse HEAD").read().strip()
         LOGGER.info(
-            f"### Starting experiment {self.cfg.exp_name}/{run_name} (mlflowid={experiment_id}) (jobid={self.cfg.jobid}) (git_hash={git_hash} ###"
+            f"### Starting experiment {self.cfg.exp_name}/{run_name} (mlflowid={experiment_id}) (jobid={self.cfg.jobid}) (git_hash={git_hash}) ###"
         )
         if self.cfg.use_mlflow:
             with mlflow.start_run(experiment_id=experiment_id, run_name=run_name):
@@ -388,13 +386,13 @@ class BaseExperiment:
                 weight_decay=self.cfg.training.weight_decay,
             )
         elif self.cfg.training.optimizer == "Lion":
-            self.optimizer = Lion(
+            self.optimizer = pytorch_optimizer.Lion(
                 param_groups,
                 betas=self.cfg.training.betas,
                 weight_decay=self.cfg.training.weight_decay,
             )
-        elif self.cfg.training.optimizer == "ScheduleFree":
-            self.optimizer = schedulefree.AdamWScheduleFree(
+        elif self.cfg.training.optimizer == "ADOPT":
+            self.optimizer = pytorch_optimizer.ADOPT(
                 param_groups,
                 betas=self.cfg.training.betas,
                 weight_decay=self.cfg.training.weight_decay,
@@ -501,8 +499,6 @@ class BaseExperiment:
         for step in range(self.cfg.training.iterations):
             # training
             self.model.train()
-            if self.cfg.training.optimizer == "ScheduleFree":
-                self.optimizer.train()
             data = next(iterator)
             self._step(data, step)
 
@@ -581,7 +577,7 @@ class BaseExperiment:
         grad_norm = (
             torch.nn.utils.clip_grad_norm_(
                 self.model.parameters(),
-                self.cfg.training.clip_grad_norm,
+                self.cfg.training.clip_grad_norm if self.cfg.training.clip_grad_norm is not None else float('inf'),
                 error_if_nonfinite=False,
             )
             .cpu()
@@ -631,8 +627,6 @@ class BaseExperiment:
         metrics = self._init_metrics()
 
         self.model.eval()
-        if self.cfg.training.optimizer == "ScheduleFree":
-            self.optimizer.eval()
         with torch.no_grad():
             for data in self.val_loader:
                 # use EMA for validation if available

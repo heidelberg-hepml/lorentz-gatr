@@ -37,7 +37,7 @@ def plot_mixer(cfg, plot_path, title, plot_dict):
             for idataset, dataset in enumerate(cfg.data.dataset):
                 data = [
                     np.log(plot_dict["results_test"][dataset]["raw"]["truth"]),
-                    np.log(plot_dict["results_test"][dataset]["raw"]["truth"]),
+                    np.log(plot_dict["results_train"][dataset]["raw"]["truth"]),
                     np.log(plot_dict["results_test"][dataset]["raw"]["prediction"]),
                 ]
                 plot_histograms(

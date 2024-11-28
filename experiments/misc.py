@@ -2,10 +2,6 @@ from collections.abc import Mapping
 import torch
 
 
-class NaNError(BaseException):
-    """Exception to be raise when the training encounters a NaN in loss or model weights."""
-
-
 def get_device() -> torch.device:
     """Gets CUDA if available, CPU else."""
     return torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
