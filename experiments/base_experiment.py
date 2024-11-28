@@ -574,25 +574,15 @@ class BaseExperiment:
                 self.cfg.training.clip_grad_value,
             )
         # rescale gradients such that their norm matches a given number
-        if self.cfg.training.clip_grad_norm is not None:
-            grad_norm = (
-                torch.nn.utils.clip_grad_norm_(
-                    self.model.parameters(),
-                    self.cfg.training.clip_grad_norm,
-                    error_if_nonfinite=False,
-                )
-                .cpu()
-                .item()
+        grad_norm = (
+            torch.nn.utils.clip_grad_norm_(
+                self.model.parameters(),
+                self.cfg.training.clip_grad_norm if self.cfg.training.clip_grad_norm is not None else float('inf'),
+                error_if_nonfinite=False,
             )
-        else:
-            grad_norm =grad_norm = (
-                torch.nn.utils.clip_grad_norm_(
-                    self.model.parameters(),
-                    float('inf'),
-                    error_if_nonfinite=False,
-                )
-                .cpu()
-                .item()
+            .cpu()
+            .item()
+        )
         if step > MIN_STEP_SKIP and self.cfg.training.max_grad_norm is not None:
             if grad_norm > self.cfg.training.max_grad_norm:
                 LOGGER.warning(
