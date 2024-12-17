@@ -24,7 +24,7 @@ class TopTaggingFineTuneExperiment(TopTaggingExperiment):
             # overwrite model
             self.cfg.model = self.warmstart_cfg.model
             self.cfg.ema = self.warmstart_cfg.ema
-            self.cfg.ga_representations = self.warmstart_cfg.ga_representations
+            self.cfg.ga_settings = self.warmstart_cfg.ga_settings
 
             # overwrite model-specific data entries
             self.cfg.model.mean_aggregation = self.warmstart_cfg.model.mean_aggregation
