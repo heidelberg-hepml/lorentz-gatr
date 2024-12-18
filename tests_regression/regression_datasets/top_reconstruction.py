@@ -1,10 +1,7 @@
 import torch
 
-from experiments.base_wrapper import BaseWrapper
 from gatr.interface import embed_vector, extract_vector
 from tests_regression.regression_datasets.constants import DATASET_SIZE, DEVICE
-
-import matplotlib.pyplot as plt  # testing
 
 
 class TopReconstructionDataset(torch.utils.data.Dataset):
@@ -169,18 +166,43 @@ class TopReconstructionDataset(torch.utils.data.Dataset):
         return self.event[idx], self.reco[idx]
 
 
-class TopReconstructionWrapper(BaseWrapper):
+class TopReconstructionWrapper(torch.nn.Module):
     """Wrapper around GATr networks for TopReconstructionDataset."""
 
     mv_in_channels = 1
     mv_out_channels = 2
     s_in_channels = 1
     s_out_channels = 1
-    # raw_in_channels = 4
-    # raw_out_channels = 1
 
     def __init__(self, net):
-        super().__init__(net, scalars=True, return_other=False)
+        super().__init__()
+        self.net = net
+
+    def forward(self, inputs: torch.Tensor):
+        """Wrapped forward pass pass.
+
+        Parses inputs into GA + scalar representation, calls the forward pass of the wrapped net,
+        and extracts the outputs from the GA + scalar representation again.
+
+        Parameters
+        ----------
+        inputs : torch.Tensor
+            Raw inputs, as given by dataset.
+
+        Returns
+        -------
+        outputs : torch.Tensor
+            Raw outputs, as expected in dataset.
+        """
+
+        multivector, scalars = self.embed_into_ga(inputs)
+        multivector_outputs, scalar_outputs = self.net(
+            multivector,
+            scalars=scalars,
+        )
+        outputs = self.extract_from_ga(multivector_outputs, scalar_outputs)
+
+        return outputs
 
     def embed_into_ga(self, inputs):
         """Embeds raw inputs into the geometric algebra (+ scalar) representation.
@@ -207,8 +229,8 @@ class TopReconstructionWrapper(BaseWrapper):
         multivector = multivector.unsqueeze(2)  # (batchsize, 3, 1, 16)
 
         scalars = torch.zeros(
-            (batchsize, 1, 1), device=inputs.device
-        )  # (batchsize, 1, 1)
+            (batchsize, 3, 1), device=inputs.device
+        )  # (batchsize, 3, 1)
         return multivector, scalars
 
     def extract_from_ga(self, multivector, scalars):
@@ -227,8 +249,6 @@ class TopReconstructionWrapper(BaseWrapper):
         -------
         outputs : torch.Tensor
             Raw outputs, as expected in dataset.
-        other : torch.Tensor
-            Additional output data, e.g. required for regularization.
         """
 
         _, num_objects, num_channels, num_ga_components = multivector.shape
@@ -241,4 +261,4 @@ class TopReconstructionWrapper(BaseWrapper):
         reco = torch.stack((pt, pW), dim=1)
         reco = reco[:, :, 0, :]  # pick first output channel
         # reco = reco.mean(dim=2) # average over output channels (much worse, probably because mean breaks symmetry)
-        return reco, None
+        return reco

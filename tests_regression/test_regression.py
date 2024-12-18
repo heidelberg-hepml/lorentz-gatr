@@ -43,7 +43,8 @@ def gatr_factory(wrapper_class):
 @pytest.mark.parametrize("model_factory", [gatr_factory], ids=["GATr"])
 @pytest.mark.parametrize(
     "data,wrapper_class",
-    [  # (ParticleMassDataset(), ParticleMassWrapper),
+    [
+        (ParticleMassDataset(), ParticleMassWrapper),
         (TopReconstructionDataset(), TopReconstructionWrapper),
     ],
 )

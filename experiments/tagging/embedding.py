@@ -90,17 +90,12 @@ def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
         fourmomenta.dtype,
     )
     n_spurions = spurions.shape[0]
-    if cfg_data.beam_token:
+    if cfg_data.beam_token and n_spurions > 0:
         # prepend spurions to the token list (within each block)
-        spurion_idxs = torch.cat(
-            [
-                torch.arange(
-                    ptr_start + i * n_spurions,
-                    ptr_start + (i + 1) * n_spurions,
-                )
-                for i, ptr_start in enumerate(ptr[:-1])
-            ]
-        )
+        spurion_idxs = torch.stack(
+            [ptr[:-1] + i for i in range(n_spurions)], dim=0
+        ) + n_spurions * torch.arange(batchsize, device=ptr.device)
+        spurion_idxs = spurion_idxs.permute(1, 0).flatten()
         insert_spurion = torch.zeros(
             multivectors.shape[0] + n_spurions * batchsize,
             dtype=torch.bool,
@@ -131,18 +126,13 @@ def embed_tagging_data_into_ga(fourmomenta, scalars, ptr, cfg_data):
         multivectors = torch.cat((multivectors, spurions), dim=-2)
 
     # global tokens
-    if cfg_data.include_global_token:
+    num_global_tokens = cfg_data.num_global_tokens
+    if cfg_data.include_global_token and num_global_tokens > 0:
         # prepend global tokens to the token list
-        num_global_tokens = cfg_data.num_global_tokens
-        global_idxs = torch.cat(
-            [
-                torch.arange(
-                    ptr_start + i * num_global_tokens,
-                    ptr_start + (i + 1) * num_global_tokens,
-                )
-                for i, ptr_start in enumerate(ptr[:-1])
-            ]
-        )
+        global_idxs = torch.stack(
+            [ptr[:-1] + i for i in range(num_global_tokens)], dim=0
+        ) + num_global_tokens * torch.arange(batchsize, device=ptr.device)
+        global_idxs = global_idxs.permute(1, 0).flatten()
         is_global = torch.zeros(
             multivectors.shape[0] + batchsize * num_global_tokens,
             dtype=torch.bool,
