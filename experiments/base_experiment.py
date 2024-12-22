@@ -333,21 +333,24 @@ class BaseExperiment:
         self.device = get_device()
         LOGGER.info(f"Using device {self.device}")
 
-        if (
-            self.cfg.training.float16
-            and self.device == "cuda"
-            and torch.cuda.is_bf16_supported()
-        ):
-            self.dtype = torch.bfloat16
-            LOGGER.debug("Using dtype bfloat16")
-        elif self.cfg.training.float16:
-            self.dtype = torch.float16
-            LOGGER.debug(
-                "Using dtype float16 (bfloat16 is not supported by environment)"
-            )
+        if self.cfg.training.dtype == "float32":
+            self.dtype = torch.float32
+            LOGGER.info("Using dtype float32")
+        elif self.cfg.training.dtype == "float16":
+            if self.device == "cuda" and torch.cuda.is_bf16_supported():
+                self.dtype = torch.bfloat16
+                LOGGER.info("Using dtype bfloat16")
+            else:
+                self.dtype = torch.float16
+                LOGGER.info("Using dtype float16")
+        elif self.cfg.training.dtype == "float64":
+            self.dtype = torch.float64
+            LOGGER.info("Using dtype float64")
         else:
             self.dtype = torch.float32
-            LOGGER.debug("Using dtype float32")
+            LOGGER.warning(
+                "dtype={self.cfg.training.dtype} not recognized, using float32"
+            )
 
         torch.backends.cuda.enable_flash_sdp(self.cfg.training.enable_flash_sdp)
         torch.backends.cuda.enable_math_sdp(self.cfg.training.enable_math_sdp)
