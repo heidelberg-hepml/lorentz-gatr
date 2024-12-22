@@ -577,7 +577,9 @@ class BaseExperiment:
         grad_norm = (
             torch.nn.utils.clip_grad_norm_(
                 self.model.parameters(),
-                self.cfg.training.clip_grad_norm if self.cfg.training.clip_grad_norm is not None else float('inf'),
+                self.cfg.training.clip_grad_norm
+                if self.cfg.training.clip_grad_norm is not None
+                else float("inf"),
                 error_if_nonfinite=False,
             )
             .cpu()
