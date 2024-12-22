@@ -8,6 +8,7 @@ data:
  data_path_3j: data/Z_3.npy
  subsample: 100000
  train_test_val: [.4, .5, .1]
+ base_type: 4
 
 evaluation:
  nsamples: 1000
