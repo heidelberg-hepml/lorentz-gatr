@@ -141,7 +141,7 @@ class CFM(nn.Module):
             vp_straight, vt_straight, xt_straight
         ).mean()
         distance_particlewise = [
-            ((vp_straight - vt_straight) ** 2)[:, i].mean() for i in range(4)
+            ((vp_straight - vt_straight) ** 2)[..., i].mean() / 2 for i in range(4)
         ]
         return distance, distance_particlewise
 
