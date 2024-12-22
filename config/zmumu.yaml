@@ -3,9 +3,9 @@ exp_name: zmumu_debug
 
 data:
  n_jets: [1]
- data_path_1j: data/Z_1.npy
- data_path_2j: data/Z_2.npy
- data_path_3j: data/Z_3.npy
+ data_path_1j: data/zmumu_1j.npy
+ data_path_2j: data/zmumu_2j.npy
+ data_path_3j: data/zmumu_3j.npy
  subsample: 100000
  train_test_val: [.4, .5, .1]
  base_type: 4
