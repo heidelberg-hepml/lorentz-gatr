@@ -4,6 +4,7 @@ from experiments.tagging.experiment import TopTaggingExperiment, QGTaggingExperi
 from experiments.eventgen.processes import (
     ttbarExperiment,
     zmumuExperiment,
+    ttbarOnshellExperiment,
 )
 from experiments.tagging.jetclassexperiment import JetClassTaggingExperiment
 from experiments.tagging.finetuneexperiment import TopTaggingFineTuneExperiment
@@ -23,6 +24,8 @@ def main(cfg):
         exp = TopTaggingFineTuneExperiment(cfg)
     elif cfg.exp_type == "ttbar":
         exp = ttbarExperiment(cfg)
+    elif cfg.exp_type == "ttbar-onshell":
+        exp = ttbarOnshellExperiment(cfg)
     elif cfg.exp_type == "zmumu":
         exp = zmumuExperiment(cfg)
     else:

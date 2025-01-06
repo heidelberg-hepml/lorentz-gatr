@@ -77,11 +77,27 @@ class ttbarExperiment(EventGenerationExperiment):
         ]
 
 
+class ttbarOnshellExperiment(ttbarExperiment):
+    """
+    Like ttbarExperiment, but with all particles in the hard process on-shell
+    This is meant as a demo that GATr can generate on-shell events
+    """
+
+    def define_process_specifics(self):
+        super().define_process_specifics()
+
+        self.onshell_list = [0, 1, 2, 3, 4, 5]
+        self.onshell_mass = [1.0] * 6
+
+
 class zmumuExperiment(EventGenerationExperiment):
     """
     Process: p p > z > mu+ mu- at reco-level with 1-3 extra jets
     For comparison with our previous paper https://arxiv.org/abs/2305.10475
     Dataset available upon request
+
+    Note: Something in the dataset causes numerical instabilities,
+    therefore this does not give good results yet
     """
 
     def define_process_specifics(self):
