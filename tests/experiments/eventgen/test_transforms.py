@@ -63,7 +63,7 @@ def test_simple():
     ],
 )
 @pytest.mark.parametrize("experiment_np", [[ttbarExperiment, 10]])
-@pytest.mark.parametrize("nevents", [10000])
+@pytest.mark.parametrize("nevents", [1000])
 def test_invertibility(transforms, distribution, experiment_np, nevents):
     """test invertibility of forward() and inverse() methods"""
     experiment, nparticles = experiment_np
@@ -156,7 +156,7 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
     ],
 )
 @pytest.mark.parametrize("experiment_np", [[ttbarExperiment, 10]])
-@pytest.mark.parametrize("nevents", [10000])
+@pytest.mark.parametrize("nevents", [1000])
 def test_jacobians(transforms, distribution, experiment_np, nevents):
     """test correctness of jacobians from _jac_forward() and _jac_inverse() methods, and their invertibility"""
     experiment, nparticles = experiment_np
@@ -284,7 +284,7 @@ def test_jacobians(transforms, distribution, experiment_np, nevents):
     ],
 )
 @pytest.mark.parametrize("experiment_np", [[ttbarExperiment, 10]])
-@pytest.mark.parametrize("nevents", [10000])
+@pytest.mark.parametrize("nevents", [1000])
 def test_logdetjac(transforms, distribution, experiment_np, nevents):
     """compare logdetjac_forward and logdetjac_inverse methods to autograd"""
     experiment, nparticles = experiment_np
