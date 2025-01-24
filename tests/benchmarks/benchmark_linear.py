@@ -102,7 +102,8 @@ if __name__ == "__main__":
     axs[1].plot(n_particles, v3_mean / v1_mean, color="b")
     axs[1].set_ylabel(r"$t_{v2}/t_{v1}$")
 
-    fig.suptitle(f"Time benchmarking for linear layer on {DEVICE}")
+    full_str1 = r"$SO^+(1,3)$" if USE_FULLY_CONNECTED_SUBGROUP else r"$O(1,3)$"
+    fig.suptitle(f"Time benchmark linear layer on {DEVICE} for {full_str1}")
     full_str = "SO+13" if USE_FULLY_CONNECTED_SUBGROUP else "O13"
     fig.savefig(f"benchmark_{DEVICE}_{full_str}.pdf", bbox_inches="tight")
     plt.close()
