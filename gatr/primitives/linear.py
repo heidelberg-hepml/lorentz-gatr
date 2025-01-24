@@ -11,7 +11,7 @@ from gatr.utils.einsum import cached_einsum, custom_einsum
 # They only differ in the construction of linear maps in _compute_pin_equi_linear_basis
 USE_FULLY_CONNECTED_SUBGROUP = True
 
-LINEAR_V2 = True
+LINEAR_V2 = False
 
 
 @lru_cache()
@@ -127,9 +127,9 @@ def linear_v2(x, coeffs):
     return out
 
 
-@torch.compile()
+@torch.compile(dynamic=True)
 def linear_v2_compiled(*args):
-    linear_v2(*args)
+    return linear_v2(*args)
 
 
 def equi_linear(
