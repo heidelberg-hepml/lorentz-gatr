@@ -55,6 +55,8 @@ class TaggingGATrWrapper(nn.Module):
         scalars = embedding["s"].unsqueeze(0)
 
         mask = xformers_sa_mask(embedding["batch"], materialize=not self.force_xformers)
+        if not self.force_xformers and mask.dtype != scalars.dtype:
+            mask = mask.to(scalars.dtype)
         multivector_outputs, scalar_outputs = self.net(
             multivector, scalars=scalars, attention_mask=mask
         )

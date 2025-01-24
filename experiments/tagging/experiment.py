@@ -259,6 +259,8 @@ class TaggingExperiment(BaseExperiment):
         embedding = embed_tagging_data_into_ga(
             batch.x, batch.scalars, batch.ptr, self.cfg.data
         )
+        embedding["mv"] = embedding["mv"].to(self.dtype)
+        embedding["s"] = embedding["s"].to(self.dtype)
         y_pred = self.model(embedding)[:, 0]
         return y_pred, batch.label.to(self.dtype)
 

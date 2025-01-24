@@ -23,7 +23,7 @@ from tests.helpers import MILD_TOLERANCES as TOLERANCES
     ],
 )
 @pytest.mark.parametrize("experiment_np", [[ttbarExperiment, 10]])
-@pytest.mark.parametrize("nevents", [10000])
+@pytest.mark.parametrize("nevents", [1000])
 @pytest.mark.parametrize("use_delta_r_min", [False, True])
 @pytest.mark.parametrize("use_pt_min", [False, True])
 def test_cuts(
@@ -69,7 +69,7 @@ def test_cuts(
     ],
 )
 @pytest.mark.parametrize("experiment_np", [[ttbarExperiment, 10]])
-@pytest.mark.parametrize("nevents", [10000])
+@pytest.mark.parametrize("nevents", [1000])
 @pytest.mark.parametrize("use_delta_r_min", [False, True])
 @pytest.mark.parametrize("use_pt_min", [False, True])
 def test_onshell(

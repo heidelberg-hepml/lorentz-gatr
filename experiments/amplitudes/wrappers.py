@@ -155,6 +155,8 @@ class AmplitudeGATrWrapper(nn.Module):
             batchsize=batchsize,
             device=inputs.device,
         )
+        type_token = type_token.to(inputs.dtype)
+        global_token = global_token.to(inputs.dtype)
 
         # encode type_token in scalars
         scalars = type_token
