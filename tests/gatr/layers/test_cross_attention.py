@@ -1,60 +1,57 @@
 import pytest
 import torch
-from xformers.ops.fmha.attn_bias import BlockDiagonalMask
 
 from gatr.layers import CrossAttentionConfig, CrossAttention
-from gatr.utils.clifford import SlowRandomPinTransform
+from tests.helpers import BATCH_DIMS, MILD_TOLERANCES, check_pin_equivariance
 
 
-@pytest.mark.parametrize("block_attention", [True, False])
+@pytest.mark.parametrize("batch_dims", BATCH_DIMS)
+@pytest.mark.parametrize("items,items_condition", [(3, 8)])
+@pytest.mark.parametrize(
+    "in_kv_mv_channels,in_q_mv_channels,in_kv_s_channels,in_q_s_channels",
+    [(2, 3, 4, 5)],
+)
 @pytest.mark.parametrize("multi_query", [True, False])
-def test_cross_attention(block_attention, multi_query):
-    """Test cross attention shapes and equivariance."""
-
-    if block_attention:
-        attn_mask = BlockDiagonalMask.from_seqlens([31, 29, 40], [3, 7, 21])
-        attn_mask = attn_mask.materialize(shape=(100, 31))
-        num_batch = 1
-        num_kv = 31
-        num_q = 100
-    else:
-        attn_mask = None
-        num_batch = 2
-        num_kv = 10
-        num_q = 7
+@pytest.mark.parametrize("num_heads,increase_hidden_channels", [(3, 2)])
+def test_crossattention_equivariance(
+    batch_dims,
+    items,
+    items_condition,
+    in_kv_mv_channels,
+    in_q_mv_channels,
+    in_kv_s_channels,
+    in_q_s_channels,
+    multi_query,
+    num_heads,
+    increase_hidden_channels,
+):
+    """Test cross attention equivariance."""
 
     config = CrossAttentionConfig(
-        in_kv_mv_channels=5,
-        in_q_mv_channels=6,
-        out_mv_channels=6,
-        in_kv_s_channels=2,
-        in_q_s_channels=6,
-        out_s_channels=4,
-        num_heads=5,
-        increase_hidden_channels=3,
+        in_kv_mv_channels=in_kv_mv_channels,
+        in_q_mv_channels=in_q_mv_channels,
+        out_mv_channels=in_q_mv_channels,
+        in_kv_s_channels=in_kv_s_channels,
+        in_q_s_channels=in_q_s_channels,
+        out_s_channels=in_q_s_channels,
+        num_heads=num_heads,
+        increase_hidden_channels=increase_hidden_channels,
         multi_query=multi_query,
     )
     layer = CrossAttention(config)
 
-    mv_in = torch.randn(num_batch, num_kv, 5, 16)
-    s_in = torch.randn(num_batch, num_kv, 2)
+    scalars = torch.randn(*batch_dims, items, in_q_s_channels)
+    scalars_condition = torch.randn(*batch_dims, items_condition, in_kv_s_channels)
 
-    mv_in_q = torch.randn(num_batch, num_q, 6, 16)
-    s_in_q = torch.randn(num_batch, num_q, 6)
-
-    t = SlowRandomPinTransform(spin=True)
-
-    mv_out1, s_out1 = layer.forward(
-        mv_in, mv_in_q, s_in, s_in_q, attention_mask=attn_mask
+    num_multivector_args = [1, 1]
+    data_dims = [
+        tuple(list(batch_dims) + [items_condition, in_kv_mv_channels]),
+        tuple(list(batch_dims) + [items, in_q_mv_channels]),
+    ]
+    check_pin_equivariance(
+        layer,
+        num_multivector_args,
+        batch_dims=data_dims,
+        fn_kwargs=dict(scalars_kv=scalars_condition, scalars_q=scalars),
+        **MILD_TOLERANCES
     )
-    mv_out1 = t(mv_out1)
-
-    mv_out2, s_out2 = layer.forward(
-        t(mv_in), t(mv_in_q), s_in, s_in_q, attention_mask=attn_mask
-    )
-
-    assert mv_out1.shape == (num_batch, num_q, 6, 16)
-    assert s_out1.shape == (num_batch, num_q, 4)
-
-    torch.testing.assert_close(mv_out1, mv_out2)
-    torch.testing.assert_close(s_out1, s_out2)
