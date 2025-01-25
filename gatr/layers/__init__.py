@@ -9,3 +9,4 @@ from .mlp.geometric_bilinears import GeometricBilinear
 from .mlp.mlp import GeoMLP
 from .mlp.config import MLPConfig
 from .mlp.nonlinearities import ScalarGatedNonlinearity
+from .gatr_block import GATrBlock
