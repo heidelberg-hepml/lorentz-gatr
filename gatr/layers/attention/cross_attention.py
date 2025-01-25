@@ -58,17 +58,11 @@ class CrossAttention(nn.Module):
             out_s_channels=config.hidden_q_s_channels * config.num_heads,
         )
 
-        self.k_linear = EquiLinear(
+        self.kv_linear = EquiLinear(
             in_mv_channels=config.in_kv_mv_channels,
-            out_mv_channels=config.hidden_kv_mv_channels,
+            out_mv_channels=2 * config.hidden_kv_mv_channels,
             in_s_channels=config.in_kv_s_channels,
-            out_s_channels=config.hidden_kv_s_channels,
-        )
-        self.v_linear = EquiLinear(
-            in_mv_channels=config.in_kv_mv_channels,
-            out_mv_channels=config.hidden_kv_mv_channels,
-            in_s_channels=config.in_kv_s_channels,
-            out_s_channels=config.hidden_kv_s_channels,
+            out_s_channels=2 * config.hidden_kv_s_channels,
         )
 
         # Output projection
@@ -127,12 +121,11 @@ class CrossAttention(nn.Module):
         q_mv, q_s = self.q_linear(
             multivectors_q, scalars_q
         )  # (..., num_items, hidden_channels, 16)
-        k_mv, k_s = self.k_linear(
+        kv_mv, kv_s = self.kv_linear(
             multivectors_kv, scalars_kv
-        )  # (..., num_items, hidden_channels, 16)
-        v_mv, v_s = self.v_linear(
-            multivectors_kv, scalars_kv
-        )  # (..., num_items, hidden_channels, 16)
+        )  # (..., num_items, 2*hidden_channels, 16)
+        k_mv, v_mv = torch.tensor_split(kv_mv, 2, dim=-2)
+        k_s, v_s = torch.tensor_split(kv_s, 2, dim=-1)
 
         # Rearrange to (..., heads, items, channels, 16) shape
         q_mv = rearrange(
