@@ -13,6 +13,7 @@ from tests.helpers import BATCH_DIMS, MILD_TOLERANCES, check_pin_equivariance
 )
 @pytest.mark.parametrize("multi_query", [True, False])
 @pytest.mark.parametrize("num_heads,increase_hidden_channels", [(3, 2)])
+@pytest.mark.parametrize("dropout_prob", [None, 0.0])
 def test_crossattention_equivariance(
     batch_dims,
     items,
@@ -24,6 +25,7 @@ def test_crossattention_equivariance(
     multi_query,
     num_heads,
     increase_hidden_channels,
+    dropout_prob,
 ):
     """Test cross attention equivariance."""
 
@@ -37,6 +39,7 @@ def test_crossattention_equivariance(
         num_heads=num_heads,
         increase_hidden_channels=increase_hidden_channels,
         multi_query=multi_query,
+        dropout_prob=dropout_prob,
     )
     layer = CrossAttention(config)
 

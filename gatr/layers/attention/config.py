@@ -145,10 +145,10 @@ class CrossAttentionConfig:
         Whether to use HeadScaleMHA following the NormFormer (https://arxiv.org/pdf/2110.09456)
     """
 
-    in_q_mv_channels: int
-    in_kv_mv_channels: int
-    out_mv_channels: int
-    out_s_channels: int
+    in_q_mv_channels: Optional[int] = None
+    in_kv_mv_channels: Optional[int] = None
+    out_mv_channels: Optional[int] = None
+    out_s_channels: Optional[int] = None
     in_q_s_channels: Optional[int] = None
     in_kv_s_channels: Optional[int] = None
     num_heads: int = 8
@@ -172,15 +172,19 @@ class CrossAttentionConfig:
             self.dropout_prob = None
 
     @property
-    def hidden_q_mv_channels(self) -> Optional[int]:
-        """Returns the number of hidden multivector query channels."""
+    def hidden_mv_channels(self) -> Optional[int]:
+        """Returns the number of hidden multivector channels."""
+
+        if self.in_q_mv_channels is None:
+            return None
+
         return max(
             self.increase_hidden_channels * self.in_q_mv_channels // self.num_heads, 1
         )
 
     @property
-    def hidden_q_s_channels(self) -> Optional[int]:
-        """Returns the number of hidden scalar query channels."""
+    def hidden_s_channels(self) -> Optional[int]:
+        """Returns the number of hidden scalar channels."""
 
         if self.in_q_s_channels is None:
             assert self.in_kv_s_channels is None
@@ -188,25 +192,6 @@ class CrossAttentionConfig:
 
         return max(
             self.increase_hidden_channels * self.in_q_s_channels // self.num_heads, 4
-        )
-
-    @property
-    def hidden_kv_mv_channels(self) -> Optional[int]:
-        """Returns the number of hidden multivector key/value channels."""
-        return max(
-            self.increase_hidden_channels * self.in_kv_mv_channels // self.num_heads, 1
-        )
-
-    @property
-    def hidden_kv_s_channels(self) -> Optional[int]:
-        """Returns the number of hidden scalar key/value channels."""
-
-        if self.in_kv_s_channels is None:
-            assert self.in_q_s_channels is None
-            return None
-
-        return max(
-            self.increase_hidden_channels * self.in_kv_s_channels // self.num_heads, 4
         )
 
     @classmethod

@@ -21,10 +21,6 @@ class CrossAttention(nn.Module):
     ----------
     config : SelfAttentionConfig
         Attention configuration.
-    in_q_mv_channels : int
-        Number of query MV channels
-    in_q_s_channels : int
-        Number of query scalar channels
     """
 
     def __init__(
@@ -48,30 +44,29 @@ class CrossAttention(nn.Module):
 
         self.q_linear = EquiLinear(
             in_mv_channels=config.in_q_mv_channels,
-            out_mv_channels=config.hidden_q_mv_channels * config.num_heads,
+            out_mv_channels=config.hidden_mv_channels * config.num_heads,
             in_s_channels=config.in_q_s_channels,
-            out_s_channels=config.hidden_q_s_channels * config.num_heads,
+            out_s_channels=config.hidden_s_channels * config.num_heads,
         )
-
         self.kv_linear = EquiLinear(
             in_mv_channels=config.in_kv_mv_channels,
             out_mv_channels=2
-            * config.hidden_kv_mv_channels
+            * config.hidden_mv_channels
             * (1 if config.multi_query else config.num_heads),
             in_s_channels=config.in_kv_s_channels,
             out_s_channels=2
-            * config.hidden_kv_s_channels
+            * config.hidden_s_channels
             * (1 if config.multi_query else config.num_heads),
         )
 
         # Output projection
         self.out_linear = EquiLinear(
-            in_mv_channels=config.hidden_kv_mv_channels * config.num_heads,
+            in_mv_channels=config.hidden_mv_channels * config.num_heads,
             out_mv_channels=config.out_mv_channels,
             in_s_channels=(
                 None
                 if config.in_kv_s_channels is None
-                else config.hidden_kv_s_channels * config.num_heads
+                else config.hidden_s_channels * config.num_heads
             ),
             out_s_channels=config.out_s_channels,
             initialization=config.output_init,
@@ -83,6 +78,10 @@ class CrossAttention(nn.Module):
         # Dropout
         self.dropout: Optional[nn.Module]
         if config.dropout_prob is not None:
+            raise ValueError(
+                "Dropout violates equivarianace for cross_attention, "
+                "thats definitely a bug but didn't the reason yet."
+            )
             self.dropout = GradeDropout(config.dropout_prob)
         else:
             self.dropout = None
@@ -136,7 +135,7 @@ class CrossAttention(nn.Module):
             q_mv,
             "... items (hidden_channels num_heads) x -> ... num_heads items hidden_channels x",
             num_heads=self.config.num_heads,
-            hidden_channels=self.config.hidden_q_mv_channels,
+            hidden_channels=self.config.hidden_mv_channels,
         )
         if self.config.multi_query:
             k_mv = rearrange(
@@ -150,13 +149,13 @@ class CrossAttention(nn.Module):
                 k_mv,
                 "... items (hidden_channels num_heads) x -> ... num_heads items hidden_channels x",
                 num_heads=self.config.num_heads,
-                hidden_channels=self.config.hidden_kv_mv_channels,
+                hidden_channels=self.config.hidden_mv_channels,
             )
             v_mv = rearrange(
                 v_mv,
                 "... items (hidden_channels num_heads) x -> ... num_heads items hidden_channels x",
                 num_heads=self.config.num_heads,
-                hidden_channels=self.config.hidden_kv_mv_channels,
+                hidden_channels=self.config.hidden_mv_channels,
             )
 
         # Same for scalars
@@ -165,7 +164,7 @@ class CrossAttention(nn.Module):
                 q_s,
                 "... items (hidden_channels num_heads) -> ... num_heads items hidden_channels",
                 num_heads=self.config.num_heads,
-                hidden_channels=self.config.hidden_q_s_channels,
+                hidden_channels=self.config.hidden_s_channels,
             )
             if self.config.multi_query:
                 k_s = rearrange(
@@ -179,13 +178,13 @@ class CrossAttention(nn.Module):
                     k_s,
                     "... items (hidden_channels num_heads) -> ... num_heads items hidden_channels",
                     num_heads=self.config.num_heads,
-                    hidden_channels=self.config.hidden_kv_s_channels,
+                    hidden_channels=self.config.hidden_s_channels,
                 )
                 v_s = rearrange(
                     v_s,
                     "... items (hidden_channels num_heads) -> ... num_heads items hidden_channels",
                     num_heads=self.config.num_heads,
-                    hidden_channels=self.config.hidden_kv_s_channels,
+                    hidden_channels=self.config.hidden_s_channels,
                 )
         else:
             q_s, k_s, v_s = None, None, None
