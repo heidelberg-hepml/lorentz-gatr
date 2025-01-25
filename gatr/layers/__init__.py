@@ -10,3 +10,4 @@ from .mlp.mlp import GeoMLP
 from .mlp.config import MLPConfig
 from .mlp.nonlinearities import ScalarGatedNonlinearity
 from .gatr_block import GATrBlock
+from .conditional_gatr_block import ConditionalGATrBlock

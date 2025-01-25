@@ -4,19 +4,24 @@ from typing import Optional, Tuple
 import torch
 from torch import nn
 
-from gatr.layers import SelfAttention, SelfAttentionConfig
+from gatr.layers import (
+    SelfAttention,
+    CrossAttention,
+    SelfAttentionConfig,
+    CrossAttentionConfig,
+)
 from gatr.layers.layer_norm import EquiLayerNorm
 from gatr.layers.mlp.config import MLPConfig
 from gatr.layers.mlp.mlp import GeoMLP
 
 
-class GATrBlock(nn.Module):
-    """Equivariant transformer encoder block for L-GATr.
-
-    This is the biggest building block of L-GATr.
+class ConditionalGATrBlock(nn.Module):
+    """Equivariant transformer decoder block for L-GATr.
 
     Inputs are first processed by a block consisting of LayerNorm, multi-head geometric
-    self-attention, and a residual connection. Then the data is processed by a block consisting of
+    self-attention, and a residual connection. Then the conditions are included with
+    cross-attention using the same overhead as in the self-attention part.
+    Then the data is processed by a block consisting of
     another LayerNorm, an item-wise two-layer geometric MLP with GeLU activations, and another
     residual connection.
 
@@ -26,8 +31,14 @@ class GATrBlock(nn.Module):
         Number of input and output multivector channels
     s_channels: int
         Number of input and output scalar channels
+    condition_mv_channels: int
+        Number of condition multivector channels
+    condition_s_channels: int
+        Number of condition scalar channels
     attention: SelfAttentionConfig
         Attention configuration
+    crossattention: CrossAttentionConfig
+        Cross-attention configuration
     mlp: MLPConfig
         MLP configuration
     dropout_prob : float or None
@@ -40,7 +51,10 @@ class GATrBlock(nn.Module):
         self,
         mv_channels: int,
         s_channels: int,
+        condition_mv_channels: int,
+        condition_s_channels: int,
         attention: SelfAttentionConfig,
+        crossattention: CrossAttentionConfig,
         mlp: MLPConfig,
         dropout_prob: Optional[float] = None,
         double_layernorm: bool = False,
@@ -64,6 +78,20 @@ class GATrBlock(nn.Module):
         )
         self.attention = SelfAttention(attention)
 
+        # Cross-attention layer
+        crossattention = replace(
+            crossattention,
+            in_q_mv_channels=mv_channels,
+            in_q_s_channels=s_channels,
+            in_kv_mv_channels=condition_mv_channels,
+            in_kv_s_channels=condition_s_channels,
+            out_mv_channels=mv_channels,
+            out_s_channels=s_channels,
+            output_init="small",
+            dropout_prob=dropout_prob,
+        )
+        self.crossattention = CrossAttention(crossattention)
+
         # MLP block
         mlp = replace(
             mlp,
@@ -76,12 +104,13 @@ class GATrBlock(nn.Module):
     def forward(
         self,
         multivectors: torch.Tensor,
-        scalars: torch.Tensor,
-        additional_qk_features_mv=None,
-        additional_qk_features_s=None,
+        multivectors_condition: torch.Tensor,
+        scalars: torch.Tensor = None,
+        scalars_condition: torch.Tensor = None,
         attention_mask=None,
+        attention_mask_condition=None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Forward pass of the transformer encoder block.
+        """Forward pass of the transformer decoder block.
 
         Parameters
         ----------
@@ -89,14 +118,14 @@ class GATrBlock(nn.Module):
             Input multivectors.
         scalars : torch.Tensor with shape (..., s_channels)
             Input scalars.
-        additional_qk_features_mv : None or torch.Tensor with shape
-            (..., num_items, add_qk_mv_channels, 16)
-            Additional Q/K features, multivector part.
-        additional_qk_features_s : None or torch.Tensor with shape
-            (..., num_items, add_qk_mv_channels, 16)
-            Additional Q/K features, scalar part.
+        multivectors_condition : torch.Tensor with shape (..., items, channels, 16)
+            Input condition multivectors.
+        scalars_condition : torch.Tensor with shape (..., s_channels)
+            Input condition scalars.
         attention_mask: None or torch.Tensor or AttentionBias
             Optional attention mask.
+        attention_mask_condition: None or torch.Tensor or AttentionBias
+            Optional attention mask for the condition.
 
         Returns
         -------
@@ -106,23 +135,42 @@ class GATrBlock(nn.Module):
             Output scalars
         """
 
-        # Attention block: pre layer norm
+        # Self-attention block: pre layer norm
         h_mv, h_s = self.norm(multivectors, scalars=scalars)
 
-        # Attention block: self attention
+        # Self-attention block: self attention
         h_mv, h_s = self.attention(
             h_mv,
             scalars=h_s,
-            additional_qk_features_mv=additional_qk_features_mv,
-            additional_qk_features_s=additional_qk_features_s,
             attention_mask=attention_mask,
         )
 
-        # Attention block: post layer norm
+        # Self-attention block: post layer norm
         if self.double_layernorm:
             h_mv, h_s = self.norm(h_mv, scalars=h_s)
 
-        # Attention block: skip connection
+        # Self-attention block: skip connection
+        multivectors = multivectors + h_mv
+        scalars = scalars + h_s
+
+        # Cross-attention block: pre layer norm
+        h_mv, h_s = self.norm(multivectors, scalars=scalars)
+        c_mv, c_s = self.norm(multivectors_condition, scalars=scalars_condition)
+
+        # Cross-attention block: cross attention
+        h_mv, h_s = self.crossattention(
+            multivectors_q=h_mv,
+            multivectors_kv=c_mv,
+            scalars_q=h_s,
+            scalars_kv=c_s,
+            attention_mask=attention_mask_condition,
+        )
+
+        # Cross-attention block: post layer norm
+        if self.double_layernorm:
+            h_mv, h_s = self.norm(h_mv, scalars=h_s)
+
+        # Cross-attention block: skip connection
         outputs_mv = multivectors + h_mv
         outputs_s = scalars + h_s
 
