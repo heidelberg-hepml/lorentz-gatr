@@ -103,3 +103,114 @@ class SelfAttentionConfig:
         if isinstance(config, Mapping):
             return cls(**config)
         raise ValueError(f"Can not cast {config} to {cls}")
+
+
+@dataclass
+class CrossAttentionConfig:
+    """Configuration for cross-attention.
+
+    Parameters
+    ----------
+    in_q_mv_channels : int
+        Number of input query multivector channels.
+    in_kv_mv_channels : int
+        Number of input key/value multivector channels.
+    out_mv_channels : int
+        Number of output multivector channels.
+    num_heads : int
+        Number of attention heads.
+    in_q_s_channels : int
+        Input query scalar channels. If None, no scalars are expected nor returned.
+    in_kv_s_channels : int
+        Input key/value scalar channels. If None, no scalars are expected nor returned.
+    out_s_channels : int
+        Output scalar channels. If None, no scalars are expected nor returned.
+    additional_q_mv_channels : int
+        Whether additional multivector features for the queries will be provided.
+    additional_q_s_channels : int
+        Whether additional scalar features for the queries will be provided.
+    additional_k_mv_channels : int
+        Whether additional multivector features for the keys will be provided.
+    additional_k_s_channels : int
+        Whether additional scalar features for the keys will be provided.
+    multi_query: bool
+        Whether to do multi-query attention
+    output_init : str
+        Initialization scheme for final linear layer
+    increase_hidden_channels : int
+        Factor by which to increase the number of hidden channels (both multivectors and scalars)
+    dropout_prob : float or None
+        Dropout probability
+    """
+
+    in_q_mv_channels: int
+    in_kv_mv_channels: int
+    out_mv_channels: int
+    out_s_channels: int
+    in_q_s_channels: Optional[int] = None
+    in_kv_s_channels: Optional[int] = None
+    num_heads: int = 8
+    additional_q_mv_channels: int = 0
+    additional_q_s_channels: int = 0
+    additional_k_mv_channels: int = 0
+    additional_k_s_channels: int = 0
+    multi_query: bool = True
+    output_init: str = "default"
+    checkpoint: bool = True
+    increase_hidden_channels: int = 2
+    dropout_prob: Optional[float] = None
+
+    def __post_init__(self):
+        """Type checking / conversion."""
+        if isinstance(self.dropout_prob, str) and self.dropout_prob.lower() in [
+            "null",
+            "none",
+        ]:
+            self.dropout_prob = None
+
+    @property
+    def hidden_q_mv_channels(self) -> Optional[int]:
+        """Returns the number of hidden multivector query channels."""
+        return max(
+            self.increase_hidden_channels * self.in_q_mv_channels // self.num_heads, 1
+        )
+
+    @property
+    def hidden_q_s_channels(self) -> Optional[int]:
+        """Returns the number of hidden scalar query channels."""
+
+        if self.in_q_s_channels is None:
+            assert self.in_kv_s_channels is None
+            return None
+
+        return max(
+            self.increase_hidden_channels * self.in_q_s_channels // self.num_heads, 4
+        )
+
+    @property
+    def hidden_kv_mv_channels(self) -> Optional[int]:
+        """Returns the number of hidden multivector key/value channels."""
+        return max(
+            self.increase_hidden_channels * self.in_kv_mv_channels // self.num_heads, 1
+        )
+
+    @property
+    def hidden_kv_s_channels(self) -> Optional[int]:
+        """Returns the number of hidden scalar key/value channels."""
+
+        if self.in_kv_s_channels is None:
+            assert self.in_q_s_channels is None
+            return None
+
+        return max(
+            self.increase_hidden_channels * self.in_kv_s_channels // self.num_heads, 4
+        )
+
+    @classmethod
+    def cast(cls, config: Any) -> CrossAttentionConfig:
+        """Casts an object as CrossAttentionConfig."""
+        if isinstance(config, CrossAttentionConfig):
+            return config
+        if isinstance(config, Mapping):
+            return cls(**config)
+        raise ValueError(f"Can not cast {config} to {cls}")

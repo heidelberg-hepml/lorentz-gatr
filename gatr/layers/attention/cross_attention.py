@@ -30,8 +30,6 @@ class CrossAttention(nn.Module):
     def __init__(
         self,
         config: SelfAttentionConfig,
-        in_q_mv_channels: int,
-        in_q_s_channels: Optional[int] = None,
     ) -> None:
         super().__init__()
 
@@ -40,47 +38,47 @@ class CrossAttention(nn.Module):
                 "Cross attention is only implemented with multi query"
             )
 
-        if config.additional_qk_mv_channels > 0 or config.additional_qk_s_channels > 0:
+        if (
+            config.additional_q_mv_channels > 0
+            or config.additional_q_s_channels > 0
+            or config.additional_k_mv_channels > 0
+            or config.additional_k_s_channels > 0
+        ):
             raise NotImplementedError(
                 "Cross attention is not implemented with additional channels"
-            )
-
-        if config.pos_encoding:
-            raise NotImplementedError(
-                "Cross attention is not implemented with positional encoding."
             )
 
         # Store settings
         self.config = config
 
         self.q_linear = EquiLinear(
-            in_mv_channels=in_q_mv_channels,
-            out_mv_channels=config.hidden_mv_channels * config.num_heads,
-            in_s_channels=in_q_s_channels,
-            out_s_channels=config.hidden_s_channels * config.num_heads,
+            in_mv_channels=config.in_q_mv_channels,
+            out_mv_channels=config.hidden_q_mv_channels * config.num_heads,
+            in_s_channels=config.in_q_s_channels,
+            out_s_channels=config.hidden_q_s_channels * config.num_heads,
         )
 
         self.k_linear = EquiLinear(
-            in_mv_channels=config.in_mv_channels,
-            out_mv_channels=config.hidden_mv_channels,
-            in_s_channels=config.in_s_channels,
-            out_s_channels=config.hidden_s_channels,
+            in_mv_channels=config.in_kv_mv_channels,
+            out_mv_channels=config.hidden_kv_mv_channels,
+            in_s_channels=config.in_kv_s_channels,
+            out_s_channels=config.hidden_kv_s_channels,
         )
         self.v_linear = EquiLinear(
-            in_mv_channels=config.in_mv_channels,
-            out_mv_channels=config.hidden_mv_channels,
-            in_s_channels=config.in_s_channels,
-            out_s_channels=config.hidden_s_channels,
+            in_mv_channels=config.in_kv_mv_channels,
+            out_mv_channels=config.hidden_kv_mv_channels,
+            in_s_channels=config.in_kv_s_channels,
+            out_s_channels=config.hidden_kv_s_channels,
         )
 
         # Output projection
         self.out_linear = EquiLinear(
-            in_mv_channels=config.hidden_mv_channels * config.num_heads,
+            in_mv_channels=config.hidden_kv_mv_channels * config.num_heads,
             out_mv_channels=config.out_mv_channels,
             in_s_channels=(
                 None
-                if config.in_s_channels is None
-                else config.hidden_s_channels * config.num_heads
+                if config.in_kv_s_channels is None
+                else config.hidden_kv_s_channels * config.num_heads
             ),
             out_s_channels=config.out_s_channels,
             initialization=config.output_init,
@@ -141,7 +139,7 @@ class CrossAttention(nn.Module):
             q_mv,
             "... items (hidden_channels num_heads) x -> ... num_heads items hidden_channels x",
             num_heads=self.config.num_heads,
-            hidden_channels=self.config.hidden_mv_channels,
+            hidden_channels=self.config.hidden_q_mv_channels,
         )
         k_mv = rearrange(
             k_mv, "... items hidden_channels x -> ... 1 items hidden_channels x"
@@ -156,7 +154,7 @@ class CrossAttention(nn.Module):
                 q_s,
                 "... items (hidden_channels num_heads) -> ... num_heads items hidden_channels",
                 num_heads=self.config.num_heads,
-                hidden_channels=self.config.hidden_s_channels,
+                hidden_channels=self.config.hidden_q_s_channels,
             )
             k_s = rearrange(
                 k_s, "... items hidden_channels -> ... 1 items hidden_channels"

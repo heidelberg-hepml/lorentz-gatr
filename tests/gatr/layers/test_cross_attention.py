@@ -2,7 +2,7 @@ import pytest
 import torch
 from xformers.ops.fmha.attn_bias import BlockDiagonalMask
 
-from gatr.layers import SelfAttentionConfig, CrossAttention
+from gatr.layers import CrossAttentionConfig, CrossAttention
 from gatr.utils.clifford import SlowRandomPinTransform
 
 
@@ -22,15 +22,17 @@ def test_cross_attention(block_attention):
         num_kv = 10
         num_q = 7
 
-    config = SelfAttentionConfig(
-        in_mv_channels=5,
+    config = CrossAttentionConfig(
+        in_kv_mv_channels=5,
         out_mv_channels=6,
-        in_s_channels=2,
+        in_kv_s_channels=2,
         out_s_channels=4,
+        in_q_mv_channels=6,
+        in_q_s_channels=6,
         num_heads=5,
         increase_hidden_channels=3,
     )
-    layer = CrossAttention(config, in_q_mv_channels=6, in_q_s_channels=6)
+    layer = CrossAttention(config)
 
     mv_in = torch.randn(num_batch, num_kv, 5, 16)
     s_in = torch.randn(num_batch, num_kv, 2)
