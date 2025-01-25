@@ -33,11 +33,6 @@ class CrossAttention(nn.Module):
     ) -> None:
         super().__init__()
 
-        if not config.multi_query:
-            raise NotImplementedError(
-                "Cross attention is only implemented with multi query"
-            )
-
         if (
             config.additional_q_mv_channels > 0
             or config.additional_q_s_channels > 0
@@ -60,9 +55,13 @@ class CrossAttention(nn.Module):
 
         self.kv_linear = EquiLinear(
             in_mv_channels=config.in_kv_mv_channels,
-            out_mv_channels=2 * config.hidden_kv_mv_channels,
+            out_mv_channels=2
+            * config.hidden_kv_mv_channels
+            * (1 if config.multi_query else config.num_heads),
             in_s_channels=config.in_kv_s_channels,
-            out_s_channels=2 * config.hidden_kv_s_channels,
+            out_s_channels=2
+            * config.hidden_kv_s_channels
+            * (1 if config.multi_query else config.num_heads),
         )
 
         # Output projection
@@ -139,12 +138,26 @@ class CrossAttention(nn.Module):
             num_heads=self.config.num_heads,
             hidden_channels=self.config.hidden_q_mv_channels,
         )
-        k_mv = rearrange(
-            k_mv, "... items hidden_channels x -> ... 1 items hidden_channels x"
-        )
-        v_mv = rearrange(
-            v_mv, "... items hidden_channels x -> ... 1 items hidden_channels x"
-        )
+        if self.config.multi_query:
+            k_mv = rearrange(
+                k_mv, "... items hidden_channels x -> ... 1 items hidden_channels x"
+            )
+            v_mv = rearrange(
+                v_mv, "... items hidden_channels x -> ... 1 items hidden_channels x"
+            )
+        else:
+            k_mv = rearrange(
+                k_mv,
+                "... items (hidden_channels num_heads) x -> ... num_heads items hidden_channels x",
+                num_heads=self.config.num_heads,
+                hidden_channels=self.config.hidden_kv_mv_channels,
+            )
+            v_mv = rearrange(
+                v_mv,
+                "... items (hidden_channels num_heads) x -> ... num_heads items hidden_channels x",
+                num_heads=self.config.num_heads,
+                hidden_channels=self.config.hidden_kv_mv_channels,
+            )
 
         # Same for scalars
         if q_s is not None:
@@ -154,12 +167,26 @@ class CrossAttention(nn.Module):
                 num_heads=self.config.num_heads,
                 hidden_channels=self.config.hidden_q_s_channels,
             )
-            k_s = rearrange(
-                k_s, "... items hidden_channels -> ... 1 items hidden_channels"
-            )
-            v_s = rearrange(
-                v_s, "... items hidden_channels -> ... 1 items hidden_channels"
-            )
+            if self.config.multi_query:
+                k_s = rearrange(
+                    k_s, "... items hidden_channels -> ... 1 items hidden_channels"
+                )
+                v_s = rearrange(
+                    v_s, "... items hidden_channels -> ... 1 items hidden_channels"
+                )
+            else:
+                k_s = rearrange(
+                    k_s,
+                    "... items (hidden_channels num_heads) -> ... num_heads items hidden_channels",
+                    num_heads=self.config.num_heads,
+                    hidden_channels=self.config.hidden_kv_s_channels,
+                )
+                v_s = rearrange(
+                    v_s,
+                    "... items (hidden_channels num_heads) -> ... num_heads items hidden_channels",
+                    num_heads=self.config.num_heads,
+                    hidden_channels=self.config.hidden_kv_s_channels,
+                )
         else:
             q_s, k_s, v_s = None, None, None
 

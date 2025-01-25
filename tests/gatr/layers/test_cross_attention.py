@@ -7,7 +7,8 @@ from gatr.utils.clifford import SlowRandomPinTransform
 
 
 @pytest.mark.parametrize("block_attention", [True, False])
-def test_cross_attention(block_attention):
+@pytest.mark.parametrize("multi_query", [True, False])
+def test_cross_attention(block_attention, multi_query):
     """Test cross attention shapes and equivariance."""
 
     if block_attention:
@@ -24,13 +25,14 @@ def test_cross_attention(block_attention):
 
     config = CrossAttentionConfig(
         in_kv_mv_channels=5,
+        in_q_mv_channels=6,
         out_mv_channels=6,
         in_kv_s_channels=2,
-        out_s_channels=4,
-        in_q_mv_channels=6,
         in_q_s_channels=6,
+        out_s_channels=4,
         num_heads=5,
         increase_hidden_channels=3,
+        multi_query=multi_query,
     )
     layer = CrossAttention(config)
 
