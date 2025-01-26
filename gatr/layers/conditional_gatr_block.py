@@ -108,7 +108,7 @@ class ConditionalGATrBlock(nn.Module):
         scalars: torch.Tensor = None,
         scalars_condition: torch.Tensor = None,
         attention_mask=None,
-        attention_mask_condition=None,
+        crossattention_mask=None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Forward pass of the transformer decoder block.
 
@@ -124,7 +124,7 @@ class ConditionalGATrBlock(nn.Module):
             Input condition scalars.
         attention_mask: None or torch.Tensor or AttentionBias
             Optional attention mask.
-        attention_mask_condition: None or torch.Tensor or AttentionBias
+        crossattention_mask: None or torch.Tensor or AttentionBias
             Optional attention mask for the condition.
 
         Returns
@@ -163,7 +163,7 @@ class ConditionalGATrBlock(nn.Module):
             multivectors_kv=c_mv,
             scalars_q=h_s,
             scalars_kv=c_s,
-            attention_mask=attention_mask_condition,
+            attention_mask=crossattention_mask,
         )
 
         # Cross-attention block: post layer norm

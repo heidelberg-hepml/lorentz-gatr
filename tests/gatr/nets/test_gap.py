@@ -1,24 +1,20 @@
 import pytest
 import torch
 
-from gatr.layers.attention.config import SelfAttentionConfig
 from gatr.layers.mlp.config import MLPConfig
-from gatr.nets import GATr
+from gatr.nets import GAP
 from tests.helpers import BATCH_DIMS, MILD_TOLERANCES, check_pin_equivariance
 
-S_CHANNELS = [(None, None, 7, False), (4, 5, 6, True)]
+S_CHANNELS = [(None, None, 7), (4, 5, 6)]
 
 
 @pytest.mark.parametrize("batch_dims", BATCH_DIMS)
 @pytest.mark.parametrize(
     "num_items,in_mv_channels,out_mv_channels,hidden_mv_channels", [(8, 3, 4, 6)]
 )
-@pytest.mark.parametrize("num_heads,num_blocks", [(4, 1)])
-@pytest.mark.parametrize(
-    "in_s_channels,out_s_channels,hidden_s_channels,pos_encoding", S_CHANNELS
-)
+@pytest.mark.parametrize("num_blocks", [1])
+@pytest.mark.parametrize("in_s_channels,out_s_channels,hidden_s_channels", S_CHANNELS)
 @pytest.mark.parametrize("dropout_prob", [None, 0.0, 0.3])
-@pytest.mark.parametrize("multi_query_attention", [False, True])
 def test_gatr_shape(
     batch_dims,
     num_items,
@@ -26,15 +22,12 @@ def test_gatr_shape(
     out_mv_channels,
     hidden_mv_channels,
     num_blocks,
-    num_heads,
     in_s_channels,
     out_s_channels,
     hidden_s_channels,
-    pos_encoding,
-    multi_query_attention,
     dropout_prob,
 ):
-    """Tests the output shape of GATr."""
+    """Tests the output shape of GAP."""
     inputs = torch.randn(*batch_dims, num_items, in_mv_channels, 16)
     scalars = (
         None
@@ -43,18 +36,13 @@ def test_gatr_shape(
     )
 
     try:
-        net = GATr(
+        net = GAP(
             in_mv_channels,
             out_mv_channels,
             hidden_mv_channels,
             in_s_channels=in_s_channels,
             out_s_channels=out_s_channels,
             hidden_s_channels=hidden_s_channels,
-            attention=SelfAttentionConfig(
-                num_heads=num_heads,
-                pos_encoding=pos_encoding,
-                multi_query=multi_query_attention,
-            ),
             num_blocks=num_blocks,
             mlp=MLPConfig(),
             dropout_prob=dropout_prob,
@@ -74,11 +62,8 @@ def test_gatr_shape(
 @pytest.mark.parametrize(
     "num_items,in_mv_channels,out_mv_channels,hidden_mv_channels", [(8, 3, 4, 6)]
 )
-@pytest.mark.parametrize("num_heads,num_blocks", [(4, 1)])
-@pytest.mark.parametrize(
-    "in_s_channels,out_s_channels,hidden_s_channels,pos_encoding", S_CHANNELS
-)
-@pytest.mark.parametrize("multi_query_attention", [False, True])
+@pytest.mark.parametrize("num_blocks", [1])
+@pytest.mark.parametrize("in_s_channels,out_s_channels,hidden_s_channels", S_CHANNELS)
 def test_gatr_equivariance(
     batch_dims,
     num_items,
@@ -86,27 +71,19 @@ def test_gatr_equivariance(
     out_mv_channels,
     hidden_mv_channels,
     num_blocks,
-    num_heads,
     in_s_channels,
     out_s_channels,
     hidden_s_channels,
-    pos_encoding,
-    multi_query_attention,
 ):
     """Tests GATr for equivariance."""
     try:
-        net = GATr(
+        net = GAP(
             in_mv_channels,
             out_mv_channels,
             hidden_mv_channels,
             in_s_channels=in_s_channels,
             out_s_channels=out_s_channels,
             hidden_s_channels=hidden_s_channels,
-            attention=SelfAttentionConfig(
-                num_heads=num_heads,
-                pos_encoding=pos_encoding,
-                multi_query=multi_query_attention,
-            ),
             num_blocks=num_blocks,
             mlp=MLPConfig(),
         )
