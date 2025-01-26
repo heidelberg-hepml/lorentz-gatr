@@ -10,7 +10,7 @@ from experiments.eventgen.distributions import (
     StandardLogPtPhiEtaLogM2,
 )
 from experiments.eventgen.processes import ttbarExperiment
-from tests.helpers import STRICT_TOLERANCES as TOLERANCES
+from tests.helpers import TOLERANCES
 
 
 def test_simple():
