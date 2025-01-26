@@ -40,15 +40,13 @@ def check_pin_equivariance(
         Function to be tested for equivariance. The first `num_multivector_args` positional
         arguments need to accept torch.Tensor inputs describing multivectors, and will be
         transformed as part of the equivariance test.
-    num_multivector_args: int or List[int]
+    num_multivector_args: int
         Number of multivector that `function` accepts.
-        For several multivectors, this is a list
-        Currently only lists with ones are supported
     fn_kwargs : dict with str keys
         Keyword arguments to call `function` with.
-    batch_dims : tuple of int or List[Tuple[int]]
-        Batch shape for the multivector inputs to `function`.
-        If this is a list of tuples, then there is one batch shape for each vector in use
+    batch_dims : Tuple[int] or List[Tuple[int]]
+        Batch shapes for the multivector inputs to `function`.
+        Expects List[Tuple[int]] if num_multivector_args==1
     spin : bool
         If True, this function tests Spin equivariance; if False, it tests Pin equivariance.
     rng : numpy.random.Generator or None
@@ -69,20 +67,15 @@ def check_pin_equivariance(
     if rng is not None:
         torch.manual_seed(rng.integers(100000))
 
-    if isinstance(num_multivector_args, int):
-        num_multivector_args = [num_multivector_args]
+    if num_multivector_args == 1:
         batch_dims = [batch_dims]
-    assert len(num_multivector_args) == len(batch_dims)
-    assert all(n == 1 for n in num_multivector_args)
+    assert num_multivector_args == len(batch_dims)
 
     # Loop over multiple checks
     for _ in range(num_checks):
         # Generate function inputs and Pin(3,0,1) transformations
         # Generate function inputs
-        inputs = [
-            torch.randn(num_args, *batch_dim, 16)
-            for num_args, batch_dim in zip(num_multivector_args, batch_dims)
-        ]
+        inputs = [torch.randn(*batch_dim, 16) for batch_dim in batch_dims]
 
         transform = SlowRandomPinTransform(rng=rng, spin=spin)
 
@@ -120,15 +113,13 @@ def check_pin_invariance(
         Function to be tested for equivariance. The first `num_multivector_args` positional
         arguments need to accept torch.Tensor inputs describing multivectors, and will be
         transformed as part of the invariance test.
-    num_multivector_args: int or List[int]
+    num_multivector_args: int
         Number of multivector that `function` accepts.
-        For several multivectors, this is a list
-        Currently only lists with ones are supported
     fn_kwargs : dict with str keys
         Keyword arguments to call `function` with.
-    batch_dims : tuple of int or List[Tuple[int]]
-        Batch shape for the multivector inputs to `function`.
-        If this is a list of tuples, then there is one batch shape for each vector in use
+    batch_dims : Tuple[int] or List[Tuple[int]]
+        Batch shapes for the multivector inputs to `function`.
+        Expects List[Tuple[int]] if num_multivector_args==1
     spin : bool
         If True, this function tests Spin equivariance; if False, it tests Pin equivariance.
         Since Spin is a subgroup of Pin, it is usually enough to confirm Pin equivariance.
@@ -150,19 +141,14 @@ def check_pin_invariance(
     if rng is not None:
         torch.manual_seed(rng.integers(100000))
 
-    if isinstance(num_multivector_args, int):
-        num_multivector_args = [num_multivector_args]
+    if num_multivector_args == 1:
         batch_dims = [batch_dims]
-    assert len(num_multivector_args) == len(batch_dims)
-    assert all(n == 1 for n in num_multivector_args)
+    assert num_multivector_args == len(batch_dims)
 
     # Loop over multiple checks
     for _ in range(num_checks):
         # Generate function inputs
-        inputs = [
-            torch.randn(num_args, *batch_dim, 16)
-            for num_args, batch_dim in zip(num_multivector_args, batch_dims)
-        ]
+        inputs = [torch.randn(*batch_dim, 16) for batch_dim in batch_dims]
 
         # Transform inputs with Pin(1,3)
         transform = SlowRandomPinTransform(rng=rng, spin=spin)

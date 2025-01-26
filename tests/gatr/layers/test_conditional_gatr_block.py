@@ -128,14 +128,13 @@ def test_conditional_gatr_block_equivariance(
         *batch_dims, num_items_condition, s_channels_condition
     )
 
-    num_multivector_args = [1, 1]
     data_dims = [
         tuple(list(batch_dims) + [num_items, mv_channels]),
         tuple(list(batch_dims) + [num_items_condition, mv_channels_condition]),
     ]
     check_pin_equivariance(
         net,
-        num_multivector_args,
+        2,
         batch_dims=data_dims,
         fn_kwargs=dict(scalars=scalars, scalars_condition=scalars_condition),
         **MILD_TOLERANCES

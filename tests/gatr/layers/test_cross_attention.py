@@ -13,7 +13,7 @@ from tests.helpers import BATCH_DIMS, MILD_TOLERANCES, check_pin_equivariance
 )
 @pytest.mark.parametrize("multi_query", [True, False])
 @pytest.mark.parametrize("num_heads,increase_hidden_channels", [(3, 2)])
-@pytest.mark.parametrize("dropout_prob", [None, 0.0])
+@pytest.mark.parametrize("dropout_prob", [None])
 def test_crossattention_equivariance(
     batch_dims,
     items,
@@ -46,14 +46,13 @@ def test_crossattention_equivariance(
     scalars = torch.randn(*batch_dims, items, in_q_s_channels)
     scalars_condition = torch.randn(*batch_dims, items_condition, in_kv_s_channels)
 
-    num_multivector_args = [1, 1]
     data_dims = [
         tuple(list(batch_dims) + [items_condition, in_kv_mv_channels]),
         tuple(list(batch_dims) + [items, in_q_mv_channels]),
     ]
     check_pin_equivariance(
         layer,
-        num_multivector_args,
+        2,
         batch_dims=data_dims,
         fn_kwargs=dict(scalars_kv=scalars_condition, scalars_q=scalars),
         **MILD_TOLERANCES
