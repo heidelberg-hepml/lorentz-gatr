@@ -7,6 +7,9 @@ pytest==7.0.1
 ## Standard science stack
 numpy>=1.25.0,<=1.26.4 # numpy>=1.25.0 is needed for pytorch-optimizer, numpy<=1.26.4 is needed for numba
 
+## Standard utils
+tqdm
+
 ## Deep learning
 einops
 opt_einsum
