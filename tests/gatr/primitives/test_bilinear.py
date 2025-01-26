@@ -24,4 +24,6 @@ def test_geometric_product_correctness(batch_dims):
 @pytest.mark.parametrize("batch_dims", BATCH_DIMS)
 def test_geometric_product_equivariance(batch_dims):
     """Tests the geometric_product() primitive for equivariance."""
-    check_pin_equivariance(geometric_product, 2, batch_dims=batch_dims, **TOLERANCES)
+    check_pin_equivariance(
+        geometric_product, 2, batch_dims=[batch_dims] * 2, **TOLERANCES
+    )

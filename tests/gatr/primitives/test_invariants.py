@@ -56,7 +56,7 @@ def test_squared_norm_of_vector(vector, true_squared_norm):
 @pytest.mark.parametrize("batch_dims", BATCH_DIMS)
 def test_inner_product_invariance(batch_dims):
     """Tests the innner_product() primitive for equivariance."""
-    check_pin_invariance(inner_product, 2, batch_dims=batch_dims, **TOLERANCES)
+    check_pin_invariance(inner_product, 2, batch_dims=[batch_dims] * 2, **TOLERANCES)
 
 
 @pytest.mark.parametrize("batch_dims", BATCH_DIMS)

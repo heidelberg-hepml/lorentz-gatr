@@ -44,8 +44,9 @@ def check_pin_equivariance(
         Number of multivector that `function` accepts.
     fn_kwargs : dict with str keys
         Keyword arguments to call `function` with.
-    batch_dims : tuple of int
-        Batch shape for the multivector inputs to `function`.
+    batch_dims : Tuple[int] or List[Tuple[int]]
+        Batch shapes for the multivector inputs to `function`.
+        Expects List[Tuple[int]] if num_multivector_args==1
     spin : bool
         If True, this function tests Spin equivariance; if False, it tests Pin equivariance.
     rng : numpy.random.Generator or None
@@ -66,10 +67,16 @@ def check_pin_equivariance(
     if rng is not None:
         torch.manual_seed(rng.integers(100000))
 
+    if num_multivector_args == 1:
+        batch_dims = [batch_dims]
+    assert num_multivector_args == len(batch_dims)
+
     # Loop over multiple checks
     for _ in range(num_checks):
         # Generate function inputs and Pin(3,0,1) transformations
-        inputs = torch.randn(num_multivector_args, *batch_dims, 16)
+        # Generate function inputs
+        inputs = [torch.randn(*batch_dim, 16) for batch_dim in batch_dims]
+
         transform = SlowRandomPinTransform(rng=rng, spin=spin)
 
         # First function, then transformation
@@ -77,7 +84,7 @@ def check_pin_equivariance(
         transformed_outputs = transform(outputs)
 
         # First transformation, then function
-        transformed_inputs = transform(inputs)
+        transformed_inputs = [transform(inputss) for inputss in inputs]
         outputs_of_transformed = get_first_output(
             function(*transformed_inputs, **fn_kwargs)
         )
@@ -110,8 +117,9 @@ def check_pin_invariance(
         Number of multivector that `function` accepts.
     fn_kwargs : dict with str keys
         Keyword arguments to call `function` with.
-    batch_dims : tuple of int
-        Batch shape for the multivector inputs to `function`.
+    batch_dims : Tuple[int] or List[Tuple[int]]
+        Batch shapes for the multivector inputs to `function`.
+        Expects List[Tuple[int]] if num_multivector_args==1
     spin : bool
         If True, this function tests Spin equivariance; if False, it tests Pin equivariance.
         Since Spin is a subgroup of Pin, it is usually enough to confirm Pin equivariance.
@@ -133,14 +141,18 @@ def check_pin_invariance(
     if rng is not None:
         torch.manual_seed(rng.integers(100000))
 
+    if num_multivector_args == 1:
+        batch_dims = [batch_dims]
+    assert num_multivector_args == len(batch_dims)
+
     # Loop over multiple checks
     for _ in range(num_checks):
         # Generate function inputs
-        inputs = torch.randn(num_multivector_args, *batch_dims, 16)
+        inputs = [torch.randn(*batch_dim, 16) for batch_dim in batch_dims]
 
         # Transform inputs with Pin(1,3)
         transform = SlowRandomPinTransform(rng=rng, spin=spin)
-        transformed_inputs = transform(inputs)
+        transformed_inputs = [transform(inputss) for inputss in inputs]
 
         # Evaluate function on original and transformed inputs
         outputs = get_first_output(function(*inputs, **fn_kwargs))
