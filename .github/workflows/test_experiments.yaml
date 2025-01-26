@@ -2,8 +2,6 @@ name: Full tests for several python versions
 
 on:
   push:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:
