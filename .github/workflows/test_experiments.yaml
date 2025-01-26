@@ -1,7 +1,9 @@
-name: Full tests with several python versions
+name: Full unit tests
 
 on:
   push:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -28,6 +30,6 @@ jobs:
         pip install -r requirements.txt
 
     # Step 4: Run tests
-    - name: Run tests
+    - name: Run all units tests
       run: |
         pytest tests

@@ -1,4 +1,4 @@
-name: GATr architecture tests
+name: GATr architecture unit tests
 
 on:
   push:
@@ -27,6 +27,6 @@ jobs:
         pip install -r requirements_minimal.txt
 
     # Step 4: Run tests
-    - name: Run tests
+    - name: Run GATr unit tests
       run: |
         pytest tests/gatr
