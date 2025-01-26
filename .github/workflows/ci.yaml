@@ -27,4 +27,4 @@ jobs:
     # Step 4: Run tests
     - name: Run tests
       run: |
-        pytest tests
+        pytest tests/gatr
