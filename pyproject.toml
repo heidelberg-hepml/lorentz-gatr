@@ -6,17 +6,18 @@ build-backend = "setuptools.build_meta"
 name = "lorentz-gatr"
 version = "1.0.0"
 description = "A versatile Lorentz-equivariant transformer for high-energy physics"
-requires-python = ">=3.10" # tested with 3.10.12 and 3.11.2
+requires-python = ">=3.9,<=3.11" # newer versions have issues with numba/clifford
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "Jonas Spinner", email = "j.spinner@thphys.uni-heidelberg.de"}]
 dependencies = [
-    "torch>=2.0",
-    "numpy<1.25",
+    "torch>=2.2",
+    "numpy>=1.25,<=1.26.4",
     "einops",
-    "opt_einsum @ git+https://github.com/dgasmith/opt_einsum.git@1a984b7b75f3e532e7129f6aa13f7ddc3da66e10",
-    "xformers",
-    "clifford==1.4.0",
+    "opt_einsum",
+    "xformers==0.0.24",
+    "clifford>=1.4.0",
+    "numba==0.58.1",
 ]
 
 [project.urls]
