@@ -138,7 +138,7 @@ class BaselineSelfAttention(nn.Module):
     pos_encoding : bool
         Whether to apply rotary positional embeddings along the item dimension to the scalar keys
         and queries.
-    pos_enc_base : int
+    pos_encoding_base : int
         Maximum frequency used in positional encodings. (The minimum frequency is always 1.)
     multi_query : bool
         Use multi-query attention instead of multi-head attention.
@@ -151,7 +151,7 @@ class BaselineSelfAttention(nn.Module):
         hidden_channels: int,
         num_heads: int = 8,
         pos_encoding: bool = False,
-        pos_enc_base: int = 4096,
+        pos_encoding_base: int = 4096,
         multi_query: bool = True,
         dropout_prob=None,
     ) -> None:
@@ -169,7 +169,7 @@ class BaselineSelfAttention(nn.Module):
         # Optional positional encoding
         if pos_encoding:
             self.pos_encoding = ApplyRotaryPositionalEncoding(
-                hidden_channels, item_dim=-2, base=pos_enc_base
+                hidden_channels, item_dim=-2, base=pos_encoding_base
             )
         else:
             self.pos_encoding = None
@@ -300,7 +300,7 @@ class BaselineTransformerBlock(nn.Module):
             hidden_channels,
             num_heads=num_heads,
             pos_encoding=pos_encoding,
-            pos_enc_base=pos_encoding_base,
+            pos_encoding_base=pos_encoding_base,
             multi_query=multi_query,
             dropout_prob=dropout_prob,
         )
@@ -428,8 +428,12 @@ class Transformer(nn.Module):
         h = self.linear_in(inputs)
         for block in self.blocks:
             if self.checkpoint_blocks:
-                fn = partial(block, attention_mask=attention_mask, is_causal=is_causal)
-                h = checkpoint(fn, h)
+                h = checkpoint(
+                    block,
+                    inputs=h,
+                    attention_mask=attention_mask,
+                    is_causal=is_causal,
+                )
             else:
                 h = block(h, attention_mask=attention_mask, is_causal=is_causal)
         outputs = self.linear_out(h)

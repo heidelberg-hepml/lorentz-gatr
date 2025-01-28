@@ -101,6 +101,9 @@ class ConditionalGATr(nn.Module):
             in_s_channels=condition_s_channels,
             out_s_channels=hidden_s_channels,
         )
+        attention = SelfAttentionConfig.cast(attention)
+        crossattention = CrossAttentionConfig.cast(crossattention)
+        attention_condition = SelfAttentionConfig.cast(attention_condition)
         mlp = MLPConfig.cast(mlp)
         self.condition_blocks = nn.ModuleList(
             [
