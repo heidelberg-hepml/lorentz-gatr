@@ -40,11 +40,9 @@ class SelfAttention(nn.Module):
         self.out_linear = EquiLinear(
             in_mv_channels=config.hidden_mv_channels * config.num_heads,
             out_mv_channels=config.out_mv_channels,
-            in_s_channels=(
-                None
-                if config.in_s_channels is None
-                else config.hidden_s_channels * config.num_heads
-            ),
+            in_s_channels=None
+            if config.in_s_channels is None
+            else config.hidden_s_channels * config.num_heads,
             out_s_channels=config.out_s_channels,
             initialization=config.output_init,
         )
@@ -53,7 +51,7 @@ class SelfAttention(nn.Module):
         self.pos_encoding: nn.Module
         if config.pos_encoding:
             self.pos_encoding = ApplyRotaryPositionalEncoding(
-                config.hidden_s_channels, item_dim=-2, base=config.pos_encoding_base
+                config.hidden_s_channels, item_dim=-2, base=config.pos_enc_base
             )
         else:
             self.pos_encoding = nn.Identity()
