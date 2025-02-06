@@ -29,7 +29,7 @@ class SelfAttentionConfig:
     pos_encoding : bool
         Whether to apply rotary positional embeddings along the item dimension to the scalar keys
         and queries.
-    pos_enc_base : int
+    pos_encoding_base : int
         Base for the frequencies in the positional encoding.
     output_init : str
         Initialization scheme for final linear layer
@@ -50,7 +50,7 @@ class SelfAttentionConfig:
     additional_qk_mv_channels: int = 0
     additional_qk_s_channels: int = 0
     pos_encoding: bool = False
-    pos_enc_base: int = 4096
+    pos_encoding_base: int = 4096
     output_init: str = "default"
     checkpoint: bool = True
     increase_hidden_channels: int = 2
