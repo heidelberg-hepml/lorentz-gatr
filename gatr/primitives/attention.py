@@ -134,7 +134,7 @@ def scaled_dot_product_attention(
         out = memory_efficient_attention(
             query.contiguous(),
             key.contiguous(),
-            value,
+            value.contiguous(),
             attn_bias=attn_mask,
         )
         out = out.transpose(1, 2)  # [batch, item, head, d] -> [batch, head, item, d]
