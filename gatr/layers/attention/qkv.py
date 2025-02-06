@@ -4,6 +4,7 @@ from torch import nn
 
 from gatr.layers.attention.config import SelfAttentionConfig
 from gatr.layers.linear import EquiLinear
+from gatr.layers.layer_norm import EquiLayerNorm
 
 
 class QKVModule(nn.Module):
@@ -223,5 +224,9 @@ class MultiQueryQKVModule(nn.Module):
             )
         else:
             q_s, k_s, v_s = None, None, None
+
+        q_mv, q_s = self.norm_qkv(q_mv, scalars=q_s)
+        k_mv, k_s = self.norm_qkv(k_mv, scalars=k_s)
+        v_mv, v_s = self.norm_qkv(v_mv, scalars=v_s)
 
         return q_mv, k_mv, v_mv, q_s, k_s, v_s
