@@ -26,6 +26,7 @@ class QKVModule(nn.Module):
             if config.in_s_channels is None
             else 3 * config.hidden_s_channels * config.num_heads,
         )
+        self.norm_qkv = EquiLayerNorm()
         self.config = config
 
     def forward(
