@@ -1,4 +1,4 @@
-name: GATr architecture tests
+name: GATr architecture unit tests
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.10'
+        python-version: '3.11'
 
     # Step 3: Install dependencies
     - name: Install dependencies
@@ -27,6 +27,6 @@ jobs:
         pip install -r requirements_minimal.txt
 
     # Step 4: Run tests
-    - name: Run tests
+    - name: Run GATr unit tests
       run: |
         pytest tests/gatr

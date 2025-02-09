@@ -2,17 +2,17 @@
 # to run experiments/ you need requirements.txt
 
 ## Code quality
-pytest==7.0.1
+pytest>=7.0.1
 
 ## Standard science stack
-numpy>=1.25.0,<=1.26.4 # numpy>=1.25.0 is needed for pytorch-optimizer, numpy<=1.26.4 is needed for numba
+numpy<=1.26.4 # numpy<=1.26.4 is needed for numba
 
 ## Deep learning
 einops
 opt_einsum
-torch==2.2.0
+torch>=2.2.0
 
 ## Project-specific: general
-clifford==1.4.0
-numba==0.58.1 # otherwise has conflicts
+clifford>=1.4.0
+numba==0.58.1 # clifford uses old numba code
 xformers==0.0.24 # there exists known compatibility issues with xformers on Mac systems
