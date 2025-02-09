@@ -32,6 +32,7 @@ class CrossAttention(nn.Module):
 
         self.num_heads = num_heads
         self.hidden_channels = hidden_channels
+        self.multi_query = multi_query
 
         self.q_linear = nn.Linear(in_q_channels, hidden_channels * num_heads)
         self.kv_linear = nn.Linear(
@@ -50,8 +51,28 @@ class CrossAttention(nn.Module):
         q = self.q_linear(q)
         k, v = torch.tensor_split(self.kv_linear(kv), 2, dim=-1)
 
+        q = rearrange(
+            q,
+            "... num_items (num_heads hidden_channels) -> ... num_heads num_items hidden_channels",
+            num_heads=self.num_heads,
+        )
+        if self.multi_query:
+            k = k.unsqueeze(-3)
+            v = v.unsqueeze(-3)
+        else:
+            k = rearrange(
+                k,
+                "... num_items (num_heads hidden_channels) -> ... num_heads num_items hidden_channels",
+                num_heads=self.num_heads,
+            )
+            v = rearrange(
+                v,
+                "... num_items (num_heads hidden_channels) -> ... num_heads num_items hidden_channels",
+                num_heads=self.num_heads,
+            )
+
         # Attention layer
-        h = BaselineSelfAttention._attend(q, k, v, attention_mask)
+        h = self._attend(q, k, v, attention_mask)
 
         # Concatenate heads and transform linearly
         h = rearrange(
@@ -62,6 +83,30 @@ class CrossAttention(nn.Module):
 
         if self.dropout is not None:
             outputs = self.dropout(outputs)
+
+        return outputs
+
+    @staticmethod
+    def _attend(q, k, v, attention_mask=None, is_causal=False):
+        """Scaled dot-product attention."""
+
+        # Add batch dimension if needed
+        bh_shape = q.shape[:-2]
+        q = to_nd(q, 4)
+        k = to_nd(k, 4)
+        v = to_nd(v, 4)
+
+        # SDPA
+        outputs = scaled_dot_product_attention(
+            q.contiguous(),
+            k.contiguous(),
+            v.contiguous(),
+            attn_mask=attention_mask,
+            is_causal=is_causal,
+        )
+
+        # Return batch dimensions to inputs
+        outputs = outputs.view(*bh_shape, *outputs.shape[-2:])
 
         return outputs
 
@@ -132,7 +177,7 @@ class ConditionalTransformer(nn.Module):
     def __init__(
         self,
         in_channels: int,
-        condition_in_channels: int,
+        condition_channels: int,
         out_channels: int,
         hidden_channels: int,
         num_blocks: int = 10,
@@ -145,7 +190,7 @@ class ConditionalTransformer(nn.Module):
         super().__init__()
         self.checkpoint_blocks = checkpoint_blocks
         self.linear_in = nn.Linear(in_channels, hidden_channels)
-        self.condition_linear_in = nn.Linear(condition_in_channels, hidden_channels)
+        self.condition_linear_in = nn.Linear(condition_channels, hidden_channels)
 
         self.condition_blocks = nn.ModuleList(
             [
