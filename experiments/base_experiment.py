@@ -98,7 +98,7 @@ class BaseExperiment:
         if self.cfg.evaluate:
             self.evaluate()
 
-        if self.cfg.plot and self.cfg.save and self.is_master:
+        if self.cfg.plot and self.cfg.save:
             self.plot()
 
         if self.device == torch.device("cuda"):
@@ -230,6 +230,9 @@ class BaseExperiment:
                 self.cfg.warm_start_idx = 0
                 self.cfg.run_name = run_name
                 self.cfg.run_dir = run_dir
+
+            # only save main process
+            self.cfg.save = self.cfg.save and self.is_master
 
             # only use mlflow if save=True
             self.cfg.use_mlflow = (

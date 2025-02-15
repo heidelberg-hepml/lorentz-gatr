@@ -366,7 +366,7 @@ class AmplitudeExperiment(BaseExperiment):
         dataset_titles = [
             DATASET_TITLE_DICT[dataset] for dataset in self.cfg.data.dataset
         ]
-        model_title = MODEL_TITLE_DICT[type(self.model.net).__name__]
+        model_title = MODEL_TITLE_DICT[self.cfg.model.net._target_.rsplit(".", 1)[-1]]
         title = [f"{model_title}: {dataset_title}" for dataset_title in dataset_titles]
         LOGGER.info(f"Creating plots in {plot_path}")
 

@@ -16,8 +16,6 @@ from experiments.tagging.embedding import embed_tagging_data_into_ga
 from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
 
-MODEL_TITLE_DICT = {"GATr": "GATr"}
-
 
 class TaggingExperiment(BaseExperiment):
     """
@@ -223,7 +221,7 @@ class TaggingExperiment(BaseExperiment):
     def plot(self):
         plot_path = os.path.join(self.cfg.run_dir, f"plots_{self.cfg.run_idx}")
         os.makedirs(plot_path, exist_ok=True)
-        model_title = MODEL_TITLE_DICT[type(self.model.net).__name__]
+        model_title = self.cfg.model.net._target_.rsplit(".", 1)[-1]
         title = model_title
         LOGGER.info(f"Creating plots in {plot_path}")
 
