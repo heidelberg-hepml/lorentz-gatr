@@ -167,22 +167,49 @@ class EventGenerationExperiment(BaseExperiment):
             self.data_prepd.append(data_prepd)
 
         # create dataloaders
-        self.train_loader = EventDataLoader(
-            dataset=EventDataset([x["trn"] for x in self.data_prepd], dtype=self.dtype),
-            batch_size=self.cfg.training.batchsize,
+        train_dataset = EventDataset(
+            [x["trn"] for x in self.data_prepd], dtype=self.dtype
+        )
+        train_sampler = torch.utils.data.DistributedSampler(
+            train_dataset,
+            num_replicas=self.world_size,
+            rank=self.rank,
             shuffle=True,
         )
-
-        self.test_loader = EventDataLoader(
-            dataset=EventDataset([x["tst"] for x in self.data_prepd], dtype=self.dtype),
-            batch_size=self.cfg.evaluation.batchsize,
-            shuffle=False,
+        self.train_loader = EventDataLoader(
+            dataset=train_dataset,
+            batch_size=self.cfg.training.batchsize,
+            sampler=train_sampler,
         )
 
-        self.val_loader = EventDataLoader(
-            dataset=EventDataset([x["val"] for x in self.data_prepd], dtype=self.dtype),
-            batch_size=self.cfg.evaluation.batchsize,
+        test_dataset = EventDataset(
+            [x["tst"] for x in self.data_prepd], dtype=self.dtype
+        )
+        test_sampler = torch.utils.data.DistributedSampler(
+            test_dataset,
+            num_replicas=self.world_size,
+            rank=self.rank,
             shuffle=False,
+        )
+        self.test_loader = EventDataLoader(
+            dataset=test_dataset,
+            batch_size=self.cfg.evaluation.batchsize,
+            sampler=test_sampler,
+        )
+
+        val_dataset = EventDataset(
+            [x["val"] for x in self.data_prepd], dtype=self.dtype
+        )
+        val_sampler = torch.utils.data.DistributedSampler(
+            val_dataset,
+            num_replicas=self.world_size,
+            rank=self.rank,
+            shuffle=False,
+        )
+        self.val_loader = EventDataLoader(
+            dataset=val_dataset,
+            batch_size=self.cfg.evaluation.batchsize,
+            sampler=val_sampler,
         )
 
         LOGGER.info(

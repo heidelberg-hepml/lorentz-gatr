@@ -81,20 +81,38 @@ class TaggingExperiment(BaseExperiment):
         LOGGER.info(f"Finished creating datasets after {dt:.2f} s = {dt/60:.2f} min")
 
     def _init_dataloader(self):
+        train_sampler = torch.utils.data.DistributedSampler(
+            self.data_train,
+            num_replicas=self.world_size,
+            rank=self.rank,
+            shuffle=True,
+        )
         self.train_loader = DataLoader(
             dataset=self.data_train,
             batch_size=self.cfg.training.batchsize,
-            shuffle=True,
+            sampler=train_sampler,
+        )
+        test_sampler = torch.utils.data.DistributedSampler(
+            self.data_test,
+            num_replicas=self.world_size,
+            rank=self.rank,
+            shuffle=False,
         )
         self.test_loader = DataLoader(
             dataset=self.data_test,
             batch_size=self.cfg.evaluation.batchsize,
+            sampler=test_sampler,
+        )
+        val_sampler = torch.utils.data.DistributedSampler(
+            self.data_val,
+            num_replicas=self.world_size,
+            rank=self.rank,
             shuffle=False,
         )
         self.val_loader = DataLoader(
             dataset=self.data_val,
             batch_size=self.cfg.evaluation.batchsize,
-            shuffle=False,
+            sampler=val_sampler,
         )
 
         LOGGER.info(

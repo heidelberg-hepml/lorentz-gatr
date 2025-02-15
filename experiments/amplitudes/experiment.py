@@ -183,28 +183,49 @@ class AmplitudeExperiment(BaseExperiment):
             )
 
         # create dataloaders
-        self.train_loader = torch.utils.data.DataLoader(
-            dataset=AmplitudeDataset(
-                train_sets["particles"], train_sets["amplitudes"], dtype=self.dtype
-            ),
-            batch_size=self.cfg.training.batchsize,
+        train_dataset = AmplitudeDataset(
+            train_sets["particles"], train_sets["amplitudes"], dtype=self.dtype
+        )
+        train_sampler = torch.utils.data.DistributedSampler(
+            train_dataset,
+            num_replicas=self.world_size,
+            rank=self.rank,
             shuffle=True,
         )
-
-        self.test_loader = torch.utils.data.DataLoader(
-            dataset=AmplitudeDataset(
-                test_sets["particles"], test_sets["amplitudes"], dtype=self.dtype
-            ),
-            batch_size=self.cfg.evaluation.batchsize,
-            shuffle=False,
+        self.train_loader = torch.utils.data.DataLoader(
+            dataset=train_dataset,
+            batch_size=self.cfg.training.batchsize // self.world_size,
+            sampler=train_sampler,
         )
 
-        self.val_loader = torch.utils.data.DataLoader(
-            dataset=AmplitudeDataset(
-                val_sets["particles"], val_sets["amplitudes"], dtype=self.dtype
-            ),
-            batch_size=self.cfg.evaluation.batchsize,
+        test_dataset = AmplitudeDataset(
+            test_sets["particles"], test_sets["amplitudes"], dtype=self.dtype
+        )
+        test_sampler = torch.utils.data.DistributedSampler(
+            test_dataset,
+            num_replicas=self.world_size,
+            rank=self.rank,
             shuffle=False,
+        )
+        self.test_loader = torch.utils.data.DataLoader(
+            dataset=test_dataset,
+            batch_size=self.cfg.evaluation.batchsize // self.world_size,
+            sampler=test_sampler,
+        )
+
+        val_dataset = AmplitudeDataset(
+            val_sets["particles"], val_sets["amplitudes"], dtype=self.dtype
+        )
+        val_sampler = torch.utils.data.DistributedSampler(
+            val_dataset,
+            num_replicas=self.world_size,
+            rank=self.rank,
+            shuffle=False,
+        )
+        self.val_loader = torch.utils.data.DataLoader(
+            dataset=val_dataset,
+            batch_size=self.cfg.evaluation.batchsize // self.world_size,
+            sampler=val_sampler,
         )
 
         LOGGER.info(

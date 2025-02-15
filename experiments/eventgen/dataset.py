@@ -4,7 +4,7 @@ import torch
 class EventDataset(torch.utils.data.Dataset):
     def __init__(self, events, dtype):
         self.events = [
-            torch.tensor(events_onedataset, dtype=dtype) for events_onedataset in events
+            events_onedataset.to(dtype=dtype) for events_onedataset in events
         ]
         self.events_eff = [e.clone() for e in self.events]
         self.lens = [len(events_onedataset) for events_onedataset in self.events]
@@ -20,9 +20,11 @@ class EventDataset(torch.utils.data.Dataset):
 
 
 class EventDataLoader(torch.utils.data.DataLoader):
-    def __init__(self, dataset, batch_size, shuffle=True, drop_last=False):
+    def __init__(self, *args, shuffle=None, **kwargs):
         super().__init__(
-            dataset, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
+            *args,
+            shuffle=shuffle,
+            **kwargs,
         )
         self.shuffle = shuffle
 

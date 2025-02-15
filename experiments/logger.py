@@ -11,3 +11,12 @@ LOGGER = logging.getLogger("lorentz-gatr")
 LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(MEMORY_HANDLER)
 LOGGING_INITIALIZED = False
+
+
+class RankFilter(logging.Filter):
+    def __init__(self, rank=0):
+        super().__init__()
+        self.rank = rank
+
+    def filter(self, record):
+        return self.rank == 0
