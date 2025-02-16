@@ -130,7 +130,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
         )
         self.train_loader = DataLoader(
             dataset=self.data_train,
-            batch_size=self.cfg.training.batchsize,
+            batch_size=self.cfg.training.batchsize // self.world_size,
             drop_last=True,
             num_workers=num_workers["train"],
             sampler=train_sampler,
@@ -143,7 +143,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
         )
         self.val_loader = DataLoader(
             dataset=self.data_val,
-            batch_size=self.cfg.evaluation.batchsize,
+            batch_size=self.cfg.evaluation.batchsize // self.world_size,
             drop_last=True,
             num_workers=num_workers["val"],
             sampler=val_sampler,
@@ -156,7 +156,7 @@ class JetClassTaggingExperiment(TaggingExperiment):
         )
         self.test_loader = DataLoader(
             dataset=self.data_test,
-            batch_size=self.cfg.evaluation.batchsize,
+            batch_size=self.cfg.evaluation.batchsize // self.world_size,
             drop_last=False,
             num_workers=num_workers["test"],
             sampler=test_sampler,

@@ -178,7 +178,7 @@ class EventGenerationExperiment(BaseExperiment):
         )
         self.train_loader = EventDataLoader(
             dataset=train_dataset,
-            batch_size=self.cfg.training.batchsize,
+            batch_size=self.cfg.training.batchsize // self.world_size,
             sampler=train_sampler,
         )
 
@@ -193,7 +193,7 @@ class EventGenerationExperiment(BaseExperiment):
         )
         self.test_loader = EventDataLoader(
             dataset=test_dataset,
-            batch_size=self.cfg.evaluation.batchsize,
+            batch_size=self.cfg.evaluation.batchsize // self.world_size,
             sampler=test_sampler,
         )
 
@@ -208,7 +208,7 @@ class EventGenerationExperiment(BaseExperiment):
         )
         self.val_loader = EventDataLoader(
             dataset=val_dataset,
-            batch_size=self.cfg.evaluation.batchsize,
+            batch_size=self.cfg.evaluation.batchsize // self.world_size,
             sampler=val_sampler,
         )
 

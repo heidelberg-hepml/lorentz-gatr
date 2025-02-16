@@ -87,7 +87,7 @@ class TaggingExperiment(BaseExperiment):
         )
         self.train_loader = DataLoader(
             dataset=self.data_train,
-            batch_size=self.cfg.training.batchsize,
+            batch_size=self.cfg.training.batchsize // self.world_size,
             sampler=train_sampler,
         )
         test_sampler = torch.utils.data.DistributedSampler(
@@ -98,7 +98,7 @@ class TaggingExperiment(BaseExperiment):
         )
         self.test_loader = DataLoader(
             dataset=self.data_test,
-            batch_size=self.cfg.evaluation.batchsize,
+            batch_size=self.cfg.evaluation.batchsize // self.world_size,
             sampler=test_sampler,
         )
         val_sampler = torch.utils.data.DistributedSampler(
@@ -109,7 +109,7 @@ class TaggingExperiment(BaseExperiment):
         )
         self.val_loader = DataLoader(
             dataset=self.data_val,
-            batch_size=self.cfg.evaluation.batchsize,
+            batch_size=self.cfg.evaluation.batchsize // self.world_size,
             sampler=val_sampler,
         )
 
