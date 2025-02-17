@@ -35,7 +35,7 @@ MIN_STEP_SKIP = 1000
 
 
 class BaseExperiment:
-    def __init__(self, cfg, rank, world_size):
+    def __init__(self, cfg, rank=0, world_size=1):
         self.cfg = cfg
         self.rank = rank
         self.world_size = world_size

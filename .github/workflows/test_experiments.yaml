@@ -1,18 +1,15 @@
-name: Full unit tests
+name: Experiment unit test
 
 on:
   push:
     branches:
       - main
+  pull_request:
   workflow_dispatch:
 
 jobs:
   test:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        python-version: ['3.9', '3.10', '3.11']
 
     steps:
     - name: Checkout code
@@ -21,7 +18,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: '3.11'
 
     # Step 3: Install dependencies
     - name: Install dependencies
