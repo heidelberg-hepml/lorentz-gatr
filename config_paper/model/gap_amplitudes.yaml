@@ -8,7 +8,7 @@ net:
  hidden_mv_channels: 96
 
  in_s_channels: 1
- out_s_channels: 1
+ out_s_channels: null
  hidden_s_channels: 96
 
  num_blocks: 8
