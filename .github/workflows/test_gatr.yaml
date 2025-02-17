@@ -1,4 +1,4 @@
-name: GATr architecture unit tests
+name: Architecture unit tests
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: ['3.9', '3.10', '3.11']
 
     # Step 3: Install dependencies
     - name: Install dependencies
