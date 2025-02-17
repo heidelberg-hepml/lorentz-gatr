@@ -133,7 +133,7 @@ class AmplitudeExperiment(BaseExperiment):
 
             # preprocess data
             amplitudes_prepd, prepd_mean, prepd_std = preprocess_amplitude(amplitudes)
-            if type(self.model.net).__name__ in BASELINE_MODELS:
+            if self.cfg.model.net._target_.rsplit(".", 1)[-1] in BASELINE_MODELS:
                 particles_prepd, _, _ = preprocess_particles(particles)
             else:
                 particles_prepd = particles / particles.std()
@@ -183,28 +183,49 @@ class AmplitudeExperiment(BaseExperiment):
             )
 
         # create dataloaders
-        self.train_loader = torch.utils.data.DataLoader(
-            dataset=AmplitudeDataset(
-                train_sets["particles"], train_sets["amplitudes"], dtype=self.dtype
-            ),
-            batch_size=self.cfg.training.batchsize,
+        train_dataset = AmplitudeDataset(
+            train_sets["particles"], train_sets["amplitudes"], dtype=self.dtype
+        )
+        train_sampler = torch.utils.data.DistributedSampler(
+            train_dataset,
+            num_replicas=self.world_size,
+            rank=self.rank,
             shuffle=True,
         )
-
-        self.test_loader = torch.utils.data.DataLoader(
-            dataset=AmplitudeDataset(
-                test_sets["particles"], test_sets["amplitudes"], dtype=self.dtype
-            ),
-            batch_size=self.cfg.evaluation.batchsize,
-            shuffle=False,
+        self.train_loader = torch.utils.data.DataLoader(
+            dataset=train_dataset,
+            batch_size=self.cfg.training.batchsize // self.world_size,
+            sampler=train_sampler,
         )
 
-        self.val_loader = torch.utils.data.DataLoader(
-            dataset=AmplitudeDataset(
-                val_sets["particles"], val_sets["amplitudes"], dtype=self.dtype
-            ),
-            batch_size=self.cfg.evaluation.batchsize,
+        test_dataset = AmplitudeDataset(
+            test_sets["particles"], test_sets["amplitudes"], dtype=self.dtype
+        )
+        test_sampler = torch.utils.data.DistributedSampler(
+            test_dataset,
+            num_replicas=self.world_size,
+            rank=self.rank,
             shuffle=False,
+        )
+        self.test_loader = torch.utils.data.DataLoader(
+            dataset=test_dataset,
+            batch_size=self.cfg.evaluation.batchsize // self.world_size,
+            sampler=test_sampler,
+        )
+
+        val_dataset = AmplitudeDataset(
+            val_sets["particles"], val_sets["amplitudes"], dtype=self.dtype
+        )
+        val_sampler = torch.utils.data.DistributedSampler(
+            val_dataset,
+            num_replicas=self.world_size,
+            rank=self.rank,
+            shuffle=False,
+        )
+        self.val_loader = torch.utils.data.DataLoader(
+            dataset=val_dataset,
+            batch_size=self.cfg.evaluation.batchsize // self.world_size,
+            sampler=val_sampler,
         )
 
         LOGGER.info(
@@ -345,7 +366,7 @@ class AmplitudeExperiment(BaseExperiment):
         dataset_titles = [
             DATASET_TITLE_DICT[dataset] for dataset in self.cfg.data.dataset
         ]
-        model_title = MODEL_TITLE_DICT[type(self.model.net).__name__]
+        model_title = MODEL_TITLE_DICT[self.cfg.model.net._target_.rsplit(".", 1)[-1]]
         title = [f"{model_title}: {dataset_title}" for dataset_title in dataset_titles]
         LOGGER.info(f"Creating plots in {plot_path}")
 

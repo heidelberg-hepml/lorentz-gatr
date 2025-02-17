@@ -123,25 +123,43 @@ class JetClassTaggingExperiment(TaggingExperiment):
             label: min(self.cfg.jc_params.num_workers, self.num_files[label])
             for label in ["train", "test", "val"]
         }
+        train_sampler = torch.utils.data.DistributedSampler(
+            self.data_train,
+            num_replicas=self.world_size,
+            rank=self.rank,
+        )
         self.train_loader = DataLoader(
             dataset=self.data_train,
-            batch_size=self.cfg.training.batchsize,
+            batch_size=self.cfg.training.batchsize // self.world_size,
             drop_last=True,
             num_workers=num_workers["train"],
+            sampler=train_sampler,
             **self.loader_kwargs,
+        )
+        val_sampler = torch.utils.data.DistributedSampler(
+            self.data_val,
+            num_replicas=self.world_size,
+            rank=self.rank,
         )
         self.val_loader = DataLoader(
             dataset=self.data_val,
-            batch_size=self.cfg.evaluation.batchsize,
+            batch_size=self.cfg.evaluation.batchsize // self.world_size,
             drop_last=True,
             num_workers=num_workers["val"],
+            sampler=val_sampler,
             **self.loader_kwargs,
+        )
+        test_sampler = torch.utils.data.DistributedSampler(
+            self.data_test,
+            num_replicas=self.world_size,
+            rank=self.rank,
         )
         self.test_loader = DataLoader(
             dataset=self.data_test,
-            batch_size=self.cfg.evaluation.batchsize,
+            batch_size=self.cfg.evaluation.batchsize // self.world_size,
             drop_last=False,
             num_workers=num_workers["test"],
+            sampler=test_sampler,
             **self.loader_kwargs,
         )
 

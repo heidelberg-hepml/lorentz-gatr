@@ -16,8 +16,6 @@ from experiments.tagging.embedding import embed_tagging_data_into_ga
 from experiments.logger import LOGGER
 from experiments.mlflow import log_mlflow
 
-MODEL_TITLE_DICT = {"GATr": "GATr"}
-
 
 class TaggingExperiment(BaseExperiment):
     """
@@ -81,20 +79,38 @@ class TaggingExperiment(BaseExperiment):
         LOGGER.info(f"Finished creating datasets after {dt:.2f} s = {dt/60:.2f} min")
 
     def _init_dataloader(self):
+        train_sampler = torch.utils.data.DistributedSampler(
+            self.data_train,
+            num_replicas=self.world_size,
+            rank=self.rank,
+            shuffle=True,
+        )
         self.train_loader = DataLoader(
             dataset=self.data_train,
-            batch_size=self.cfg.training.batchsize,
-            shuffle=True,
+            batch_size=self.cfg.training.batchsize // self.world_size,
+            sampler=train_sampler,
+        )
+        test_sampler = torch.utils.data.DistributedSampler(
+            self.data_test,
+            num_replicas=self.world_size,
+            rank=self.rank,
+            shuffle=False,
         )
         self.test_loader = DataLoader(
             dataset=self.data_test,
-            batch_size=self.cfg.evaluation.batchsize,
+            batch_size=self.cfg.evaluation.batchsize // self.world_size,
+            sampler=test_sampler,
+        )
+        val_sampler = torch.utils.data.DistributedSampler(
+            self.data_val,
+            num_replicas=self.world_size,
+            rank=self.rank,
             shuffle=False,
         )
         self.val_loader = DataLoader(
             dataset=self.data_val,
-            batch_size=self.cfg.evaluation.batchsize,
-            shuffle=False,
+            batch_size=self.cfg.evaluation.batchsize // self.world_size,
+            sampler=val_sampler,
         )
 
         LOGGER.info(
@@ -205,7 +221,7 @@ class TaggingExperiment(BaseExperiment):
     def plot(self):
         plot_path = os.path.join(self.cfg.run_dir, f"plots_{self.cfg.run_idx}")
         os.makedirs(plot_path, exist_ok=True)
-        model_title = MODEL_TITLE_DICT[type(self.model.net).__name__]
+        model_title = self.cfg.model.net._target_.rsplit(".", 1)[-1]
         title = model_title
         LOGGER.info(f"Creating plots in {plot_path}")
 
