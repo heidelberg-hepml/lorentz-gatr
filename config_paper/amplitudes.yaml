@@ -15,6 +15,7 @@ training:
  lr: 1e-4
  batchsize: 256
  scheduler: null
+ validate_every_n_steps: 1252
 
 plot: true
 plotting:
