@@ -10,7 +10,7 @@ net:
  hidden_mv_channels: 8
 
  in_s_channels: 0
- out_s_channels: 1
+ out_s_channels: null
  hidden_s_channels: 8
 
  num_blocks: 4
