@@ -133,10 +133,9 @@ class AmplitudeExperiment(BaseExperiment):
 
             # preprocess data
             amplitudes_prepd, prepd_mean, prepd_std = preprocess_amplitude(amplitudes)
+            particles = particles / particles.std()
             if self.cfg.model.net._target_.rsplit(".", 1)[-1] in BASELINE_MODELS:
-                particles_prepd, _, _ = preprocess_particles(particles)
-            else:
-                particles_prepd = particles / particles.std()
+                particles_prepd, _, _ = preprocess_particles(particles)                
 
             # collect everything
             self.particles.append(particles)
