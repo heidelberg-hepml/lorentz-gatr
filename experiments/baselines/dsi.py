@@ -130,7 +130,7 @@ class DSI(nn.Module):
         if not self.inv_inited:
             self.inv_mean = invariants.mean(dim=-2, keepdim=True)
             self.inv_std = invariants.std(dim=-2, keepdim=True).clamp(min=1e-5)
-            self.inv_inited = torch.tensor(True, dtype=torch.bool)
+            self.inv_inited.fill_(True)
         invariants = (invariants - self.inv_mean) / self.inv_std
 
         return invariants
@@ -140,7 +140,7 @@ class DSI(nn.Module):
         if not self.part_inited:
             self.part_mean = particles.mean(dim=-2, keepdim=True)
             self.part_std = particles.std(dim=-2, keepdim=True).clamp(min=1e-5)
-            self.part_inited = torch.tensor(True, dtype=torch.bool)
+            self.part_inited.fill_(True)
         particles_prepd = (particles - self.part_mean) / self.part_std
 
         particles_prepd = particles_prepd.view(
