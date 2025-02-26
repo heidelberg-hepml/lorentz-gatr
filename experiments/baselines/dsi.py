@@ -127,6 +127,7 @@ class DSI(nn.Module):
         if not self.inv_inited:
             self.inv_mean = invariants.mean(dim=-2, keepdim=True)
             self.inv_std = invariants.std(dim=-2, keepdim=True).clamp(min=1e-5)
+            self.inv_inited.fill_(True)
         invariants = (invariants - self.inv_mean) / self.inv_std
 
         return invariants

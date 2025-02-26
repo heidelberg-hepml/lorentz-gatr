@@ -31,7 +31,7 @@ training:
  clip_grad_norm: 5
  clip_grad_value: null
  max_grad_norm: null
- log_every_n_steps: 100
+ log_every_n_steps: 1000
 
  optimizer : Adam
  lr: 3.e-4
