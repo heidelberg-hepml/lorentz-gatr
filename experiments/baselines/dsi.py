@@ -119,9 +119,6 @@ class DSI(nn.Module):
         self.register_buffer("inv_inited", torch.tensor(False, dtype=torch.bool))
         self.register_buffer("inv_mean", torch.zeros(1, 1, n_invariants))
         self.register_buffer("inv_std", torch.ones(1, 1, n_invariants))
-        self.register_buffer("part_inited", torch.tensor(False, dtype=torch.bool))
-        self.register_buffer("part_mean", torch.zeros(1, 1, 4 * n))
-        self.register_buffer("part_std", torch.ones(1, 1, 4 * n))
 
     def _compute_invariants(self, particles):
         invariants = compute_invariants(particles)
@@ -135,31 +132,16 @@ class DSI(nn.Module):
 
         return invariants
 
-    def _standardize_particles(self, particles):
-        particles = particles.view(*particles.shape[:-2], -1)
-        if not self.part_inited:
-            self.part_mean = particles.mean(dim=-2, keepdim=True)
-            self.part_std = particles.std(dim=-2, keepdim=True).clamp(min=1e-5)
-            self.part_inited.fill_(True)
-        particles_prepd = (particles - self.part_mean) / self.part_std
-
-        particles_prepd = particles_prepd.view(
-            *particles_prepd.shape[:-1], len(self.type_token_list), 4
-        )
-
-        return particles_prepd
-
     def forward(self, particles, type_token):
 
         # deep set preprocessing
-        particles_prepd = self._standardize_particles(particles)
         if self.use_deepset:
             assert len(type_token) == 1
             type_token = type_token[0]
             assert type_token.cpu().numpy().tolist() == self.type_token_list
             preprocessing = []
             for i in range(max(type_token) + 1):
-                identical_particles = particles_prepd[..., type_token == i, :]
+                identical_particles = particles[..., type_token == i, :]
                 embedding = self.prenets[i](identical_particles)
                 embedding = (
                     embedding.sum(dim=-2, keepdim=True)
@@ -168,9 +150,9 @@ class DSI(nn.Module):
                 )
                 preprocessing.append(embedding)
             preprocessing = torch.cat(preprocessing, dim=-2)
-            preprocessing = preprocessing.view(*particles_prepd.shape[:-2], -1)
+            preprocessing = preprocessing.view(*particles.shape[:-2], -1)
         else:
-            preprocessing = particles_prepd.view(*particles_prepd.shape[:-2], -1)
+            preprocessing = particles.view(*particles.shape[:-2], -1)
 
         # invariants
         if self.use_invariants:
