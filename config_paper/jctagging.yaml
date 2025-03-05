@@ -20,6 +20,9 @@ jc_params:
  steps_per_epoch: null
  steps_per_epoch_val: null
 
+training:
+ weight_decay: 0
+
 plotting:
  roc: false
  score: false

@@ -6,5 +6,8 @@ data:
  dataset: full
  add_scalar_features: false
 
+training:
+ weight_decay: 0.2
+
 defaults:
  - default_tagging
