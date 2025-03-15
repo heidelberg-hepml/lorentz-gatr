@@ -295,9 +295,7 @@ class AmplitudeExperiment(BaseExperiment):
 
                 y_pred = pred[0, ..., 0]
                 if self.cfg.heteroscedastic:
-                    std_prepd = torch.exp(
-                            pred[0, ..., 1] / 2
-                    )
+                    std_prepd = torch.exp(pred[0, ..., 1] / 2)
                     std_pred_prepd[idataset].append(std_prepd.cpu().float().numpy())
 
                 amplitudes_pred_prepd[idataset].append(y_pred.cpu().float().numpy())
@@ -423,17 +421,26 @@ class AmplitudeExperiment(BaseExperiment):
         plot_mixer(self.cfg, plot_path, title, plot_dict)
         LOGGER.info(f"Saving results in {plot_path}")
         np.save(os.path.join(plot_path, "results_test.npy"), plot_dict["results_test"])
-        np.save(os.path.join(plot_path, "results_train.npy"), plot_dict["results_train"])
+        np.save(
+            os.path.join(plot_path, "results_train.npy"), plot_dict["results_train"]
+        )
 
     def _init_loss(self):
         if self.cfg.heteroscedastic:
+
             def heteroscedastic_loss(y_true, pred):
+                dtype = torch.float64
                 y_pred, logsigma2 = pred[..., [0]], pred[..., [1]]
+                y_pred, logsigma2 = y_pred.to(dtype), logsigma2.to(dtype)
                 logsigma2 = torch.clamp(logsigma2, min=-30)
-                expression = (y_pred - y_true) ** 2 / (
-                    2 * logsigma2.exp()
-                ) + logsigma2 / 2 + np.log(2.0 * np.pi) / 2
+                reco = (y_pred - y_true) ** 2
+                expression = (
+                    reco / (2 * logsigma2.exp())
+                    + logsigma2 / 2
+                    + np.log(2.0 * np.pi) / 2
+                )
                 return expression.mean()
+
             self.loss = heteroscedastic_loss
         else:
             self.loss = torch.nn.MSELoss()

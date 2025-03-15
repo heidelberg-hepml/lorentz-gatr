@@ -1,14 +1,15 @@
 exp_type: amplitudes
 exp_name: amp_debug
+base_dir: /remote/gpu06/favaro/lorentz-gatr/lorentz-gatr
 
 data:
- dataset : [zgg]
- data_path : data/
+ dataset : [aag]
+ data_path : /remote/gpu06/favaro/datasets/amplitudes/
  subsample : 10000
  include_permsym: true
  train_test_val: [.4, .5, .1]
 
-heteroscedastic: True
+heteroscedastic: False
 train: true
 training:
  lr: 3e-4
@@ -18,6 +19,7 @@ plotting:
  histograms: true
  delta: true
  delta_prepd: true
+ pull: false
 
 defaults:
  - model: gatr_amplitudes
