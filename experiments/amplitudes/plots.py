@@ -338,6 +338,7 @@ def plot_delta_histogram(
     fig.savefig(file, format="pdf", bbox_inches="tight")
     plt.close()
 
+
 def plot_pull(
     file, pulls, labels, xlabel, title=None, xrange=None, bins=60, logy=False
 ):
