@@ -11,7 +11,7 @@ LAYOUT, _ = clifford.Cl(1, 3)
 
 def _sample_list_of_mv(batch_dims, rng):
     """Utility function that samples a list of multivectors."""
-    total_batchsize = 1 if not batch_dims else np.product(batch_dims)
+    total_batchsize = 1 if not batch_dims else np.prod(batch_dims)
     xs = clifford.randomMV(layout=LAYOUT, n=total_batchsize, rng=rng)
     if total_batchsize == 1:  # Dealing with inconsistency of clifford.randomMV
         xs = [xs]

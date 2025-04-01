@@ -10,6 +10,8 @@
 
 </div>
 
+> If you want to try L-GATr for yourself, please use the pip-installable [lgatr](https://github.com/heidelberg-hepml/lgatr) package. We will continue maintaining that version.
+
 This repository contains the official implementation of the **Lorentz-Equivariant Geometric Algebra Transformer (L-GATr)** by [Jonas Spinner](mailto:j.spinner@thphys.uni-heidelberg.de), [Víctor Bresó](mailto:breso@thphys.uni-heidelberg.de), Pim de Haan, Tilman Plehn, Huilin Qu, Jesse Thaler, and Johann Brehmer. L-GATr uses spacetime geometric algebra representations to construct Lorentz-equivariant layers and combines them into a transformer architecture.
 
 ![](img/gatr.png)
