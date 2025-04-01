@@ -22,7 +22,7 @@ class MLP(nn.Module):
         self.in_shape = in_shape
         self.out_shape = out_shape
 
-        layers: List[nn.Module] = [nn.Linear(np.product(in_shape), hidden_channels)]
+        layers: List[nn.Module] = [nn.Linear(np.prod(in_shape), hidden_channels)]
         if dropout_prob is not None:
             layers.append(nn.Dropout(dropout_prob))
         for _ in range(hidden_layers - 1):
@@ -32,7 +32,7 @@ class MLP(nn.Module):
                 layers.append(nn.Dropout(dropout_prob))
 
         layers.append(nn.GELU())
-        layers.append(nn.Linear(hidden_channels, np.product(self.out_shape)))
+        layers.append(nn.Linear(hidden_channels, np.prod(self.out_shape)))
         self.mlp = nn.Sequential(*layers)
 
     def forward(self, inputs: torch.Tensor):
