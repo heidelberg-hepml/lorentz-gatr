@@ -6,7 +6,7 @@ black==22.3.0
 h5py
 hdf5plugin
 matplotlib
-numpy>=1.25.0,<=1.26.4 # numpy>=1.25.0 is needed for pytorch-optimizer, numpy<=1.26.4 is needed for numba
+numpy
 
 ## Standard utils
 tqdm
@@ -18,18 +18,16 @@ opt_einsum
 torch>=2.2.0
 torch_geometric>=2.4.0
 torch-ema
-pytorch_optimizer>=3.2.0
+pytorch_optimizer>=3.0.0
 
 ## Experiment management
 hydra-core
 mlflow==2.4.1 # avoid database version issues
-optuna
 
 ## Project-specific: general
-clifford>=1.4.0
-numba==0.58.1 # clifford uses old numba code
-xformers==0.0.24 # there exists known compatibility issues with xformers on Mac systems
+xformers # required for attention on sparse tensors in tagging
 torchdiffeq # for CFM sampling
+clifford @ git+https://github.com/pygae/clifford # only used in tests
 
 #weaver packages
 tqdm>=4.41.0
