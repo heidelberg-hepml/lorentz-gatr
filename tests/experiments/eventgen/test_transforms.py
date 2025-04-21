@@ -101,7 +101,7 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
     x_fit = x.clone()
     for t in ts[:-1]:
         x_fit = t.forward(x)
-    ts[-1].init_fit([x])
+    ts[-1].init_fit([x_fit])
 
     for t in ts:
         x = t.forward(x)
@@ -194,7 +194,7 @@ def test_jacobians(transforms, distribution, experiment_np, nevents):
     x_fit = x.clone()
     for t in ts[:-1]:
         x_fit = t.forward(x)
-    ts[-1].init_fit([x])
+    ts[-1].init_fit([x_fit])
 
     x.requires_grad_()
     xs = [x.clone()]
@@ -322,7 +322,7 @@ def test_logdetjac(transforms, distribution, experiment_np, nevents):
     x_fit = x.clone()
     for t in ts[:-1]:
         x_fit = t.forward(x)
-    ts[-1].init_fit([x])
+    ts[-1].init_fit([x_fit])
 
     x.requires_grad_()
     xs = [x.clone()]

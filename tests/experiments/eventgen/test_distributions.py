@@ -1,7 +1,6 @@
 import pytest
 import torch
 
-import experiments.eventgen.coordinates as c
 from experiments.eventgen.distributions import (
     NaivePPPM2,
     NaivePPPLogM2,
