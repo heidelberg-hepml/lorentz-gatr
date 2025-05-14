@@ -40,6 +40,8 @@ In case you want to run our experiments, you first have to collect the datasets.
 python data/collect_data.py
 ```
 
+<span style="color:red">xformers on MacOS</span> The L-GATr tagger uses xformers' `xformers.ops.memory_efficient_attention` as attention backend, because it supports block-diagonal attention matrices that allow us to save a factor of ~2 of RAM usage compared to standard torch attention with zero-padding for different-length jets. Unfortunately, [xformers does not support MacOS anymore](https://github.com/facebookresearch/xformers/issues/775). For more details, have a look at the pip-installable L-GATr package at https://github.com/heidelberg-hepml/lgatr.
+
 ## 2. Running experiments
 
 You can run any of our experiments with the following commands, the results will be stored in a folder called `runs/exp_name/run_name`, where `exp_name` and `run_name` can be specified in the config file
