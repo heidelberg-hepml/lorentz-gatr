@@ -68,7 +68,7 @@ def main():
             for njets in range(5):
                 data = file[f"ttbar+{njets}jet"]
                 target_path = os.path.join(DATA_DIR, f"ttbar_{njets}j.npy")
-                np.save(data, target_path)
+                np.save(target_path, data)
                 print(f"Successfully created {target_path}")
 
 

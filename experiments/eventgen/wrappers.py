@@ -35,9 +35,41 @@ class MLPCFM(EventCFM):
 
 
 class EventCFMForGA(EventCFM):
-    def __init__(self, scalar_dims, *args, **kwargs):
+    def __init__(
+        self,
+        beam_reference,
+        add_time_reference,
+        two_beams,
+        num_spurions,
+        scalar_dims,
+        *args,
+        **kwargs,
+    ):
+        """
+        beam_reference : str
+            Type of beam reference used to break the Lorentz symmetry
+            Options: [None, "xyplane", "spacelike", "lightlike", "timelike"]
+            See gatr.interface.spurions.py::embed_spurions for details
+        two_beams : bool
+            If beam_reference in ["spacelike", "lightlike", "timelike"],
+            decide whether only (alpha,0,0,1) or both (alpha,0,0,+/-1) are included
+            See gatr.interface.spurions.py::embed_spurions for details
+        add_time_reference : bool
+            Whether time direction (1,0,0,0) is included to break Lorentz group down to SO(3)
+            This is formally required, because equivariant generation on non-compact groups is not possible
+            See gatr.interface.spurions.py::embed_spurions for details
+        scalar_dims : List[int]
+            Components within the used parametrization
+            for which the equivariantly predicted velocity (using multivector channels)
+            is overwritten by a scalar network output (using scalar channels)
+            This is required when cfm.coordinates contains log-transforms
+        """
         super().__init__(*args, **kwargs)
         self.scalar_dims = scalar_dims
+        self.num_spurions = num_spurions
+        self.beam_reference = beam_reference
+        self.add_time_reference = add_time_reference
+        self.two_beams = two_beams
         assert (np.array(scalar_dims) < 4).all() and (np.array(scalar_dims) >= 0).all()
 
     def get_velocity(self, x_straight, t, ijet):
@@ -67,22 +99,12 @@ class GAPCFM(EventCFMForGA):
     def __init__(
         self,
         net,
-        cfm,
-        beam_reference,
-        two_beams,
-        add_time_reference,
-        scalar_dims,
-        odeint,
+        *args,
+        **kwargs,
     ):
         # See GATrCFM.__init__ for documentation
-        super().__init__(
-            cfm,
-            odeint=odeint,
-        )
+        super().__init__(*args, **kwargs)
         self.net = net
-        self.beam_reference = beam_reference
-        self.two_beams = two_beams
-        self.add_time_reference = add_time_reference
 
     def embed_into_ga(self, x, t, ijet):
         # note: ijet is not used
@@ -105,6 +127,7 @@ class GAPCFM(EventCFMForGA):
         if beam is not None:
             beam = beam.unsqueeze(0).expand(*mv.shape[:-2], beam.shape[-2], 16)
             mv = torch.cat([mv, beam], dim=-2)
+        print(mv.shape, s.shape)
 
         return mv, s
 
@@ -155,58 +178,31 @@ class GATrCFM(EventCFMForGA):
     def __init__(
         self,
         net,
-        cfm,
         type_token_channels,
         process_token_channels,
-        beam_reference,
-        two_beams,
-        add_time_reference,
-        scalar_dims,
-        odeint,
+        spurion_token,
+        *args,
+        **kwargs,
     ):
         """
         Parameters
         ----------
         net : torch.nn.Module
-        cfm : Dict
-            Information about how to set up CFM (used in parent classes)
         type_token_channels : int
             Number of different particle id's
             Used for one-hot encoding to break permutation symmetry
         process_token_channels : int
             Number of different process id's
             Used for one-hot encoding to break permutation symmetry
-        beam_reference : str
-            Type of beam reference used to break the Lorentz symmetry
-            Options: [None, "xyplane", "spacelike", "lightlike", "timelike"]
-            See gatr.interface.spurions.py::embed_spurions for details
-        two_beams : bool
-            If beam_reference in ["spacelike", "lightlike", "timelike"],
-            decide whether only (alpha,0,0,1) or both (alpha,0,0,+/-1) are included
-            See gatr.interface.spurions.py::embed_spurions for details
-        add_time_reference : bool
-            Whether time direction (1,0,0,0) is included to break Lorentz group down to SO(3)
-            This is formally required, because equivariant generation on non-compact groups is not possible
-            See gatr.interface.spurions.py::embed_spurions for details
-        scalar_dims : List[int]
-            Components within the used parametrization
-            for which the equivariantly predicted velocity (using multivector channels)
-            is overwritten by a scalar network output (using scalar channels)
-            This is required when cfm.coordinates contains log-transforms
-        odeint : Dict
-            ODE solver settings to be passed to torchdiffeq.odeint
+        spurion_token: bool
+            Whether spurions should be included as extra tokens.
+            The alternative is extra channels.
         """
-        super().__init__(
-            scalar_dims,
-            cfm,
-            odeint,
-        )
+        super().__init__(*args, **kwargs)
         self.net = net
         self.type_token_channels = type_token_channels
         self.process_token_channels = process_token_channels
-        self.beam_reference = beam_reference
-        self.two_beams = two_beams
-        self.add_time_reference = add_time_reference
+        self.spurion_token = spurion_token
 
     def embed_into_ga(self, x, t, ijet):
         # scalar embedding
@@ -227,15 +223,39 @@ class GATrCFM(EventCFMForGA):
             dtype=mv.dtype,
         )
         if beam is not None:
-            beam = (
-                beam.unsqueeze(0)
-                .unsqueeze(0)
-                .expand(*mv.shape[:-2], beam.shape[-2], 16)
-            )
-            mv = torch.cat([mv, beam], dim=-2)
+            if not self.spurion_token:
+                # append spurions as extra channels
+                beam = (
+                    beam.unsqueeze(0)
+                    .unsqueeze(0)
+                    .expand(*mv.shape[:-2], self.num_spurions, 16)
+                )
+                mv = torch.cat([mv, beam], dim=-2)
+            else:
+                # append spurions as extra tokens
+                beam = (
+                    beam.unsqueeze(0)
+                    .unsqueeze(-2)
+                    .repeat(mv.shape[0], 1, beam.shape[-2], 1)
+                )
+                mv = mv.repeat(1, 1, self.num_spurions, 1)
+                mv = torch.cat([mv, beam], dim=1)
+                s_beam = torch.zeros(
+                    s.shape[0],
+                    beam.shape[1],
+                    s.shape[2],
+                    dtype=s.dtype,
+                    device=s.device,
+                )
+                s = torch.cat([s, s_beam], dim=1)
 
         return mv, s
 
     def extract_from_ga(self, mv, s):
         v = extract_vector(mv).squeeze(dim=-2)
+        if self.spurion_token:
+            # remove spurion tokens
+            v = v[:, : -self.num_spurions]
+            s = s[:, : -self.num_spurions]
+
         return v, s

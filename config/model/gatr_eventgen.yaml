@@ -3,6 +3,8 @@ beam_reference: xyplane
 two_beams: false
 add_time_reference: true
 scalar_dims: [0, 3]
+spurion_token: false
+num_spurions: null
 
 net:
  _target_: gatr.nets.GATr

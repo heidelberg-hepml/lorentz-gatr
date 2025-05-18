@@ -25,6 +25,7 @@ class EventGenerationExperiment(BaseExperiment):
         self.modelname = self.cfg.model.net._target_.rsplit(".", 1)[-1]
         n_particles = self.n_hard_particles + max(self.cfg.data.n_jets)
         n_datasets = len(self.cfg.data.n_jets)
+
         with open_dict(self.cfg):
             # preparation for joint training
             if self.modelname in ["GATr", "Transformer"]:
@@ -54,17 +55,23 @@ class EventGenerationExperiment(BaseExperiment):
 
             # extra treatment for lorentz-symmetry breaking inputs in equivariant models
             if self.modelname in ["GATr", "GAP"]:
-                if self.cfg.model.beam_reference is not None:
-                    self.cfg.model.net.in_mv_channels += (
-                        2
-                        if (
-                            self.cfg.model.two_beams
-                            and self.cfg.model.beam_reference != "xyplane"
-                        )
-                        else 1
-                    )
+                num_spurions = 0
                 if self.cfg.model.add_time_reference:
-                    self.cfg.model.net.in_mv_channels += 1
+                    num_spurions += 1
+                if self.cfg.model.beam_reference is not None:
+                    num_spurions += 1
+                    if (
+                        self.cfg.model.two_beams
+                        and not self.cfg.model.beam_reference == "xyplane"
+                    ):
+                        num_spurions += 1
+                self.cfg.model.num_spurions = num_spurions
+                if self.modelname == "GAP":
+                    self.cfg.model.net.in_mv_channels += num_spurions
+                elif not self.cfg.model.spurion_token:
+                    self.cfg.model.net.in_mv_channels = 1 + num_spurions
+                else:
+                    self.cfg.model.net.in_mv_channels = max(1, num_spurions)
 
             # copy model-specific parameters
             if self.modeltype == "CFM":
