@@ -8,6 +8,7 @@ data:
  include_permsym: true
  train_test_val: [.4, .5, .1]
 
+heteroscedastic: False
 train: true
 training:
  lr: 3e-4
@@ -17,6 +18,7 @@ plotting:
  histograms: true
  delta: true
  delta_prepd: true
+ pull: false
 
 defaults:
  - model: gatr_amplitudes
