@@ -1,6 +1,5 @@
 import pytest
 import torch
-import numpy as np
 
 import experiments.eventgen.coordinates as c
 from experiments.eventgen.distributions import (

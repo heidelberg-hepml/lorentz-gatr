@@ -100,8 +100,8 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
     # this does nothing, except for StandardNormal
     x_fit = x.clone()
     for t in ts[:-1]:
-        x_fit = t.forward(x)
-    ts[-1].init_fit([x])
+        x_fit = t.forward(x, **kwargs)
+    ts[-1].init_fit([x_fit])
 
     for t in ts:
         x = t.forward(x)
@@ -193,8 +193,8 @@ def test_jacobians(transforms, distribution, experiment_np, nevents):
     # this does nothing, except for StandardNormal
     x_fit = x.clone()
     for t in ts[:-1]:
-        x_fit = t.forward(x)
-    ts[-1].init_fit([x])
+        x_fit = t.forward(x, **kwargs)
+    ts[-1].init_fit([x_fit])
 
     x.requires_grad_()
     xs = [x.clone()]
@@ -321,8 +321,8 @@ def test_logdetjac(transforms, distribution, experiment_np, nevents):
     # this does nothing, except for StandardNormal
     x_fit = x.clone()
     for t in ts[:-1]:
-        x_fit = t.forward(x)
-    ts[-1].init_fit([x])
+        x_fit = t.forward(x, **kwargs)
+    ts[-1].init_fit([x_fit])
 
     x.requires_grad_()
     xs = [x.clone()]
