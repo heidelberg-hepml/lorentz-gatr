@@ -9,8 +9,13 @@
 [![black](https://img.shields.io/badge/Code%20Style-Black-black.svg?labelColor=gray)](https://black.readthedocs.io/en/stable/)
 
 </div>
-
-> If you want to try L-GATr for yourself, please use the pip-installable [lgatr](https://github.com/heidelberg-hepml/lgatr) package. We will continue maintaining that version.
+<div align="center">
+  <h3 style="color: white; background-color: #d9534f; padding: 0.5em; border-radius: 4px;">
+    ⚠️ This repository is archived ⚠️ </br>
+    If you want to try L-GATr for yourself, </br>
+    please have a look at <a href="https://github.com/heidelberg-hepml/lgatr" style="color: white; text-decoration: underline;">heidelberg-hepml/lgatr</a>.
+  </h3>
+</div>
 
 This repository contains the official implementation of the **Lorentz-Equivariant Geometric Algebra Transformer (L-GATr)** by [Jonas Spinner](mailto:j.spinner@thphys.uni-heidelberg.de), [Víctor Bresó](mailto:breso@thphys.uni-heidelberg.de), Pim de Haan, Tilman Plehn, Huilin Qu, Jesse Thaler, and Johann Brehmer. L-GATr uses spacetime geometric algebra representations to construct Lorentz-equivariant layers and combines them into a transformer architecture.
 
@@ -281,7 +286,6 @@ Here we list some additional functional elements of the code that are not explic
 5. Switches to control the geometric algebra representations  under `ga_settings` in `config/default.yaml`, e.g. to turn off the bivector representations, turn off the geometric product, or have equivariance under the full Lorentz group including parity and time reversal
 6. Features of the original GATr repo that we do not use: Positional encodings, axial transformer and axial L-GATr build
 7. More options for the transformer architecture: `dropout`, several activation functions (`relu`, `gelu`, `sigmoid`), `multi_query` attention, `increase_hidden_channels` option for the transformer MLP, `double_layernorm` before and after attention/MLP blocks, `head_scale` (learnable coefficients for each attention head), option to reinsert input channels in each attention step
-8. `CrossAttention`, `ConditionalGATrBlock`, `ConditionalGATr` as GATr versions of `torch.nn.TransformerDecoderLayer` and `torch.nn.Transformer`. They are covered by unit tests, but we did not use them in any experiments yet.
 
 ## 5. Citation
 
