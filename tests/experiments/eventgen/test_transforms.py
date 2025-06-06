@@ -9,6 +9,7 @@ from experiments.eventgen.distributions import (
     StandardPPPLogM2,
     StandardLogPtPhiEtaLogM2,
 )
+from experiments.eventgen.coordinates import PtPhiEtaM2
 from experiments.eventgen.processes import ttbarExperiment
 from tests.helpers import TOLERANCES
 
@@ -50,6 +51,11 @@ def test_simple():
             tr.M2_to_LogM2,
             tr.Pt_to_LogPt,
             tr.StandardNormal,
+        ],
+        [
+            tr.EPPP_to_PtPhiEtaE,
+            tr.PtPhiEtaE_to_PtPhiEtaM2,
+            tr.PtPhiEtaM2_to_PtPhiEtaM2Relative,
         ],
     ],
 )
@@ -96,6 +102,13 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
     fourmomenta_original = d.sample(shape, device, dtype)
     x = fourmomenta_original.clone()
 
+    kwargs = {}
+    if tr.PtPhiEtaM2_to_PtPhiEtaM2Relative in transforms:
+        coordinates = PtPhiEtaM2()
+        jet = x.sum(dim=-2, keepdim=True).expand(x.shape)
+        jet_x = coordinates.fourmomenta_to_x(jet)
+        kwargs["jet"] = jet_x
+
     # init_fit (has to be done manually in this case
     # this does nothing, except for StandardNormal
     x_fit = x.clone()
@@ -104,13 +117,13 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
     ts[-1].init_fit([x_fit])
 
     for t in ts:
-        x = t.forward(x)
+        x = t.forward(x, **kwargs)
     x_original = x.clone()
     for t in ts[::-1]:
-        x = t.inverse(x)
+        x = t.inverse(x, **kwargs)
     fourmomenta_transformed = x.clone()
     for t in ts:
-        x = t.forward(x)
+        x = t.forward(x, **kwargs)
     x_transformed = x.clone()
 
     torch.testing.assert_close(
@@ -143,6 +156,11 @@ def test_invertibility(transforms, distribution, experiment_np, nevents):
             tr.M2_to_LogM2,
             tr.Pt_to_LogPt,
             tr.StandardNormal,
+        ],
+        [
+            tr.EPPP_to_PtPhiEtaE,
+            tr.PtPhiEtaE_to_PtPhiEtaM2,
+            tr.PtPhiEtaM2_to_PtPhiEtaM2Relative,
         ],
     ],
 )
@@ -189,6 +207,13 @@ def test_jacobians(transforms, distribution, experiment_np, nevents):
     fourmomenta_original = d.sample(shape, device, dtype)
     x = fourmomenta_original.clone()
 
+    kwargs = {}
+    if tr.PtPhiEtaM2_to_PtPhiEtaM2Relative in transforms:
+        coordinates = PtPhiEtaM2()
+        jet = x.sum(dim=-2, keepdim=True).expand(x.shape)
+        jet_x = coordinates.fourmomenta_to_x(jet)
+        kwargs["jet"] = jet_x
+
     # init_fit (has to be done manually in this case
     # this does nothing, except for StandardNormal
     x_fit = x.clone()
@@ -199,15 +224,15 @@ def test_jacobians(transforms, distribution, experiment_np, nevents):
     x.requires_grad_()
     xs = [x.clone()]
     for t in ts[:-1]:
-        x = t.forward(x)
+        x = t.forward(x, **kwargs)
         xs.append(x.clone())
     x = xs[-1]
-    y = ts[-1].forward(x)
-    z = ts[-1].inverse(y)
+    y = ts[-1].forward(x, **kwargs)
+    z = ts[-1].inverse(y, **kwargs)
 
     # jacobians from code
-    jac_fw = ts[-1]._jac_forward(x, y)
-    jac_inv = ts[-1]._jac_inverse(y, z)
+    jac_fw = ts[-1]._jac_forward(x, y, **kwargs)
+    jac_inv = ts[-1]._jac_inverse(y, z, **kwargs)
 
     # test jacobian invertibility
     diag_left = torch.einsum("...ij,...jk->...ik", jac_fw, jac_inv)
@@ -272,6 +297,11 @@ def test_jacobians(transforms, distribution, experiment_np, nevents):
             tr.Pt_to_LogPt,
             tr.StandardNormal,
         ],
+        [
+            tr.EPPP_to_PtPhiEtaE,
+            tr.PtPhiEtaE_to_PtPhiEtaM2,
+            tr.PtPhiEtaM2_to_PtPhiEtaM2Relative,
+        ],
     ],
 )
 @pytest.mark.parametrize(
@@ -317,6 +347,13 @@ def test_logdetjac(transforms, distribution, experiment_np, nevents):
     fourmomenta_original = d.sample(shape, device, dtype)
     x = fourmomenta_original.clone()
 
+    kwargs = {}
+    if tr.PtPhiEtaM2_to_PtPhiEtaM2Relative in transforms:
+        coordinates = PtPhiEtaM2()
+        jet = x.sum(dim=-2, keepdim=True).expand(x.shape)
+        jet_x = coordinates.fourmomenta_to_x(jet)
+        kwargs["jet"] = jet_x
+
     # init_fit (has to be done manually in this case
     # this does nothing, except for StandardNormal
     x_fit = x.clone()
@@ -327,15 +364,15 @@ def test_logdetjac(transforms, distribution, experiment_np, nevents):
     x.requires_grad_()
     xs = [x.clone()]
     for t in ts[:-1]:
-        x = t.forward(x)
+        x = t.forward(x, **kwargs)
         xs.append(x.clone())
     x = xs[-1]
-    y = ts[-1].forward(x)
-    z = ts[-1].inverse(y)
+    y = ts[-1].forward(x, **kwargs)
+    z = ts[-1].inverse(y, **kwargs)
 
     # logdetjac from code
-    logdetjac_fw = ts[-1].logdetjac_forward(x, y)
-    logdetjac_inv = ts[-1].logdetjac_inverse(y, z)
+    logdetjac_fw = ts[-1].logdetjac_forward(x, y, **kwargs)
+    logdetjac_inv = ts[-1].logdetjac_inverse(y, z, **kwargs)
 
     # logdetjac from autograd
     jac_fw_autograd, jac_inv_autograd = [], []

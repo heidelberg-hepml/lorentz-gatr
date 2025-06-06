@@ -16,72 +16,72 @@ class BaseCoordinates:
         self.contains_mass = False
         self.transforms = []
 
-    def init_fit(self, fourmomenta_list):
+    def init_fit(self, fourmomenta_list, **kwargs):
         # only does something for StandardNormal()
         # requires that StandardNormal() comes last in self.transforms
         x_list = [fourmomenta.clone() for fourmomenta in fourmomenta_list]
         for transform in self.transforms[:-1]:
-            x_list = [transform.forward(x) for x in x_list]
+            x_list = [transform.forward(x, **kwargs) for x in x_list]
         self.transforms[-1].init_fit(x_list)
 
     def init_unit(self, particles_list):
         self.transforms[-1].init_unit(particles_list)
 
-    def fourmomenta_to_x(self, a_in):
+    def fourmomenta_to_x(self, a_in, **kwargs):
         assert torch.isfinite(a_in).all()
         a = a_in.to(dtype=DTYPE)
         for transform in self.transforms:
-            a = transform.forward(a)
+            a = transform.forward(a, **kwargs)
         return a.to(dtype=a_in.dtype)
 
-    def x_to_fourmomenta(self, a_in):
+    def x_to_fourmomenta(self, a_in, **kwargs):
         assert torch.isfinite(a_in).all()
         a = a_in.to(dtype=DTYPE)
         for transform in self.transforms[::-1]:
-            a = transform.inverse(a)
+            a = transform.inverse(a, **kwargs)
         return a.to(dtype=a_in.dtype)
 
-    def velocity_fourmomenta_to_x(self, v_in, a_in):
+    def velocity_fourmomenta_to_x(self, v_in, a_in, **kwargs):
         assert torch.isfinite(a_in).all() and torch.isfinite(v_in).all()
         v, a = v_in.to(dtype=DTYPE), a_in.to(dtype=DTYPE)
         for transform in self.transforms:
-            b = transform.forward(a)
-            v = transform.velocity_forward(v, a, b)
+            b = transform.forward(a, **kwargs)
+            v = transform.velocity_forward(v, a, b, **kwargs)
             a = b
         return v.to(dtype=v_in.dtype), a.to(dtype=a_in.dtype)
 
-    def velocity_x_to_fourmomenta(self, v_in, a_in):
+    def velocity_x_to_fourmomenta(self, v_in, a_in, **kwargs):
         assert torch.isfinite(a_in).all() and torch.isfinite(v_in).all()
         v, a = v_in.to(dtype=DTYPE), a_in.to(dtype=DTYPE)
         for transform in self.transforms[::-1]:
-            b = transform.inverse(a)
-            v = transform.velocity_inverse(v, a, b)
+            b = transform.inverse(a, **kwargs)
+            v = transform.velocity_inverse(v, a, b, **kwargs)
             a = b
         return v.to(dtype=v_in.dtype), a.to(dtype=a_in.dtype)
 
-    def logdetjac_fourmomenta_to_x(self, a_in):
+    def logdetjac_fourmomenta_to_x(self, a_in, **kwargs):
         # logdetjac = log|da/db| = -log|db/da| with a=fourmomenta, b=x
         assert torch.isfinite(a_in).all()
         a = a_in.to(dtype=DTYPE)
-        b = self.transforms[0].forward(a)
-        logdetjac = -self.transforms[0].logdetjac_forward(a, b)
+        b = self.transforms[0].forward(a, **kwargs)
+        logdetjac = -self.transforms[0].logdetjac_forward(a, b, **kwargs)
         a = b
         for transform in self.transforms[1:]:
-            b = transform.forward(a)
-            logdetjac -= transform.logdetjac_forward(a, b)
+            b = transform.forward(a, **kwargs)
+            logdetjac -= transform.logdetjac_forward(a, b, **kwargs)
             a = b
         return logdetjac.to(dtype=a_in.dtype), a.to(dtype=a_in.dtype)
 
-    def logdetjac_x_to_fourmomenta(self, a_in):
+    def logdetjac_x_to_fourmomenta(self, a_in, **kwargs):
         # logdetjac = log|da/db| = -log|db/da| with a=x, b=fourmomenta
         assert torch.isfinite(a_in).all()
         a = a_in.to(dtype=DTYPE)
-        b = self.transforms[-1].inverse(a)
-        logdetjac = -self.transforms[-1].logdetjac_inverse(a, b)
+        b = self.transforms[-1].inverse(a, **kwargs)
+        logdetjac = -self.transforms[-1].logdetjac_inverse(a, b, **kwargs)
         a = b
         for transform in self.transforms[::-1][1:]:
-            b = transform.inverse(a)
-            logdetjac -= transform.logdetjac_inverse(a, b)
+            b = transform.inverse(a, **kwargs)
+            logdetjac -= transform.logdetjac_inverse(a, b, **kwargs)
             a = b
         return logdetjac.to(dtype=a_in.dtype), a.to(dtype=a_in.dtype)
 
@@ -212,4 +212,17 @@ class StandardLogPtPhiEtaLogM2(BaseCoordinates):
             tr.Pt_to_LogPt(pt_min, units),
             tr.M2_to_LogM2(),
             tr.StandardNormal([1], onshell_list),
+        ]
+
+
+class PtPhiEtaM2Relative(BaseCoordinates):
+    # (pt/pt_jet, phi-phi_jet, eta-eta_jet, log(m^2))
+    def __init__(self):
+        super().__init__()
+        self.contains_phi = True
+        self.contains_mass = True
+        self.transforms = [
+            tr.EPPP_to_PtPhiEtaE(),
+            tr.PtPhiEtaE_to_PtPhiEtaM2(),
+            tr.PtPhiEtaM2_to_PtPhiEtaM2Relative(),
         ]

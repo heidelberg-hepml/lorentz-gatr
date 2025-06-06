@@ -27,6 +27,7 @@ from tests.helpers import TOLERANCES
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaLogM2,
         c.StandardLogPtPhiEtaLogM2,
+        c.PtPhiEtaM2Relative,
     ],
 )
 @pytest.mark.parametrize(
@@ -75,13 +76,22 @@ def test_invertibility(coordinates, distribution, experiment_np, nevents):
     shape = (nevents, nparticles, 4)
     fourmomenta_original = d.sample(shape, device, dtype)
 
+    kwargs = {}
+    if coordinates == c.PtPhiEtaM2Relative:
+        coordinates = c.PtPhiEtaM2()
+        jet = fourmomenta_original.sum(dim=-2, keepdim=True).expand(
+            fourmomenta_original.shape
+        )
+        jet_x = coordinates.fourmomenta_to_x(jet)
+        kwargs["jet"] = jet_x
+
     # init_fit (this does nothing, except for FitNormal)
-    coord.init_fit([fourmomenta_original])
+    coord.init_fit([fourmomenta_original], **kwargs)
 
     # forward and inverse transform
-    x_original = coord.fourmomenta_to_x(fourmomenta_original)
-    fourmomenta_transformed = coord.x_to_fourmomenta(x_original)
-    x_transformed = coord.fourmomenta_to_x(fourmomenta_transformed)
+    x_original = coord.fourmomenta_to_x(fourmomenta_original, **kwargs)
+    fourmomenta_transformed = coord.x_to_fourmomenta(x_original, **kwargs)
+    x_transformed = coord.fourmomenta_to_x(fourmomenta_transformed, **kwargs)
 
     torch.testing.assert_close(
         fourmomenta_original, fourmomenta_transformed, **TOLERANCES
@@ -104,6 +114,7 @@ def test_invertibility(coordinates, distribution, experiment_np, nevents):
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaLogM2,
         c.StandardLogPtPhiEtaLogM2,
+        c.PtPhiEtaM2Relative,
     ],
 )
 @pytest.mark.parametrize(
@@ -148,13 +159,20 @@ def test_velocity(coordinates, distribution, experiment_np, nevents):
     shape = (nevents, nparticles, 4)
     x = d.sample(shape, device, dtype)
 
+    kwargs = {}
+    if coordinates == c.PtPhiEtaM2Relative:
+        coordinates = c.PtPhiEtaM2()
+        jet = x.sum(dim=-2, keepdim=True).expand(x.shape)
+        jet_x = coordinates.fourmomenta_to_x(jet)
+        kwargs["jet"] = jet_x
+
     # init_fit (this does nothing, except for FitNormal)
-    coord.init_fit([x])
+    coord.init_fit([x], **kwargs)
 
     x.requires_grad_()
     v_x = torch.randn_like(x)
-    v_y, y = coord.velocity_fourmomenta_to_x(v_x, x)
-    v_z, z = coord.velocity_x_to_fourmomenta(v_y, y)
+    v_y, y = coord.velocity_fourmomenta_to_x(v_x, x, **kwargs)
+    v_z, z = coord.velocity_x_to_fourmomenta(v_y, y, **kwargs)
 
     # jacobians from autograd
     jac_fw_autograd, jac_inv_autograd = [], []
@@ -204,6 +222,7 @@ def test_velocity(coordinates, distribution, experiment_np, nevents):
         c.LogPtPhiEtaM2,
         c.LogPtPhiEtaLogM2,
         c.StandardLogPtPhiEtaLogM2,
+        c.PtPhiEtaM2Relative,
     ],
 )
 @pytest.mark.parametrize(
@@ -248,12 +267,19 @@ def test_logdetjac(coordinates, distribution, experiment_np, nevents):
     shape = (nevents, nparticles, 4)
     x = d.sample(shape, device, dtype)
 
+    kwargs = {}
+    if coordinates == c.PtPhiEtaM2Relative:
+        coordinates = c.PtPhiEtaM2()
+        jet = x.sum(dim=-2, keepdim=True).expand(x.shape)
+        jet_x = coordinates.fourmomenta_to_x(jet)
+        kwargs["jet"] = jet_x
+
     # init_fit (this does nothing, except for FitNormal)
-    coord.init_fit([x])
+    coord.init_fit([x], **kwargs)
 
     x.requires_grad_()
-    logdetjac_fw, y = coord.logdetjac_fourmomenta_to_x(x)
-    logdetjac_inv, z = coord.logdetjac_x_to_fourmomenta(y)
+    logdetjac_fw, y = coord.logdetjac_fourmomenta_to_x(x, **kwargs)
+    logdetjac_inv, z = coord.logdetjac_x_to_fourmomenta(y, **kwargs)
 
     # jacobians from autograd
     jac_fw_autograd, jac_inv_autograd = [], []
